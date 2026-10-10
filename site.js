@@ -68,7 +68,7 @@
         ${p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
       </div>
       ${p.usd || p.ars ? `<button class="add" data-add="${p.id}">Agregar <span aria-hidden="true">+</span></button>`
-        : `<a class="add" href="${waLink(`¡Hola! Quiero consultar el precio de: ${p.name}`)}" target="_blank" rel="noopener">Consultar</a>`}
+        : `<a class="add" href="${waLink(`¡Hola! Quiero consultar el precio de: ${p.name}`)}" target="_blank" rel="noopener" data-consulta="${p.id}">Consultar</a>`}
     </article>`;
 
   // ---------- WhatsApp ----------
@@ -172,7 +172,7 @@
         </div>
         <div>
           <h4>Tienda</h4>
-          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h4>Contacto</h4>
@@ -207,6 +207,9 @@
   document.querySelectorAll("[data-cfg]").forEach((el) => (el.textContent = CONFIG[el.dataset.cfg]));
   window.addEventListener("scroll", () => $("#nav").classList.toggle("scrolled", scrollY > 30), { passive: true });
 
+  // Actividad para el panel (qué buscan y qué consultan)
+  const evento = (tipo, dato = "", producto = "") => { try { fetch("/api/evento", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ tipo, dato, producto }) }).catch(() => {}); } catch {} };
+  let ultimaVacia = "";
   const normQ = (x) => String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const buscar = (q) => { const w = normQ(q).split(/\s+/).filter(Boolean); return PRODUCTS.filter((p) => !p.agotado && w.every((x) => normQ([p.name, p.brand, p.model, p.cat, p.desc].join(" ")).includes(x))); };
   const sugg = $("#sugg"), navQ = $("#navQ");
@@ -219,6 +222,8 @@
       ? r.slice(0, 6).map((p) => `<a role="option" href="/producto/${p.id}" ${home ? `data-view="${p.id}"` : ""} class="sugg-item">${art(p)}<span><b>${esc(p.name)}</b><small>${esc(p.brand || p.cat)}</small></span>${priceHTML(p)}</a>`).join("") +
         (r.length > 6 ? `<button type="submit" class="sugg-all">Ver los ${r.length} resultados →</button>` : "")
       : `<p class="sugg-none">No lo tenemos cargado. <a href="/contacto#pedido">Pedilo por encargo</a>.</p>`;
+    clearTimeout(navQ._t);
+    if (!r.length) navQ._t = setTimeout(() => { if (q.length >= 3 && q !== ultimaVacia && !q.startsWith(ultimaVacia || "\u0000")) { ultimaVacia = q; evento("busqueda_vacia", q); } }, 1500);
     sugg.hidden = false; navQ.setAttribute("aria-expanded", "true");
   });
   navQ.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarSugg(); if (e.key === "ArrowDown") { e.preventDefault(); sugg.querySelector("a")?.focus(); } });
@@ -235,7 +240,7 @@
     e.preventDefault();
     const q = $("#navQ").value.trim();
     cerrarSugg();
-    if (q && !buscar(q).length) { try { const b = JSON.parse(localStorage.getItem("tdv-busquedas") || "[]"); b.unshift(q); localStorage.setItem("tdv-busquedas", JSON.stringify(b.slice(0, 50))); } catch {} }
+    if (q && !buscar(q).length) evento("busqueda_vacia", q);
     if (home && window.TDV_SEARCH) window.TDV_SEARCH(q);
     else location.href = "/?q=" + encodeURIComponent(q) + "#catalogo";
   });
@@ -365,7 +370,9 @@
     Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir });
     store.set("tdv-datos", datos);
     const now = new Date();
-    const num = `TDV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 900) + 100)}`;
+    const num = `TDV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(10)), (x) => "abcdefghijkmnpqrstuvwxyz23456789"[x % 32]).join("");
+    const seguir = `${CONFIG.sitio}/seguimiento#${num}.${token}`;
     const lines = cart.map((l) => {
       const i = lineInfo(l);
       const link = l.kit ? "" : `\n  ${CONFIG.sitio}/producto/${l.id}`;
@@ -373,9 +380,16 @@
     });
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())} + envío\n\n` +
       `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.entrega === "Envío en el día (CABA)" ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}` : "") +
-      (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "");
+      (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
+    // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
+    try {
+      fetch("/api/pedido", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({
+        num, token, totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (!l.kit && byId[l.id].usd ? byId[l.id].usd * l.qty : 0), 0) || null,
+        cliente: d, items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, kit: l.kit || "", name: i.name, sub: i.sub, qty: l.qty, label: i.label, unitArs: Math.round(i.unit), usd: !l.kit && byId[l.id].usd ? byId[l.id].usd : null }; }),
+      }) }).catch(() => {});
+    } catch {}
     const pedidos = store.get("tdv-pedidos", []);
-    pedidos.unshift({ num, fecha: now.toISOString(), total: total(), items: cart.map((l) => ({ ...l })) });
+    pedidos.unshift({ num, token, fecha: now.toISOString(), total: total(), items: cart.map((l) => ({ ...l })) });
     store.set("tdv-pedidos", pedidos.slice(0, 20));
     window.open(waLink(msg), "_blank", "noopener");
     cart = []; save(); step = "listo";
@@ -383,6 +397,7 @@
     $("#drawerTitle").textContent = "¡Pedido enviado!";
     $("#drawerBody").innerHTML = `<div class="cart-empty done"><div>✈️</div><h4>Gracias, ${esc(d.nombre.split(" ")[0])}</h4>
       <p>Tu pedido <b>${num}</b> se abrió en WhatsApp. Enviá el mensaje y te confirmamos stock, envío y forma de pago.</p>
+      <p><a class="btn btn-ghost" href="/seguimiento#${num}.${token}">Seguí tu pedido</a></p>
       ${avisoHorario() ? `<p class="small">${esc(avisoHorario())}.</p>` : ""}
       <p class="muted small">¿No se abrió WhatsApp? Escribinos al ${esc(CONFIG.whatsappVisible)} con el número de pedido.</p></div>`;
     $("#drawerFoot").innerHTML = `<button class="btn btn-primary btn-block" id="doneBtn">Seguir comprando</button>`;
@@ -398,6 +413,10 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCart(); });
 
   document.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-consulta],[data-quiero]");
+    if (c) evento(c.dataset.quiero ? "lo_quiero" : "consulta", "", c.dataset.quiero || c.dataset.consulta);
+  });
+  document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-add],[data-inc],[data-dec],[data-fav]");
     if (!t) return;
     if (t.dataset.add) { const p = byId[t.dataset.add]; add({ id: p.id, variante: p.variantes ? p.variantes[0] : "" }, p.name); }
@@ -407,7 +426,7 @@
   });
 
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, get favs() { return favs; } };
+  window.TDV = { evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, get favs() { return favs; } };
   renderCart();
   window.dispatchEvent(new Event("tdv:listo"));
 })();

@@ -48,6 +48,32 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists oferta_hasta date`);
     await q(`alter table tdv_productos add column if not exists video text not null default ''`);
     await q(`alter table tdv_productos enable row level security`).catch(() => {});
+    await q(`create table if not exists tdv_pedidos (
+      num text primary key,
+      token text not null,
+      creado timestamptz not null default now(),
+      estado text not null default 'nuevo',
+      cliente_tel text not null default '',
+      cliente jsonb not null default '{}',
+      items jsonb not null default '[]',
+      total_ars numeric, usd_sub numeric,
+      cobrado_ars numeric, cobrado_usd numeric, pagado_en timestamptz,
+      envio_empresa text not null default '', envio_codigo text not null default '', enviado_en timestamptz,
+      notas text not null default '', stock_descontado boolean not null default false,
+      historial jsonb not null default '[]'
+    )`);
+    await q(`create index if not exists tdv_pedidos_creado on tdv_pedidos (creado desc)`);
+    await q(`create table if not exists tdv_clientes (
+      tel text primary key, nombre text not null default '', dni text not null default '',
+      cumple date, escuela text not null default '', notas text not null default '',
+      creado timestamptz not null default now()
+    )`);
+    await q(`create table if not exists tdv_eventos (
+      id bigserial primary key, tipo text not null, dato text not null default '', producto text not null default '',
+      creado timestamptz not null default now()
+    )`);
+    await q(`create index if not exists tdv_eventos_creado on tdv_eventos (creado desc)`);
+    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       await fetch(`${SUPA_URL}/storage/v1/bucket`, {
         method: "POST", headers: supaHeaders({ "content-type": "application/json" }),
@@ -139,6 +165,26 @@ export function conSesion(req) {
 }
 
 // ---------- Utilidades de respuesta ----------
+// ---------- Pedidos y clientes ----------
+export const ESTADOS = ["nuevo", "señado", "pagado", "enviado", "entregado", "cancelado"];
+export const VENDIDOS = ["pagado", "enviado", "entregado"];
+// Teléfono argentino a formato internacional para WhatsApp (5491112345678)
+export function telWa(t) {
+  let d = String(t || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("54")) return d.startsWith("549") ? d : "549" + d.slice(2);
+  if (d.startsWith("0")) d = d.slice(1);
+  if (d.length === 10) return "549" + d;
+  if (d.length === 8) return "54911" + d;
+  return d;
+}
+export function nivel(compras) { return compras >= 4 ? "Comandante" : compras >= 2 ? "Piloto" : compras >= 1 ? "Alumno" : "Interesado"; }
+export function pedidoAdmin(r) {
+  return { num: r.num, token: r.token, creado: r.creado, estado: r.estado, tel: r.cliente_tel, cliente: r.cliente, items: r.items,
+    totalArs: num(r.total_ars), usdSub: num(r.usd_sub), cobradoArs: num(r.cobrado_ars), cobradoUsd: num(r.cobrado_usd), pagadoEn: r.pagado_en,
+    envioEmpresa: r.envio_empresa, envioCodigo: r.envio_codigo, enviadoEn: r.enviado_en, notas: r.notas, stockDescontado: r.stock_descontado, historial: r.historial };
+}
+
 export const body = (req) => (typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {});
 export function send(res, code, data) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

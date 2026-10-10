@@ -188,6 +188,7 @@
       $("#pvWant").href = waLink(`¡Hola! Lo quiero: ${p.name}${p.brand ? ` (${p.brand}${p.model ? " " + p.model : ""})` : ""}${op ? `\nOpción: ${op}` : ""}${precio ? `\nPrecio: ${precio}` : ""}\n${CONFIG.sitio}/producto/${p.id}`);
     };
     $("#pvVariant").onchange = loQuiero; loQuiero();
+    $("#pvWant").dataset.quiero = p.id; $("#pvAsk").dataset.consulta = p.id;
     $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar precio por WhatsApp";
     setWa(consulta);
     const yt = (p.video || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/);

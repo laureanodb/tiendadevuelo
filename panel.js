@@ -78,8 +78,22 @@
   async function cargar() {
     const d = await api("productos");
     productos = d.productos;
+    ir(location.hash.slice(1) || "productos");
+    // Cuenta los pedidos nuevos para mostrarlos en la pestaña
+    cargarPedidos().then(() => { const nav = app.querySelector(".p-tabs"); if (nav) nav.outerHTML = tabsHTML(nav.querySelector("[aria-current]")?.dataset.tab || "productos"); }).catch(() => {});
+  }
+
+  // ---------- Pestañas ----------
+  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["actividad", "Actividad"]];
+  const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}</button>`).join("")}</nav>`;
+  let pendientes = 0, pedidosCache = null;
+  function ir(tab) {
+    if (tab === "pedidos") return verPedidos();
+    if (tab === "clientes") return verClientes();
+    if (tab === "actividad") return verActividad();
     lista();
   }
+  app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
 
   // ---------- Lista ----------
   const stockBajo = (p) => p.stock !== null && p.stockMin !== null && p.stock <= p.stockMin;
@@ -89,7 +103,7 @@
     : `<svg viewBox="0 0 64 64" fill="none" stroke="${(CAT_COLORS[p.cat] || ["#0e8be0"])[0]}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon] || ICONS.tag}</svg>`;
 
   function lista() {
-    history.replaceState(null, "", "/panel");
+    history.replaceState(null, "", "/panel#productos");
     const ocultos = productos.filter((p) => !p.visible).length;
     const bajos = productos.filter(stockBajo).length;
     const FILTROS = ["Todos", "En la web", "Ocultos", "Stock bajo", ...CATEGORIES];
@@ -98,7 +112,7 @@
     const vis = productos.filter((p) => (pasa[filtro] ? pasa[filtro](p) : p.cat === filtro) &&
       (!busca || norm([p.name, p.brand, p.model, p.proveedor].join(" ")).includes(norm(busca))));
 
-    app.innerHTML = `
+    app.innerHTML = tabsHTML("productos") + `
       <div class="p-head">
         <div><h1>Productos</h1>
           <p class="muted">${productos.length} cargados · ${productos.length - ocultos} en la web${ocultos ? ` · ${ocultos} ocultos` : ""}</p></div>
@@ -368,6 +382,239 @@
         await cargar();
       } catch (x) { toast(x.message); $("guardar").disabled = false; }
     };
+  }
+
+  // ---------- Pedidos ----------
+  const ESTADOS = [["nuevo", "Nuevo"], ["señado", "Señado"], ["pagado", "Pagado"], ["enviado", "Enviado"], ["entregado", "Entregado"], ["cancelado", "Cancelado"]];
+  const estadoTxt = (e) => (ESTADOS.find((x) => x[0] === e) || [e, e])[1];
+  const fechaCorta = (d) => new Date(d).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  const waCliente = (tel, msg) => `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
+  const sitio = CONFIG.sitio;
+  let filtroPed = "Activos", buscaPed = "";
+
+  async function cargarPedidos() {
+    const d = await api("pedidos");
+    pedidosCache = d;
+    pendientes = d.pedidos.filter((p) => p.estado === "nuevo").length;
+    return d;
+  }
+  async function verPedidos() {
+    app.innerHTML = tabsHTML("pedidos") + '<p class="p-loading">Cargando pedidos…</p>';
+    let d;
+    try { d = await cargarPedidos(); } catch (x) { app.innerHTML = tabsHTML("pedidos") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    const r = d.resumen;
+    const monto = (o) => [o.ars ? ars(o.ars) : "", o.usd ? usd(o.usd) : ""].filter(Boolean).join(" + ") || "$0";
+    const FILT = ["Activos", "Todos", ...ESTADOS.map((x) => x[1])];
+    const norm = (x) => String(x).toLowerCase();
+    const vis = d.pedidos.filter((p) => (filtroPed === "Todos" ? true : filtroPed === "Activos" ? !["entregado", "cancelado"].includes(p.estado) : estadoTxt(p.estado) === filtroPed) &&
+      (!buscaPed || norm(p.num + " " + p.cliente.nombre + " " + p.cliente.tel).includes(norm(buscaPed))));
+    app.innerHTML = tabsHTML("pedidos") + `
+      <div class="p-head"><div><h1>Pedidos</h1><p class="muted">${d.pedidos.length} en total${pendientes ? ` · <b>${pendientes} nuevos para atender</b>` : ""}</p></div></div>
+      <div class="p-stats">
+        <div class="p-stat"><span>Hoy</span><b>${monto(r.hoy)}</b><small>${r.hoy.n} ${r.hoy.n === 1 ? "venta" : "ventas"}</small></div>
+        <div class="p-stat"><span>Este mes</span><b>${monto(r.mes)}</b><small>${r.mes.n} ${r.mes.n === 1 ? "venta" : "ventas"}</small></div>
+        <div class="p-stat"><span>Mes anterior</span><b>${monto(r.anterior)}</b><small>&nbsp;</small></div>
+      </div>
+      <p class="muted small">Las ventas cuentan lo que anotás como cobrado en pedidos pagados, enviados o entregados. Pesos y dólares por separado.</p>
+      <div class="p-tools">
+        <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="buscaPed" type="search" placeholder="Buscar por número, nombre o teléfono" value="${esc(buscaPed)}"></label>
+        <div class="chips">${FILT.map((f) => `<button class="chip${f === filtroPed ? " on" : ""}" data-fp="${esc(f)}">${esc(f)}</button>`).join("")}</div>
+      </div>
+      <div class="p-list">${vis.map((p) => `
+        <button class="p-row p-order" data-ped="${esc(p.num)}">
+          <span class="p-row-info"><b>${esc(p.cliente.nombre || "Sin nombre")}</b><span class="muted small">${esc(p.num)} · ${fechaCorta(p.creado)}</span>
+            <span class="muted small">${esc(p.items.map((i) => `${i.qty}× ${i.name}`).join(", "))}</span></span>
+          <span class="p-row-num"><i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i><b>${p.cobradoArs || p.cobradoUsd ? [p.cobradoArs ? ars(p.cobradoArs) : "", p.cobradoUsd ? usd(p.cobradoUsd) : ""].filter(Boolean).join(" + ") : p.totalArs ? "≈ " + ars(p.totalArs) : ""}</b></span>
+        </button>`).join("") || '<p class="empty">No hay pedidos con ese filtro.</p>'}</div>`;
+    app.querySelectorAll("[data-fp]").forEach((b) => (b.onclick = () => { filtroPed = b.dataset.fp; verPedidos(); }));
+    app.querySelectorAll("[data-ped]").forEach((b) => (b.onclick = () => verPedido(d.pedidos.find((p) => p.num === b.dataset.ped))));
+    const bp = document.getElementById("buscaPed");
+    bp.oninput = () => { buscaPed = bp.value; clearTimeout(bp._t); bp._t = setTimeout(() => { const pos = bp.selectionStart; verPedidos().then(() => { const n = document.getElementById("buscaPed"); n.focus(); n.setSelectionRange(pos, pos); }); }, 250); };
+  }
+
+  function mensajeCliente(p) {
+    const nombre = (p.cliente.nombre || "").split(" ")[0];
+    const link = `${sitio}/seguimiento#${p.num}.${p.token}`;
+    const m = {
+      nuevo: `¡Hola ${nombre}! Recibimos tu pedido ${p.num}. Ya te confirmamos stock, envío y forma de pago.`,
+      "señado": `¡Hola ${nombre}! Recibimos la seña de tu pedido ${p.num}: el producto queda reservado. Podés seguirlo acá: ${link}`,
+      pagado: `¡Hola ${nombre}! Recibimos el pago de tu pedido ${p.num}. Ya lo estamos preparando. Seguilo acá: ${link}`,
+      enviado: `¡Hola ${nombre}! Tu pedido ${p.num} ya salió${p.envioEmpresa ? " por " + p.envioEmpresa : ""}.${p.envioCodigo ? " Código de seguimiento: " + p.envioCodigo + "." : ""} Seguilo acá: ${link} ¡Buen vuelo! ✈`,
+      entregado: `¡Hola ${nombre}! ¿Te llegó bien tu pedido ${p.num}? Gracias por comprar en Tienda de Vuelo. Si tenés un minuto, nos ayudaría mucho que nos cuentes qué te pareció. ✈`,
+      cancelado: `¡Hola ${nombre}! Cancelamos tu pedido ${p.num}. Si fue un error o querés retomarlo, escribinos.`,
+    };
+    return m[p.estado] || m.nuevo;
+  }
+
+  function verPedido(p) {
+    window.scrollTo(0, 0);
+    const c = p.cliente;
+    app.innerHTML = `
+      <button class="back-btn" id="volverPed">← Pedidos</button>
+      <form class="p-form" id="pedForm">
+        <h1>${esc(p.num)}</h1>
+        <p class="muted">Hecho el ${fechaCorta(p.creado)}${p.historial.length > 1 ? " · " + p.historial.slice(1).map((h) => `${estadoTxt(h.estado)} ${fechaCorta(h.at)}`).join(" · ") : ""}</p>
+        <section class="p-card">
+          <h2>Estado</h2>
+          <div class="p-seg" role="radiogroup" aria-label="Estado del pedido">${ESTADOS.map(([k, t]) => `<label><input type="radio" name="estado" value="${k}"${k === p.estado ? " checked" : ""}> ${t}</label>`).join("")}</div>
+        </section>
+        <section class="p-card">
+          <h2>Cliente</h2>
+          <p class="p-cli"><b>${esc(c.nombre)}</b><br>
+            <a href="https://wa.me/${esc(p.tel)}" target="_blank" rel="noopener">${esc(c.tel)}</a>${c.dni ? ` · DNI/CUIT ${esc(c.dni)}` : ""}<br>
+            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.dir ? "<br>" + esc(c.dir) : ""}
+            ${c.notas ? `<br><i>“${esc(c.notas)}”</i>` : ""}</p>
+        </section>
+        <section class="p-card">
+          <h2>Productos</h2>
+          <div class="table-wrap"><table><tbody>${p.items.map((i) => `<tr><td>${i.qty} × ${esc(i.name)}${i.sub ? `<br><small class="muted">${esc(i.sub)}</small>` : ""}</td><td class="num">${esc(i.label || "")}</td></tr>`).join("")}
+            ${p.totalArs ? `<tr><td>Total aproximado al pedir</td><td class="num"><b>${ars(p.totalArs)}</b>${p.usdSub ? `<br><small class="muted">incluye ${usd(p.usdSub)}</small>` : ""}</td></tr>` : ""}</tbody></table></div>
+          ${p.stockDescontado ? '<p class="muted small">✓ Ya se descontó del stock.</p>' : '<button type="button" class="btn btn-ghost" id="descontar">Descontar del stock</button>'}
+        </section>
+        <section class="p-card">
+          <h2>Cobro</h2>
+          <div class="p-grid2">
+            <label><span>Cobrado en pesos</span><input id="cArs" type="number" min="0" step="1" inputmode="numeric" value="${esc(p.cobradoArs ?? "")}"></label>
+            <label><span>Cobrado en dólares</span><input id="cUsd" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.cobradoUsd ?? "")}"></label>
+          </div>
+          <p class="muted small">Cuenta para las ventas cuando el pedido está pagado, enviado o entregado.</p>
+        </section>
+        <section class="p-card">
+          <h2>Envío</h2>
+          <div class="p-grid2">
+            <label>Empresa<select id="envEmp">${["", "Andreani", "Correo Argentino", "Vía Cargo", "OCA", "Moto o cadete", "Retiro en persona", "Otra"].map((x) => `<option${x === p.envioEmpresa ? " selected" : ""} value="${x}">${x || "—"}</option>`).join("")}</select></label>
+            <label>Código de seguimiento<input id="envCod" value="${esc(p.envioCodigo)}"></label>
+          </div>
+        </section>
+        <section class="p-card">
+          <h2>Notas internas</h2>
+          <textarea id="pedNotas" rows="3" placeholder="Solo las ves vos">${esc(p.notas)}</textarea>
+        </section>
+        <section class="p-card p-acciones">
+          <a class="btn btn-wa" id="avisar" target="_blank" rel="noopener">Avisar al cliente por WhatsApp</a>
+          <button type="button" class="btn btn-ghost" id="etiqueta">Imprimir etiqueta</button>
+          <a class="btn btn-ghost" href="/seguimiento#${esc(p.num)}.${esc(p.token)}" target="_blank" rel="noopener">Ver lo que ve el cliente ↗</a>
+        </section>
+        <div class="p-save"><button type="button" class="btn btn-ghost" id="cancelPed">Volver</button><button class="btn btn-primary" id="guardarPed" type="submit">Guardar</button></div>
+      </form>`;
+    const $ = (id) => document.getElementById(id);
+    const actual = () => ({ ...p, estado: document.querySelector('input[name="estado"]:checked').value, envioEmpresa: $("envEmp").value, envioCodigo: $("envCod").value.trim() });
+    const syncAviso = () => { $("avisar").href = waCliente(p.tel, mensajeCliente(actual())); };
+    $("pedForm").addEventListener("input", syncAviso); $("pedForm").addEventListener("change", syncAviso); syncAviso();
+    // Si marcás pagado y no anotaste cobro, se sugiere el total
+    document.querySelectorAll('input[name="estado"]').forEach((r) => r.addEventListener("change", () => {
+      if (["pagado", "enviado", "entregado"].includes(r.value) && !$("cArs").value && !$("cUsd").value && p.totalArs) { $("cArs").value = p.totalArs; toast("Puse el total del pedido como cobrado. Corregilo si cobraste otro monto."); }
+    }));
+    $("volverPed").onclick = $("cancelPed").onclick = () => verPedidos();
+    $("etiqueta").onclick = () => etiqueta(p);
+    if ($("descontar")) $("descontar").onclick = async () => {
+      try { const d = await api("pedidos", { method: "POST", body: { num: p.num, accion: "descontar" } }); toast("Listo, se descontó del stock."); const pr = await api("productos"); productos = pr.productos; verPedido(d.pedido); }
+      catch (x) { toast(x.message); }
+    };
+    $("pedForm").onsubmit = async (e) => {
+      e.preventDefault();
+      $("guardarPed").disabled = true;
+      try {
+        const a = actual();
+        const d = await api("pedidos", { method: "POST", body: { num: p.num, estado: a.estado, cobradoArs: $("cArs").value, cobradoUsd: $("cUsd").value, envioEmpresa: a.envioEmpresa, envioCodigo: a.envioCodigo, notas: $("pedNotas").value } });
+        toast(a.estado !== p.estado ? `Guardado como ${estadoTxt(a.estado).toLowerCase()}. Avisale al cliente con el botón verde.` : "Guardado.");
+        verPedido(d.pedido);
+      } catch (x) { toast(x.message); $("guardarPed").disabled = false; }
+    };
+  }
+
+  function etiqueta(p) {
+    const c = p.cliente;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Permití las ventanas emergentes para imprimir la etiqueta."); return; }
+    w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Etiqueta ${esc(p.num)}</title>
+      <style>@page{size:100mm 150mm;margin:6mm}body{font:14px/1.4 Arial,sans-serif;color:#000;margin:0}.e{border:2px solid #000;border-radius:8px;padding:12px;width:86mm}
+      h1{font-size:13px;letter-spacing:.2em;margin:0 0 6px;text-transform:uppercase}.para{font-size:20px;font-weight:700;margin:4px 0}.de{border-top:1px dashed #000;margin-top:12px;padding-top:8px;font-size:12px}
+      .num{font:700 16px monospace;margin-top:10px}.logo{display:flex;align-items:center;gap:6px;font-weight:700}.logo img{width:26px}</style></head><body>
+      <div class="e"><h1>Destinatario</h1><div class="para">${esc(c.nombre)}</div><div>${esc(c.dir || "Retira en CABA")}</div><div>Tel: ${esc(c.tel)}</div>${c.dni ? `<div>DNI/CUIT: ${esc(c.dni)}</div>` : ""}
+      ${p.envioEmpresa ? `<div>Envío: ${esc(p.envioEmpresa)}${p.envioCodigo ? " · " + esc(p.envioCodigo) : ""}</div>` : ""}
+      <div class="num">${esc(p.num)}</div>
+      <div class="de"><div class="logo"><img src="${location.origin}/logo.svg" alt="">Tienda de Vuelo</div>${esc(CONFIG.ciudad)} · WhatsApp ${esc(CONFIG.whatsappVisible)} · tiendadevuelo.com.ar</div></div>
+      <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+    w.document.close();
+  }
+
+  // ---------- Clientes ----------
+  let buscaCli = "";
+  async function verClientes() {
+    app.innerHTML = tabsHTML("clientes") + '<p class="p-loading">Cargando clientes…</p>';
+    let d;
+    try { d = await api("clientes"); } catch (x) { app.innerHTML = tabsHTML("clientes") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    const hoy = new Date(Date.now() + (new Date().getTimezoneOffset() - 180) * 60000);
+    const enDias = (cumple) => { if (!cumple) return null; const [, m, dd] = cumple.split("-").map(Number); let x = new Date(hoy.getFullYear(), m - 1, dd); const h0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()); if (x < h0) x = new Date(hoy.getFullYear() + 1, m - 1, dd); return Math.round((x - h0) / 864e5); };
+    const cumples = d.clientes.map((c) => ({ ...c, en: enDias(c.cumple) })).filter((c) => c.en !== null && c.en <= 7).sort((a, b) => a.en - b.en);
+    const norm = (x) => String(x).toLowerCase();
+    const vis = d.clientes.filter((c) => !buscaCli || norm(c.nombre + " " + c.tel + " " + c.escuela).includes(norm(buscaCli)));
+    const niveles = ["Comandante", "Piloto", "Alumno"].map((n) => [n, d.clientes.filter((c) => c.nivel === n).length]);
+    app.innerHTML = tabsHTML("clientes") + `
+      <div class="p-head"><div><h1>Clientes</h1><p class="muted">${d.clientes.length} clientes · ${niveles.map(([n, k]) => `${k} ${n.toLowerCase()}`).join(" · ")}</p></div></div>
+      <p class="muted small">Se arman solos con cada pedido. Niveles: Alumno (1 compra), Piloto (2 o 3), Comandante (4 o más).</p>
+      ${cumples.length ? `<section class="p-card p-cumples"><h2>🎂 Cumpleaños de esta semana</h2>${cumples.map((c) => `
+        <div class="p-cumple"><span><b>${esc(c.nombre)}</b> · ${c.en === 0 ? "¡hoy!" : c.en === 1 ? "mañana" : `en ${c.en} días`}</span>
+        <a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(c.tel, `¡Feliz cumpleaños, ${c.nombre.split(" ")[0]}! 🎂✈ Te deseamos un gran año y muchas horas de vuelo. — Tienda de Vuelo`)}">Saludar</a></div>`).join("")}</section>` : ""}
+      <div class="p-tools"><label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="buscaCli" type="search" placeholder="Buscar por nombre, teléfono o escuela" value="${esc(buscaCli)}"></label></div>
+      <div class="p-list">${vis.map((c) => `
+        <button class="p-row p-order" data-cli="${esc(c.tel)}">
+          <span class="p-row-info"><b>${esc(c.nombre || c.tel)}</b><span class="muted small">${esc(c.tel)}${c.escuela ? " · " + esc(c.escuela) : ""}${c.cumple ? " · 🎂 " + c.cumple.slice(8) + "/" + c.cumple.slice(5, 7) : ""}</span>
+            <span class="muted small">${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.ultimo ? " · último pedido " + new Date(c.ultimo).toLocaleDateString("es-AR") : ""}</span></span>
+          <span class="p-row-num"><i class="p-nivel n-${c.nivel.toLowerCase()}">${c.nivel}</i><b>${[c.totalArs ? ars(c.totalArs) : "", c.totalUsd ? usd(c.totalUsd) : ""].filter(Boolean).join(" + ")}</b></span>
+        </button>`).join("") || '<p class="empty">Todavía no hay clientes. Aparecen solos cuando entra el primer pedido.</p>'}</div>`;
+    app.querySelectorAll("[data-cli]").forEach((b) => (b.onclick = () => verCliente(d.clientes.find((c) => c.tel === b.dataset.cli))));
+    const bc = document.getElementById("buscaCli");
+    bc.oninput = () => { buscaCli = bc.value; clearTimeout(bc._t); bc._t = setTimeout(() => { const pos = bc.selectionStart; verClientes().then(() => { const n = document.getElementById("buscaCli"); n.focus(); n.setSelectionRange(pos, pos); }); }, 250); };
+  }
+
+  async function verCliente(c) {
+    window.scrollTo(0, 0);
+    if (!pedidosCache) { try { await cargarPedidos(); } catch {} }
+    const suyos = (pedidosCache?.pedidos || []).filter((p) => p.tel === c.tel);
+    app.innerHTML = `
+      <button class="back-btn" id="volverCli">← Clientes</button>
+      <form class="p-form" id="cliForm">
+        <h1>${esc(c.nombre || c.tel)}</h1>
+        <p><i class="p-nivel n-${c.nivel.toLowerCase()}">${c.nivel}</i> · ${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.totalArs || c.totalUsd ? " · " + [c.totalArs ? ars(c.totalArs) : "", c.totalUsd ? usd(c.totalUsd) : ""].filter(Boolean).join(" + ") : ""}</p>
+        <section class="p-card">
+          <label>Nombre<input id="cNom" value="${esc(c.nombre)}"></label>
+          <div class="p-grid2">
+            <label>Cumpleaños<input id="cCum" type="date" value="${esc(c.cumple || "")}"></label>
+            <label>Escuela de vuelo<input id="cEsc" value="${esc(c.escuela)}" placeholder="Ej.: Aeroclub San Fernando"></label>
+          </div>
+          <label>Notas<textarea id="cNot" rows="3" placeholder="Qué vuela, qué le interesa…">${esc(c.notas)}</textarea></label>
+          <a class="btn btn-wa" href="https://wa.me/${esc(c.tel)}" target="_blank" rel="noopener">Escribirle por WhatsApp</a>
+        </section>
+        <section class="p-card"><h2>Pedidos</h2>${suyos.length ? suyos.map((p) => `<button type="button" class="p-row p-order" data-ped="${esc(p.num)}"><span class="p-row-info"><b>${esc(p.num)}</b><span class="muted small">${fechaCorta(p.creado)} · ${esc(p.items.map((i) => i.name).join(", "))}</span></span><span class="p-row-num"><i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i></span></button>`).join("") : '<p class="muted">Sin pedidos.</p>'}</section>
+        <div class="p-save"><button type="button" class="btn btn-ghost" id="cancelCli">Volver</button><button class="btn btn-primary" id="guardarCli" type="submit">Guardar</button></div>
+      </form>`;
+    const $ = (id) => document.getElementById(id);
+    $("volverCli").onclick = $("cancelCli").onclick = () => verClientes();
+    app.querySelectorAll("[data-ped]").forEach((b) => (b.onclick = () => verPedido(suyos.find((p) => p.num === b.dataset.ped))));
+    $("cliForm").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("clientes", { method: "POST", body: { tel: c.tel, nombre: $("cNom").value, cumple: $("cCum").value, escuela: $("cEsc").value, notas: $("cNot").value } }); toast("Cliente guardado."); verClientes(); }
+      catch (x) { toast(x.message); }
+    };
+  }
+
+  // ---------- Actividad ----------
+  async function verActividad() {
+    app.innerHTML = tabsHTML("actividad") + '<p class="p-loading">Cargando…</p>';
+    let d;
+    try { d = await api("actividad"); } catch (x) { app.innerHTML = tabsHTML("actividad") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    app.innerHTML = tabsHTML("actividad") + `
+      <div class="p-head"><div><h1>Actividad</h1><p class="muted">Últimos 30 días</p></div></div>
+      <div class="p-grid2 p-act">
+        <section class="p-card"><h2>Lo que buscan y no encuentran</h2><p class="muted small">Pistas de qué conviene traer.</p>
+          ${d.busquedas.length ? `<ol class="p-rank">${d.busquedas.map((b) => `<li><span>${esc(b.dato)}</span><b>${b.n}</b></li>`).join("")}</ol>` : '<p class="muted">Todavía nada. Aparece cuando alguien busca algo que no está cargado.</p>'}</section>
+        <section class="p-card"><h2>Productos más consultados</h2><p class="muted small">Toques en “Lo quiero”, “Consultar” y “Hacer una pregunta”.</p>
+          ${d.consultas.length ? `<ol class="p-rank">${d.consultas.map((c) => `<li><span>${esc(c.name)}</span><b>${c.n}</b>${c.quiero ? `<small>${c.quiero} “Lo quiero”</small>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía nada.</p>'}</section>
+      </div>`;
   }
 
   // Achica la foto en el celular antes de subirla (máx. 1600 px, JPG).

@@ -480,3 +480,20 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
 .guide li a { color: var(--accent); white-space: nowrap; }
 .nf-search { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; max-width: 560px; }
 .nf-search input { flex: 1; min-width: 0; }
+.steps { list-style: none; padding: 0; margin: 8px 0 24px; display: grid; gap: 0; }
+.steps li { position: relative; padding: 0 0 22px 36px; color: var(--muted); }
+.steps li::before { content: ""; position: absolute; left: 0; top: 2px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); background: #fff; }
+.steps li::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: 0; width: 2px; background: var(--line); }
+.steps li:last-child::after { display: none; }
+.steps li b { display: block; color: var(--text); }
+.steps li small { color: var(--muted); }
+.steps li.done::before { background: var(--green); border-color: var(--green); }
+.steps li.done::after { background: var(--green); }
+.steps li.now::before { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 5px rgba(14, 139, 224, .18); }
+.steps li.now b { color: var(--accent); }
+.track { margin-bottom: 8px; }
+@media print {
+  .metar, .notice, .nav, .footer, .wa-float, .wa-bubble, .no-print, .toast, .drawer, .overlay { display: none !important; }
+  .page-hero { background: none; padding-top: 0; }
+  body { font-size: 12pt; }
+}
