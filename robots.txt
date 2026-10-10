@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /opciones
+Sitemap: https://www.tiendadevuelo.com.ar/sitemap.xml

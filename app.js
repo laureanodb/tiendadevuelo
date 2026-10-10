@@ -1,256 +1,223 @@
+// Portada: destacados, banners, catálogo, kits armables, altímetro y ficha de producto.
 (() => {
-  const $ = (s) => document.querySelector(s);
-  const money = (n) => "$" + Math.round(n).toLocaleString("es-AR");
-  const byId = Object.fromEntries(PRODUCTS.map((p) => [p.id, p]));
+  const { $, esc, ars, byId, pesos, priceHTML, art, card, waLink, add, toast, isFav, toggleFav } = window.TDV;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const visibles = PRODUCTS.filter((p) => !p.agotado);
 
-  const art = (p, big) => {
-    const [a, b] = CAT_COLORS[p.cat];
-    return `<div class="art${big ? " art-big" : ""}" style="--a:${a};--b:${b}">
-      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon]}</svg>
-    </div>`;
+  // ---------- Destacados, tripulantes, regalos ----------
+  const renderRows = () => {
+    $("#destacados").innerHTML = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map(card).join("");
+    $("#tcpGrid").innerHTML = visibles.filter((p) => p.tcp).slice(0, 4).map(card).join("");
+    $("#regalosGrid").innerHTML = visibles.filter((p) => p.regalo).slice(0, 4).map(card).join("");
   };
 
-  // ---------- Catálogo ----------
-  const state = { cat: "Todos", q: "", sort: "destacados" };
-  const chips = $("#chips");
-  ["Todos", ...CATEGORIES].forEach((c) => {
-    const b = document.createElement("button");
-    b.className = "chip";
-    b.textContent = c;
-    b.setAttribute("role", "tab");
-    b.onclick = () => { state.cat = c; render(); };
-    chips.appendChild(b);
-  });
+  // ---------- Banners que rotan ----------
+  $("#banners").innerHTML = `<div class="banner-track" id="bannerTrack">${BANNERS.map((b, i) => `
+    <a class="banner b${i % 3}" href="${b.href}">
+      <span class="kicker">${esc(b.kicker)}</span><h3>${esc(b.title)}</h3><p>${esc(b.text)}</p><span class="banner-cta">${esc(b.cta)} →</span>
+    </a>`).join("")}</div>
+    <div class="dots" role="tablist" aria-label="Banners">${BANNERS.map((_, i) => `<button role="tab" aria-label="Banner ${i + 1}" data-dot="${i}"></button>`).join("")}</div>`;
+  let bi = 0, bTimer;
+  const showBanner = (i) => {
+    bi = (i + BANNERS.length) % BANNERS.length;
+    $("#bannerTrack").style.transform = `translateX(-${bi * 100}%)`;
+    document.querySelectorAll("[data-dot]").forEach((d, k) => d.setAttribute("aria-selected", k === bi));
+  };
+  const autoBanner = () => { clearInterval(bTimer); if (!reduceMotion) bTimer = setInterval(() => showBanner(bi + 1), 5500); };
+  document.querySelectorAll("[data-dot]").forEach((d) => (d.onclick = () => { showBanner(+d.dataset.dot); autoBanner(); }));
+  showBanner(0); autoBanner();
 
+  // ---------- Categorías ----------
+  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚" };
+  $("#cats").innerHTML = CATEGORIES.map((c) => `<button class="cat-card" data-goto="${c}"><span>${catEmoji[c] || "✈"}</span>${c}</button>`).join("");
+
+  // ---------- Catálogo ----------
+  const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados" };
+  const FILTROS = ["Todos", "Más vendidos", "Nuevo ingreso", "Por encargo", "Favoritos", ...CATEGORIES];
+  const chips = $("#chips");
+  chips.innerHTML = FILTROS.map((f) => `<button class="chip" role="tab" data-f="${f}">${f === "Favoritos" ? "♥ Favoritos" : f}</button>`).join("");
+  chips.addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { state.f = b.dataset.f; render(); } });
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  $("#search").value = state.q;
 
   function render() {
-    chips.querySelectorAll(".chip").forEach((c) => {
-      const on = c.textContent === state.cat;
-      c.classList.toggle("on", on);
-      c.setAttribute("aria-selected", on);
-    });
+    chips.querySelectorAll(".chip").forEach((c) => { const on = c.dataset.f === state.f; c.classList.toggle("on", on); c.setAttribute("aria-selected", on); });
     const q = norm(state.q);
-    let list = PRODUCTS.filter((p) =>
-      (state.cat === "Todos" || p.cat === state.cat) &&
-      (!q || norm(p.name + " " + p.desc + " " + p.cat).includes(q)));
+    const pass = {
+      "Todos": () => true, "Más vendidos": (p) => p.top, "Nuevo ingreso": (p) => p.nuevo, "Por encargo": (p) => p.encargo, "Favoritos": (p) => isFav(p.id),
+    };
+    let list = visibles.filter((p) => (pass[state.f] ? pass[state.f](p) : p.cat === state.f) &&
+      (!q || norm([p.name, p.brand, p.model, p.desc, p.cat].join(" ")).includes(q)));
+    const precio = (p) => pesos(p) ?? Infinity;
     const sorters = {
-      destacados: (a, b) => (a.featured || 99) - (b.featured || 99),
-      "precio-asc": (a, b) => a.price - b.price,
-      "precio-desc": (a, b) => b.price - a.price,
+      destacados: (a, b) => (a.destacado || (a.top ? 50 : 99)) - (b.destacado || (b.top ? 50 : 99)),
+      "precio-asc": (a, b) => precio(a) - precio(b),
+      "precio-desc": (a, b) => (pesos(b) ?? -1) - (pesos(a) ?? -1),
       nombre: (a, b) => a.name.localeCompare(b.name, "es"),
     };
     list.sort(sorters[state.sort]);
-
-    $("#grid").innerHTML = list.map((p, i) => `
-      <article class="card" style="--i:${i}" data-id="${p.id}">
-        ${p.badge ? `<span class="badge">${p.badge}</span>` : ""}
-        ${p.old ? `<span class="badge badge-off">-${Math.round((1 - p.price / p.old) * 100)}%</span>` : ""}
-        <button class="card-art" data-view="${p.id}" aria-label="Ver ${p.name}">${art(p)}</button>
-        <div class="card-body">
-          <span class="card-cat">${p.cat}</span>
-          <h3><button class="link" data-view="${p.id}">${p.name}</button></h3>
-          <div class="price">${p.old ? `<s>${money(p.old)}</s>` : ""}<b>${money(p.price)}</b></div>
-          <div class="cuotas">6 cuotas de ${money(p.price / 6)}</div>
-        </div>
-        <button class="add" data-add="${p.id}">Agregar <span aria-hidden="true">+</span></button>
-      </article>`).join("");
+    $("#grid").innerHTML = list.map(card).join("");
     $("#empty").hidden = list.length > 0;
+    $("#empty").innerHTML = state.f === "Favoritos" && !state.q
+      ? "Todavía no guardaste favoritos. Tocá el ♡ de cualquier producto."
+      : `No encontramos nada con esa búsqueda. <a href="/contacto#pedido">Pedinos el producto</a> y lo conseguimos.`;
   }
-
   $("#search").addEventListener("input", (e) => { state.q = e.target.value; render(); });
   $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
-
-  document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => {
-    state.cat = b.dataset.goto;
-    render();
-    $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
-  }));
-
-  // ---------- Kits ----------
-  $("#kitsGrid").innerHTML = KITS.map((k) => {
-    const full = k.items.reduce((s, id) => s + byId[id].price, 0);
-    const price = full * (1 - k.off);
-    return `<article class="kit reveal${k.highlight ? " kit-hl" : ""}">
-      ${k.highlight ? '<span class="badge">El más elegido</span>' : ""}
-      <div class="kit-emoji">${k.emoji}</div>
-      <h3>${k.name}</h3>
-      <p class="muted">${k.tagline}</p>
-      <ul>${k.items.map((id) => `<li>${byId[id].name}</li>`).join("")}</ul>
-      <div class="kit-price"><s>${money(full)}</s><b>${money(price)}</b><span class="save">Ahorrás ${money(full - price)}</span></div>
-      <button class="btn btn-primary btn-block" data-kit="${k.id}">Agregar kit</button>
-    </article>`;
-  }).join("");
-
-  // ---------- Carrito ----------
-  let cart = [];
-  try { cart = JSON.parse(localStorage.getItem("tdv-cart")) || []; } catch { cart = []; }
-  const save = () => { try { localStorage.setItem("tdv-cart", JSON.stringify(cart)); } catch {} };
-
-  const lineOf = (line) => {
-    if (line.kit) {
-      const k = KITS.find((x) => x.id === line.kit);
-      const full = k.items.reduce((s, id) => s + byId[id].price, 0);
-      return { name: k.name, unit: full * (1 - k.off), emoji: k.emoji };
-    }
-    const p = byId[line.id];
-    return { name: p.name, unit: p.price, p };
-  };
-  const key = (l) => l.kit || l.id;
-  const total = () => cart.reduce((s, l) => s + lineOf(l).unit * l.qty, 0);
-
-  function add(line, label) {
-    const found = cart.find((l) => key(l) === key(line));
-    if (found) found.qty++; else cart.push({ ...line, qty: 1 });
-    save(); renderCart();
-    const btn = $("#cartBtn");
-    btn.classList.remove("bump"); void btn.offsetWidth; btn.classList.add("bump");
-    toast(`✈️ ${label} agregado al carrito`);
-  }
-
-  function renderCart() {
-    const count = cart.reduce((s, l) => s + l.qty, 0);
-    $("#cartCount").textContent = count;
-    $("#cartCount").classList.toggle("show", count > 0);
-    const t = total();
-    $("#cartTotal").textContent = money(t);
-    $("#transferNote").textContent = t ? `Con transferencia: ${money(t * (1 - CONFIG.descuentoTransferencia))} · o 6 cuotas de ${money(t / 6)}` : "";
-
-    const pct = Math.min(100, (t / CONFIG.envioGratisDesde) * 100);
-    $("#fuelFill").style.width = pct + "%";
-    $("#fuelFill").classList.toggle("full", pct >= 100);
-    $("#fuelLabel").innerHTML = pct >= 100
-      ? "⛽ <b>¡Tanque lleno!</b> Tenés envío gratis"
-      : `⛽ Te faltan <b>${money(CONFIG.envioGratisDesde - t)}</b> para el envío gratis`;
-
-    $("#cartItems").innerHTML = cart.length ? cart.map((l) => {
-      const info = lineOf(l);
-      return `<div class="line">
-        ${info.p ? art(info.p) : `<div class="art art-kit">${info.emoji}</div>`}
-        <div class="line-info">
-          <b>${info.name}</b>
-          <span class="muted">${money(info.unit)}</span>
-          <div class="qty">
-            <button data-dec="${key(l)}" aria-label="Quitar uno">−</button>
-            <span>${l.qty}</span>
-            <button data-inc="${key(l)}" aria-label="Agregar uno">+</button>
-          </div>
-        </div>
-        <b class="line-total">${money(info.unit * l.qty)}</b>
-      </div>`;
-    }).join("") : `<div class="cart-empty"><div>🛫</div><p>Tu carrito está vacío.<br>¡Preparate para despegar!</p></div>`;
-    $("#checkout").disabled = !cart.length;
-  }
-
-  function changeQty(k, d) {
-    const l = cart.find((x) => key(x) === k);
-    if (!l) return;
-    l.qty += d;
-    if (l.qty <= 0) cart = cart.filter((x) => x !== l);
-    save(); renderCart();
-  }
-
-  const drawer = $("#drawer"), overlay = $("#overlay");
-  const openCart = () => { overlay.hidden = false; drawer.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); };
-  const closeCart = () => { drawer.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); overlay.hidden = true; };
-  $("#cartBtn").onclick = openCart;
-  $("#closeCart").onclick = closeCart;
-  overlay.onclick = () => { closeCart(); closeModal(); };
-
-  const waLink = (text) => `https://wa.me/${CONFIG.whatsapp}${text ? "?text=" + encodeURIComponent(text) : ""}`;
-  document.querySelectorAll("[data-wa]").forEach((a) => {
-    a.href = waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.");
-    a.target = "_blank"; a.rel = "noopener";
-  });
-
-  $("#checkout").onclick = () => {
-    const t = total();
-    const lines = cart.map((l) => { const i = lineOf(l); return `• ${l.qty} x ${i.name} — ${money(i.unit * l.qty)}`; });
-    const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido:\n\n${lines.join("\n")}\n\nTotal: ${money(t)}` +
-      (t >= CONFIG.envioGratisDesde ? "\n(Con envío gratis)" : "");
-    window.open(waLink(msg), "_blank", "noopener");
-  };
-
-  // ---------- Vista rápida ----------
-  const modal = $("#modal");
-  let current = null;
-  function openModal(id) {
-    const p = byId[id]; current = p;
-    $("#modalArt").innerHTML = art(p, true);
-    $("#modalCat").textContent = p.cat;
-    $("#modalTitle").textContent = p.name;
-    $("#modalDesc").textContent = p.desc;
-    $("#modalSpecs").innerHTML = p.specs.map((s) => `<li>${s}</li>`).join("");
-    $("#modalPrice").innerHTML = `${p.old ? `<s>${money(p.old)}</s>` : ""}<b>${money(p.price)}</b><span class="muted">6 cuotas sin interés de ${money(p.price / 6)}</span>`;
-    modal.hidden = false;
-    requestAnimationFrame(() => modal.classList.add("open"));
-    $("#closeModal").focus();
-  }
-  function closeModal() { modal.classList.remove("open"); modal.hidden = true; }
-  $("#closeModal").onclick = closeModal;
-  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-  $("#modalAdd").onclick = () => { add({ id: current.id }, current.name); closeModal(); };
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeCart(); } });
-
-  // Clicks delegados
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-add],[data-view],[data-kit],[data-inc],[data-dec]");
-    if (!t) return;
-    if (t.dataset.add) add({ id: t.dataset.add }, byId[t.dataset.add].name);
-    else if (t.dataset.view) openModal(t.dataset.view);
-    else if (t.dataset.kit) add({ kit: t.dataset.kit }, KITS.find((k) => k.id === t.dataset.kit).name);
-    else if (t.dataset.inc) changeQty(t.dataset.inc, 1);
-    else if (t.dataset.dec) changeQty(t.dataset.dec, -1);
+    const b = e.target.closest("[data-goto]");
+    if (!b) return;
+    state.f = b.dataset.goto; render();
+    $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
   });
+  window.TDV_SEARCH = (q) => { state.q = q; state.f = "Todos"; $("#search").value = q; render(); closeView(); $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); };
 
-  // ---------- Avisos ----------
-  let toastTimer;
-  function toast(msg) {
-    const el = $("#toast");
-    el.textContent = msg; el.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  // ---------- Kits armables ----------
+  const kitSel = Object.fromEntries(KITS.map((k) => [k.id, new Set(k.items)]));
+  function renderKits() {
+    $("#kitsGrid").innerHTML = KITS.map((k) => {
+      const sel = [...kitSel[k.id]];
+      const price = sel.reduce((s, id) => s + (pesos(byId[id]) || 0), 0) * (1 - k.off);
+      return `<article class="kit${k.highlight ? " kit-hl" : ""}">
+        ${k.highlight ? '<span class="badge">El más elegido</span>' : ""}
+        <div class="kit-emoji">${k.emoji}</div>
+        <h3>${esc(k.name)}</h3>
+        <p class="muted">${esc(k.tagline)}</p>
+        <ul>${k.items.map((id) => `<li><label><input type="checkbox" data-kit="${k.id}" data-item="${id}" ${kitSel[k.id].has(id) ? "checked" : ""}> ${esc(byId[id].name)}</label></li>`).join("")}</ul>
+        <div class="kit-price"><b>${sel.length ? ars(price) : "—"}</b><span class="muted small">con 10% off</span></div>
+        <button class="btn btn-primary btn-block" data-addkit="${k.id}" ${sel.length < 2 ? "disabled" : ""}>${sel.length < 2 ? "Elegí al menos 2" : "Agregar kit"}</button>
+      </article>`;
+    }).join("");
   }
-
-  $("#newsForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    e.target.reset();
-    toast("¡Bienvenido a bordo! Te vamos a escribir pronto 📬");
+  $("#kitsGrid").addEventListener("change", (e) => {
+    const c = e.target.closest("[data-kit]"); if (!c) return;
+    const s = kitSel[c.dataset.kit];
+    c.checked ? s.add(c.dataset.item) : s.delete(c.dataset.item);
+    renderKits();
+  });
+  $("#kitsGrid").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-addkit]"); if (!b) return;
+    const k = KITS.find((x) => x.id === b.dataset.addkit);
+    add({ kit: k.id, items: k.items.filter((id) => kitSel[k.id].has(id)) }, k.name);
   });
 
-  // ---------- Horizonte artificial ----------
-  const horizon = $("#horizon");
-  let target = { bank: 0, pitch: 0 }, cur = { bank: 0, pitch: 0 }, userMoved = false;
-  window.addEventListener("pointermove", (e) => {
-    userMoved = true;
-    target.bank = ((e.clientX / innerWidth) - 0.5) * 50;
-    target.pitch = ((e.clientY / innerHeight) - 0.5) * 30;
+  // ---------- Marcas ----------
+  const marcas = [...new Set(PRODUCTS.map((p) => p.brand).filter(Boolean))];
+  $("#brands").innerHTML = marcas.map((m) => `<button class="brand-chip" data-brand="${esc(m)}">${esc(m)}</button>`).join("");
+  $("#brands").addEventListener("click", (e) => { const b = e.target.closest("[data-brand]"); if (b) window.TDV_SEARCH(b.dataset.brand); });
+
+  // ---------- Ficha de producto (/producto/id) ----------
+  const view = $("#pview");
+  let current = null, lastScroll = 0;
+  const baseTitle = document.title;
+  function openView(id, push = true) {
+    const p = byId[id];
+    if (!p) return;
+    current = p;
+    if (view.hidden) lastScroll = scrollY;
+    const fotos = p.fotos && p.fotos.length ? p.fotos : null;
+    $("#pvGallery").innerHTML = fotos
+      ? `<div class="zoom" id="pvZoom"><img id="pvMain" src="${esc(fotos[0])}" alt="${esc(p.name)}"></div>
+         <div class="thumbs">${fotos.map((f, i) => `<button data-foto="${esc(f)}" aria-label="Foto ${i + 1}"><img src="${esc(f)}" alt=""></button>`).join("")}</div>`
+      : art(p, true);
+    $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
+    $("#pvTitle").textContent = p.name;
+    $("#pvTags").innerHTML = [
+      '<span class="seal seal-sm">✈ Recomendado por pilotos</span>',
+      p.encargo && '<span class="tag tag-order">Por encargo · 15 a 30 días</span>',
+      p.reacond && '<span class="tag">Reacondicionado</span>',
+      p.nuevo && '<span class="tag tag-new">Nuevo ingreso</span>',
+    ].filter(Boolean).join("");
+    $("#pvPrice").innerHTML = priceHTML(p, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar oficial del día.</p>' : "");
+    $("#pvDesc").textContent = p.desc;
+    $("#pvSpecs").innerHTML = p.specs.map((s) => `<li>${esc(s)}</li>`).join("");
+    $("#pvEtapas").innerHTML = p.etapas?.length ? `<span class="muted small">Ideal para:</span> ${p.etapas.map((e) => `<span class="tag">${ETAPAS[e]}</span>`).join("")}` : "";
+    $("#pvVariantWrap").hidden = !p.variantes;
+    $("#pvVariant").innerHTML = (p.variantes || []).map((v) => `<option>${esc(v)}</option>`).join("");
+    const conPrecio = p.usd || p.ars;
+    $("#pvAdd").hidden = !conPrecio;
+    $("#pvAsk").href = waLink(`¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`);
+    $("#pvAsk").textContent = conPrecio ? "Consultar por WhatsApp" : "Consultar precio por WhatsApp";
+    $("#pvShare").href = `https://wa.me/?text=${encodeURIComponent(`Mirá esto en Tienda de Vuelo: ${p.name} ${CONFIG.sitio}/producto/${p.id}`)}`;
+    syncFav();
+    // Se lleva junto con: productos de los kits donde está, o de la misma etapa
+    const enKits = KITS.filter((k) => k.items.includes(p.id)).flatMap((k) => k.items);
+    const etapa = visibles.filter((x) => x.etapas?.some((e) => p.etapas?.includes(e)));
+    const together = [...new Set([...enKits, ...etapa.map((x) => x.id)])].filter((id) => id !== p.id && byId[id].cat !== p.cat).slice(0, 4);
+    $("#pvTogether").innerHTML = together.map((id) => card(byId[id])).join("");
+    $("#pvRelated").innerHTML = visibles.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4).map(card).join("");
+    view.hidden = false;
+    document.body.classList.add("viewing");
+    document.title = `${p.name} · Tienda de Vuelo`;
+    if (push) history.pushState({ id }, "", `/producto/${id}`);
+    view.scrollTop = 0; window.scrollTo(0, 0);
+  }
+  function closeView(push = true) {
+    if (view.hidden) return;
+    view.hidden = true; current = null;
+    document.body.classList.remove("viewing");
+    document.title = baseTitle;
+    if (push) history.pushState({}, "", "/");
+    window.scrollTo(0, lastScroll);
+  }
+  const syncFav = () => { if (current) $("#pvFav").textContent = isFav(current.id) ? "♥ En favoritos" : "♡ Guardar en favoritos"; };
+  $("#pvFav").onclick = () => { toggleFav(current.id); };
+  $("#pvBack").onclick = () => (history.state && history.length > 1 ? history.back() : closeView());
+  $("#pvAdd").onclick = () => add({ id: current.id, variante: current.variantes ? $("#pvVariant").value : "" }, current.name);
+  $("#pvGallery").addEventListener("click", (e) => { const t = e.target.closest("[data-foto]"); if (t) $("#pvMain").src = t.dataset.foto; });
+  $("#pvGallery").addEventListener("mousemove", (e) => {
+    const z = e.target.closest("#pvZoom"); if (!z) return;
+    const r = z.getBoundingClientRect();
+    z.style.setProperty("--zx", ((e.clientX - r.left) / r.width) * 100 + "%");
+    z.style.setProperty("--zy", ((e.clientY - r.top) / r.height) * 100 + "%");
   });
-  window.addEventListener("deviceorientation", (e) => {
-    if (e.gamma == null) return;
-    userMoved = true;
-    target.bank = Math.max(-35, Math.min(35, e.gamma));
-    target.pitch = Math.max(-15, Math.min(15, (e.beta || 45) - 45));
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-view]");
+    if (!a || e.metaKey || e.ctrlKey) return;
+    e.preventDefault(); openView(a.dataset.view);
   });
-  function loop(t) {
-    if (!userMoved) { target.bank = Math.sin(t / 1800) * 12; target.pitch = Math.sin(t / 2600) * 5; }
-    cur.bank += (target.bank - cur.bank) * 0.06;
-    cur.pitch += (target.pitch - cur.pitch) * 0.06;
-    horizon.style.transform = `rotate(${-cur.bank}deg) translateY(${cur.pitch * 2}px)`;
+  window.addEventListener("popstate", () => {
+    const m = location.pathname.match(/^\/producto\/([\w-]+)/);
+    m ? openView(m[1], false) : closeView(false);
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !view.hidden) closeView(); });
+
+  // ---------- Altímetro: sube con el scroll ----------
+  const ticks = $("#altTicks"), nums = $("#altNums");
+  for (let i = 0; i < 50; i++) {
+    const a = (i / 50) * Math.PI * 2, big = i % 5 === 0;
+    const r1 = big ? 70 : 76, r2 = 84;
+    ticks.insertAdjacentHTML("beforeend", `<line x1="${100 + Math.sin(a) * r1}" y1="${100 - Math.cos(a) * r1}" x2="${100 + Math.sin(a) * r2}" y2="${100 - Math.cos(a) * r2}" stroke="#e8f1fb" stroke-width="${big ? 2.4 : 1.2}"/>`);
+  }
+  for (let n = 0; n < 10; n++) {
+    const a = (n / 10) * Math.PI * 2;
+    nums.insertAdjacentHTML("beforeend", `<text x="${100 + Math.sin(a) * 58}" y="${106 - Math.cos(a) * 58}">${n}</text>`);
+  }
+  let altCur = 0, altTarget = 0;
+  const altFt = $("#altFt"), nH = $("#needleH"), nK = $("#needleK");
+  const updateTarget = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    altTarget = Math.max(0, Math.min(1, scrollY / (max || 1))) * 12500;
+  };
+  window.addEventListener("scroll", updateTarget, { passive: true });
+  function loop() {
+    altCur += (altTarget - altCur) * 0.08;
+    nH.setAttribute("transform", `rotate(${(altCur % 1000) * 0.36} 100 100)`);
+    nK.setAttribute("transform", `rotate(${(altCur / 10000) * 360} 100 100)`);
+    altFt.textContent = Math.round(altCur / 10) * 10 >= 0 ? (Math.round(altCur / 10) * 10).toLocaleString("es-AR") : "0";
     requestAnimationFrame(loop);
   }
-  if (!reduceMotion) requestAnimationFrame(loop);
+  if (reduceMotion) { updateTarget(); altCur = altTarget; }
+  altTarget = 1500; // despegue al entrar
+  setTimeout(updateTarget, 2200);
+  requestAnimationFrame(loop);
 
-  // ---------- Animaciones al hacer scroll ----------
-  const io = new IntersectionObserver((entries) => entries.forEach((en) => {
-    if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
-  }), { threshold: 0.12 });
-  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-
-  window.addEventListener("scroll", () => $("#nav").classList.toggle("scrolled", scrollY > 30), { passive: true });
-  $("#year").textContent = new Date().getFullYear();
-
-  render();
-  renderCart();
+  // ---------- Arranque ----------
+  const rerender = () => { renderRows(); render(); renderKits(); if (current) openView(current.id, false); };
+  document.addEventListener("tdv:precios", rerender);
+  document.addEventListener("tdv:favs", () => { if (state.f === "Favoritos") render(); syncFav(); });
+  rerender();
+  const m = location.pathname.match(/^\/producto\/([\w-]+)/);
+  if (m) openView(m[1], false);
+  if (state.q) $("#catalogo").scrollIntoView();
 })();

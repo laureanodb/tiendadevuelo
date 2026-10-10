@@ -1,0 +1,12 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/producto/:id", "destination": "/index.html" }
+  ],
+  "redirects": [
+    { "source": "/kit", "destination": "/#kits", "permanent": false },
+    { "source": "/kits", "destination": "/#kits", "permanent": false },
+    { "source": "/pedido", "destination": "/contacto#pedido", "permanent": false },
+    { "source": "/arrepentimiento", "destination": "/legales#arrepentimiento", "permanent": false }
+  ]
+}

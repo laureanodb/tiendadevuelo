@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contacto · Tienda de Vuelo</title>
+  <meta name="description" content="Escribinos por WhatsApp o email. Pedí un producto que no está en la web y lo traemos por encargo.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/contacto">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="contacto" data-wa="¡Hola Tienda de Vuelo! Quería hacerles una consulta.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Contacto</span>
+      <h1>Hablemos</h1>
+      <p>Respondemos en el día. La forma más rápida es WhatsApp.</p>
+    </div></section>
+    <section class="wrap prose">
+      <div class="contact-grid">
+        <div class="contact-list">
+          <a class="contact-item" id="cWa" target="_blank" rel="noopener"><span class="muted small">WhatsApp</span><b id="cWaNum"></b></a>
+          <a class="contact-item" id="cMail"><span class="muted small">Email</span><b id="cMailTxt"></b></a>
+          <div class="contact-item"><span class="muted small">Dónde estamos</span><b id="cCity"></b><span class="muted small">Retiro coordinado por WhatsApp.</span></div>
+        </div>
+        <form class="form-card" id="contactForm">
+          <h2 style="margin:0;font-size:24px">Escribinos</h2>
+          <label>Tu nombre<input id="ctNombre" required autocomplete="name"></label>
+          <label>Tu consulta<textarea id="ctMsg" rows="4" required></textarea></label>
+          <button class="btn btn-primary" type="submit">Enviar por WhatsApp</button>
+        </form>
+      </div>
+
+      <h2 id="pedido">Pedí un producto que no está</h2>
+      <p>Lo traemos por encargo. Suele tardar 15 a 30 días. Te pasamos precio antes de confirmar.</p>
+      <form class="form-card" id="pedidoForm" style="max-width:640px">
+        <label>¿Qué producto buscás?<input id="pdProd" required placeholder="Ej.: auricular ANR con ficha LEMO"></label>
+        <label><span>Marca y modelo <span class="muted">(si sabés)</span></span><input id="pdMarca"></label>
+        <label>Cantidad<input id="pdCant" type="number" min="1" value="1"></label>
+        <label>Tu nombre<input id="pdNombre" required autocomplete="name"></label>
+        <button class="btn btn-primary" type="submit">Pedir por WhatsApp</button>
+      </form>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/site.js"></script>
+  <script>
+    (() => {
+      const { waLink } = window.TDV;
+      document.getElementById("cWa").href = waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.");
+      document.getElementById("cWaNum").textContent = CONFIG.whatsappVisible;
+      document.getElementById("cMail").href = "mailto:" + CONFIG.email;
+      document.getElementById("cMailTxt").textContent = CONFIG.email;
+      document.getElementById("cCity").textContent = CONFIG.ciudad;
+      const v = (id) => document.getElementById(id).value.trim();
+      document.getElementById("contactForm").onsubmit = (e) => {
+        e.preventDefault();
+        window.open(waLink(`¡Hola! Soy ${v("ctNombre")}. ${v("ctMsg")}`), "_blank", "noopener");
+      };
+      document.getElementById("pedidoForm").onsubmit = (e) => {
+        e.preventDefault();
+        window.open(waLink(`¡Hola! Soy ${v("pdNombre")}. Quiero pedir por encargo:\n• Producto: ${v("pdProd")}` + (v("pdMarca") ? `\n• Marca y modelo: ${v("pdMarca")}` : "") + `\n• Cantidad: ${v("pdCant") || 1}`), "_blank", "noopener");
+      };
+    })();
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
