@@ -33,11 +33,11 @@ const ICONS = {
 };
 
 const CAT_COLORS = {
-  "Comunicaciones": ["#1d4ed8", "#38bdf8"],
-  "Navegación": ["#0f766e", "#2dd4bf"],
-  "Uniforme": ["#1e3a8a", "#a78bfa"],
-  "Accesorios": ["#9a3412", "#fb923c"],
-  "Libros y regalos": ["#7c2d12", "#fbbf24"],
+  "Comunicaciones": ["#0e8be0", "#d6ebfc"],
+  "Navegación": ["#0f8f7e", "#d5f1ec"],
+  "Uniforme": ["#3b55c4", "#e1e7fb"],
+  "Accesorios": ["#e0742c", "#fde6d6"],
+  "Libros y regalos": ["#b7791f", "#f9ecd2"],
 };
 
 const PRODUCTS = [
