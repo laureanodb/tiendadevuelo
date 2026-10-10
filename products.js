@@ -1,7 +1,7 @@
 // Datos de la tienda: cambiá esto y se actualiza todo el sitio.
 const CONFIG = {
-  whatsapp: "5491100000000",            // número con código de país, sin + ni espacios (FALTA EL REAL)
-  whatsappVisible: "+54 9 11 0000-0000", // cómo se muestra escrito
+  whatsapp: "5491133586360",            // número con código de país, sin + ni espacios
+  whatsappVisible: "11 3358-6360",      // cómo se muestra escrito
   email: "info@tiendadevuelo.com.ar",
   ciudad: "CABA, Buenos Aires",
   ventas: "+2.500",                      // ventas realizadas
