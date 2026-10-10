@@ -46,25 +46,8 @@
           </ul>
         </div>
 
-        <!-- Altímetro: sube a medida que bajás por la página -->
-        <div class="instrument-wrap">
-          <div class="instrument" aria-hidden="true">
-            <svg viewBox="0 0 200 200" class="alt-svg">
-              <circle cx="100" cy="100" r="96" fill="#0c2340"/>
-              <circle cx="100" cy="100" r="86" fill="#0a1a2f"/>
-              <g id="altTicks"></g>
-              <g font-family="Outfit, sans-serif" font-size="17" font-weight="600" fill="#e8f1fb" text-anchor="middle" id="altNums"></g>
-              <rect x="122" y="92" width="36" height="16" rx="2" fill="#071222" stroke="#2b4466"/>
-              <text x="140" y="104.5" font-family="Outfit, sans-serif" font-size="11" fill="#e8f1fb" text-anchor="middle">1013</text>
-              <text x="100" y="70" font-family="Inter, sans-serif" font-size="8" letter-spacing="2" fill="#93a7bf" text-anchor="middle">ALT</text>
-              <text x="100" y="140" font-family="Inter, sans-serif" font-size="7" letter-spacing="1.5" fill="#93a7bf" text-anchor="middle">100 FEET</text>
-              <g id="needleK"><path d="M100 100 L96 104 L100 52 L104 104 Z" fill="#e8f1fb"/></g>
-              <g id="needleH"><path d="M100 100 L98 106 L100 22 L102 106 Z" fill="#ffb020"/></g>
-              <circle cx="100" cy="100" r="6" fill="#1d3550" stroke="#e8f1fb" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <div class="alt-readout"><span id="altFt">0</span> ft · bajá para ganar altura</div>
-        </div>
+        <!-- Vitrina: los productos destacados rotan solos -->
+        <div class="showcase" id="showcase" aria-roledescription="carrusel" aria-label="Productos destacados"></div>
       </div>
     </section>
 
@@ -235,8 +218,7 @@
   </div>
 
   <script src="/products.js"></script>
-  <script src="/site.js"></script>
-  <script src="/app.js"></script>
+  <script src="/catalogo.js" data-load="/site.js,/app.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

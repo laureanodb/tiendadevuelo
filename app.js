@@ -182,38 +182,41 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !view.hidden) closeView(); });
 
-  // ---------- Altímetro: sube con el scroll ----------
-  const ticks = $("#altTicks"), nums = $("#altNums");
-  for (let i = 0; i < 50; i++) {
-    const a = (i / 50) * Math.PI * 2, big = i % 5 === 0;
-    const r1 = big ? 70 : 76, r2 = 84;
-    ticks.insertAdjacentHTML("beforeend", `<line x1="${100 + Math.sin(a) * r1}" y1="${100 - Math.cos(a) * r1}" x2="${100 + Math.sin(a) * r2}" y2="${100 - Math.cos(a) * r2}" stroke="#e8f1fb" stroke-width="${big ? 2.4 : 1.2}"/>`);
+  // ---------- Vitrina de la portada ----------
+  let vi = 0, vTimer;
+  function renderShowcase() {
+    const dest = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado);
+    const lista = (dest.length >= 2 ? dest : visibles.filter((p) => p.top || p.nuevo)).slice(0, 5);
+    if (!lista.length) { $("#showcase").hidden = true; return; }
+    $("#showcase").innerHTML = `
+      <div class="sc-stage">${lista.map((p, i) => `
+        <a class="sc-slide" href="/producto/${p.id}" data-view="${p.id}" data-i="${i}" aria-label="${esc(p.name)}">
+          <div class="sc-img">${art(p, true)}</div>
+          <div class="sc-info">
+            <span class="sc-brand">${esc(p.brand || p.cat)}</span>
+            <b class="sc-name">${esc(p.name)}</b>
+            ${priceHTML(p)}
+            <span class="sc-cta">Ver producto →</span>
+          </div>
+        </a>`).join("")}</div>
+      <div class="sc-thumbs">${lista.map((p, i) => `<button class="sc-thumb" data-sc="${i}" aria-label="Ver ${esc(p.name)}">${art(p)}</button>`).join("")}</div>`;
+    showSlide(vi % lista.length);
+    clearInterval(vTimer);
+    if (!reduceMotion && lista.length > 1) vTimer = setInterval(() => showSlide((vi + 1) % lista.length), 4500);
   }
-  for (let n = 0; n < 10; n++) {
-    const a = (n / 10) * Math.PI * 2;
-    nums.insertAdjacentHTML("beforeend", `<text x="${100 + Math.sin(a) * 58}" y="${106 - Math.cos(a) * 58}">${n}</text>`);
+  function showSlide(i) {
+    vi = i;
+    document.querySelectorAll(".sc-slide").forEach((s) => s.classList.toggle("on", +s.dataset.i === i));
+    document.querySelectorAll(".sc-thumb").forEach((t) => t.setAttribute("aria-current", +t.dataset.sc === i));
   }
-  let altCur = 0, altTarget = 0;
-  const altFt = $("#altFt"), nH = $("#needleH"), nK = $("#needleK");
-  const updateTarget = () => {
-    const max = document.documentElement.scrollHeight - innerHeight;
-    altTarget = Math.max(0, Math.min(1, scrollY / (max || 1))) * 12500;
-  };
-  window.addEventListener("scroll", updateTarget, { passive: true });
-  function loop() {
-    altCur += (altTarget - altCur) * 0.08;
-    nH.setAttribute("transform", `rotate(${(altCur % 1000) * 0.36} 100 100)`);
-    nK.setAttribute("transform", `rotate(${(altCur / 10000) * 360} 100 100)`);
-    altFt.textContent = Math.round(altCur / 10) * 10 >= 0 ? (Math.round(altCur / 10) * 10).toLocaleString("es-AR") : "0";
-    requestAnimationFrame(loop);
-  }
-  if (reduceMotion) { updateTarget(); altCur = altTarget; }
-  altTarget = 1500; // despegue al entrar
-  setTimeout(updateTarget, 2200);
-  requestAnimationFrame(loop);
+  $("#showcase").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-sc]"); if (!t) return;
+    showSlide(+t.dataset.sc); renderShowcaseTimer();
+  });
+  const renderShowcaseTimer = () => { clearInterval(vTimer); const n = document.querySelectorAll(".sc-slide").length; if (!reduceMotion && n > 1) vTimer = setInterval(() => showSlide((vi + 1) % n), 4500); };
 
   // ---------- Arranque ----------
-  const rerender = () => { renderRows(); render(); renderKits(); if (current) openView(current.id, false); };
+  const rerender = () => { renderShowcase(); renderRows(); render(); renderKits(); if (current) openView(current.id, false); };
   document.addEventListener("tdv:precios", rerender);
   document.addEventListener("tdv:favs", () => { if (state.f === "Favoritos") render(); syncFav(); });
   rerender();

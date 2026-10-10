@@ -325,4 +325,5 @@
 
   window.TDV = { $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, get favs() { return favs; } };
   renderCart();
+  window.dispatchEvent(new Event("tdv:listo"));
 })();

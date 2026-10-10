@@ -50,9 +50,9 @@
   </main>
   <div id="siteFooter"></div>
   <script src="/products.js"></script>
-  <script src="/site.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
   <script>
-    (() => {
+    window.addEventListener("tdv:listo", () => {
       const { waLink } = window.TDV;
       document.getElementById("cWa").href = waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.");
       document.getElementById("cWaNum").textContent = CONFIG.whatsappVisible;
@@ -68,7 +68,7 @@
         e.preventDefault();
         window.open(waLink(`¡Hola! Soy ${v("pdNombre")}. Quiero pedir por encargo:\n• Producto: ${v("pdProd")}` + (v("pdMarca") ? `\n• Marca y modelo: ${v("pdMarca")}` : "") + `\n• Cantidad: ${v("pdCant") || 1}`), "_blank", "noopener");
       };
-    })();
+    });
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>

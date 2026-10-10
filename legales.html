@@ -52,9 +52,9 @@
   </main>
   <div id="siteFooter"></div>
   <script src="/products.js"></script>
-  <script src="/site.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
   <script>
-    (() => {
+    window.addEventListener("tdv:listo", () => {
       const { waLink } = window.TDV;
       for (const id of ["mailPriv", "mailArr"]) { const el = document.getElementById(id); el.textContent = CONFIG.email; if (el.tagName === "A") el.href = "mailto:" + CONFIG.email; }
       const v = (id) => document.getElementById(id).value.trim();
@@ -62,7 +62,7 @@
         e.preventDefault();
         window.open(waLink(`Solicitud de arrepentimiento de compra\n• Nombre: ${v("arNombre")}\n• Contacto: ${v("arContacto")}\n• Pedido: ${v("arPedido")}\n• Producto: ${v("arProd")}`), "_blank", "noopener");
       };
-    })();
+    });
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>

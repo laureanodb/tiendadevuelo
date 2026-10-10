@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Panel · Tienda de Vuelo</title>
+  <meta name="theme-color" content="#0c2340">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/panel.css">
+</head>
+<body class="panel">
+  <header class="p-top">
+    <div class="wrap p-top-inner">
+      <a href="/panel" class="brand"><img src="/logo.svg" alt="" width="36" height="36"><span class="brand-text"><b>Panel</b><small>Tienda de Vuelo</small></span></a>
+      <div class="p-top-actions">
+        <a class="p-link" href="/" target="_blank" rel="noopener">Ver la web ↗</a>
+        <button class="p-link" id="salir" hidden>Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap p-main" id="app">
+    <p class="p-loading">Cargando…</p>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/products.js"></script>
+  <script src="/panel.js"></script>
+</body>
+</html>
