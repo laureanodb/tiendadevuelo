@@ -92,8 +92,8 @@ img, svg { display: block; max-width: 100%; }
 .c2 { width: 160px; top: 60%; animation-duration: 95s; animation-delay: -40s; }
 .c3 { width: 260px; top: 85%; animation-duration: 120s; animation-delay: -80s; }
 @keyframes drift { from { transform: translateX(-320px); } to { transform: translateX(110vw); } }
-.plane { position: absolute; top: 14%; width: 56px; color: rgba(12, 35, 64, .22); animation: fly 26s linear infinite; }
-@keyframes fly { 0% { transform: translate(-80px, 40px) rotate(-6deg); } 100% { transform: translate(110vw, -60px) rotate(-6deg); } }
+.plane { position: absolute; top: 12%; left: 0; width: 150px; color: rgba(12, 35, 64, .5); filter: drop-shadow(0 6px 6px rgba(12, 35, 64, .12)); animation: fly 24s linear infinite; }
+@keyframes fly { 0% { transform: translate(-140px, 60px) rotate(-7deg); } 100% { transform: translate(110vw, -70px) rotate(-7deg); } }
 .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; align-items: center; gap: 48px; }
 .pill { display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 14px; color: var(--muted); }
 .hero h1 { font-size: clamp(38px, 6vw, 72px); margin: 18px 0 16px; }
