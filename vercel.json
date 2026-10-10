@@ -1,7 +1,7 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/producto/:id", "destination": "/index.html" }
+    { "source": "/producto/:id", "destination": "/" }
   ],
   "redirects": [
     { "source": "/kit", "destination": "/#kits", "permanent": false },
