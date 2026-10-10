@@ -7,6 +7,17 @@ const CONFIG = {
   ventas: "+2.500",                      // ventas realizadas
   dolarRespaldo: 1500,                   // si no se puede leer el dólar oficial del día
   sitio: "https://www.tiendadevuelo.com.ar",
+  horario: { desde: 9, hasta: 21 },      // fuera de este horario la web avisa cuándo respondemos
+};
+
+// Texto de cada categoría para su página (/categoria/...): lo lee Google.
+const CAT_INFO = {
+  "Comunicaciones": "Auriculares de aviación ANR y pasivos, adaptadores y accesorios para tus comunicaciones en cabina.",
+  "Navegación": "Kneeboards, computadoras de vuelo E6B, plotters, cartas VFR y libros de vuelo para planificar y volar.",
+  "Aviónica": "GPS portátiles, relojes de piloto y equipos electrónicos para la cabina.",
+  "Uniforme": "Alas, charreteras y porta credenciales para pilotos y tripulantes de cabina.",
+  "Accesorios": "Flight bags, linternas, anteojos, testers de combustible y todo lo que llevás en cada vuelo.",
+  "Libros y regalos": "Manuales de estudio y regalos para pilotos.",
 };
 
 const CATEGORIES = ["Comunicaciones", "Navegación", "Aviónica", "Uniforme", "Accesorios", "Libros y regalos"];

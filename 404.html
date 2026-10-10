@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Página no encontrada · Tienda de Vuelo</title>
+  <meta name="description" content="La página que buscás no existe.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="404" data-wa="¡Hola! No encontré lo que buscaba en la web.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero nf"><div class="wrap narrow">
+      <span class="kicker">Error 404</span>
+      <h1>Perdimos el rumbo</h1>
+      <p>La página que buscás no existe o cambió de lugar. Probá buscando el producto o volvé a la pista principal.</p>
+      <form class="nf-search" action="/" method="get" onsubmit="this.action='/#catalogo'" role="search">
+        <input name="q" type="search" placeholder="Buscá un producto: auricular, GPS, logbook…" aria-label="Buscar productos">
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </form>
+      <div class="cta-row"><a class="btn btn-ghost" href="/">Ir al inicio</a><a class="btn btn-ghost" href="/contacto">Escribinos</a></div>
+    </div></section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

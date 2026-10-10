@@ -1,12 +1,86 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/producto/:id", "destination": "/" }
+    {
+      "source": "/producto/:id",
+      "destination": "/"
+    },
+    {
+      "source": "/categoria/:slug",
+      "destination": "/"
+    },
+    {
+      "source": "/marca/:slug",
+      "destination": "/"
+    },
+    {
+      "source": "/ofertas",
+      "destination": "/"
+    },
+    {
+      "source": "/usados",
+      "destination": "/"
+    },
+    {
+      "source": "/novedades",
+      "destination": "/"
+    }
   ],
   "redirects": [
-    { "source": "/kit", "destination": "/#kits", "permanent": false },
-    { "source": "/kits", "destination": "/#kits", "permanent": false },
-    { "source": "/pedido", "destination": "/contacto#pedido", "permanent": false },
-    { "source": "/arrepentimiento", "destination": "/legales#arrepentimiento", "permanent": false }
+    {
+      "source": "/kit",
+      "destination": "/#kits",
+      "permanent": false
+    },
+    {
+      "source": "/kits",
+      "destination": "/#kits",
+      "permanent": false
+    },
+    {
+      "source": "/pedido",
+      "destination": "/contacto#pedido",
+      "permanent": false
+    },
+    {
+      "source": "/arrepentimiento",
+      "destination": "/legales#arrepentimiento",
+      "permanent": false
+    },
+    {
+      "source": "/auriculares",
+      "destination": "/categoria/comunicaciones",
+      "permanent": false
+    },
+    {
+      "source": "/gps",
+      "destination": "/categoria/avionica",
+      "permanent": false
+    },
+    {
+      "source": "/navegacion",
+      "destination": "/categoria/navegacion",
+      "permanent": false
+    },
+    {
+      "source": "/accesorios",
+      "destination": "/categoria/accesorios",
+      "permanent": false
+    },
+    {
+      "source": "/primer-vuelo",
+      "destination": "/guia-primer-vuelo",
+      "permanent": false
+    },
+    {
+      "source": "/tripulantes",
+      "destination": "/#tripulantes",
+      "permanent": false
+    },
+    {
+      "source": "/regalos",
+      "destination": "/#regalos",
+      "permanent": false
+    }
   ]
 }

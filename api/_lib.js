@@ -44,6 +44,9 @@ export function ensureSchema() {
       creado timestamptz not null default now(), actualizado timestamptz not null default now()
     )`);
     // La tabla no se lee desde el navegador: solo desde estas funciones.
+    await q(`alter table tdv_productos add column if not exists antes numeric`);
+    await q(`alter table tdv_productos add column if not exists oferta_hasta date`);
+    await q(`alter table tdv_productos add column if not exists video text not null default ''`);
     await q(`alter table tdv_productos enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       await fetch(`${SUPA_URL}/storage/v1/bucket`, {
@@ -62,13 +65,19 @@ export function fromRow(r, admin = false) {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
     regalo: r.regalo, tcp: r.tcp, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
-    specs: r.specs, desc: r.descr, fotos: r.fotos,
+    specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
   };
+  // Oferta vigente: precio anterior cargado y fecha de fin no vencida (hora de Argentina).
+  const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  const hasta = r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null;
+  const precio = num(r.usd) ?? num(r.ars);
+  if (num(r.antes) && precio && num(r.antes) > precio && (!hasta || hasta >= hoy)) { p.antes = num(r.antes); p.ofertaHasta = hasta; }
   if (!admin) {
     p.agotado = r.stock !== null && r.stock <= 0 && !r.encargo;
+    p.ultimas = r.stock !== null && r.stock > 0 && r.stock < 3;
     return p;
   }
-  return { ...p, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
+  return { ...p, antes: num(r.antes), ofertaHasta: r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
     visible: r.visible, proveedor: r.proveedor, notas: r.notas, orden: r.orden, actualizado: r.actualizado };
 }
 
@@ -86,6 +95,8 @@ export function toRow(p) {
     encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp,
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
+    antes: money(p.antes), oferta_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(p.ofertaHasta || "")) ? p.ofertaHasta : null,
+    video: /^https:\/\//.test(str(p.video, 300)) ? str(p.video, 300) : "",
     visible: p.visible !== false, proveedor: str(p.proveedor, 120), notas: str(p.notas, 1000), orden: int(p.orden) ?? 0,
   };
 }

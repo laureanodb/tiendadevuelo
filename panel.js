@@ -213,6 +213,7 @@
           <label>Descripción corta<textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
           <label><span>Características <span class="muted">(una por renglón)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón, ej.: Fichas GA dual)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
+          <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
         </section>
 
         <section class="p-card">
@@ -220,7 +221,12 @@
           <div class="p-seg" role="radiogroup" aria-label="Moneda">
             ${[["USD", "En dólares"], ["ARS", "En pesos"], ["consultar", "A consultar"]].map(([v, t]) => `<label><input type="radio" name="moneda" value="${v}"${v === moneda ? " checked" : ""}> ${t}</label>`).join("")}
           </div>
-          <label id="precioWrap">Precio de venta<input id="precio" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(precio)}"></label>
+          <div id="precioWrap" class="p-grid2">
+            <label>Precio de venta<input id="precio" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(precio)}"></label>
+            <label><span>Precio anterior <span class="muted">(para mostrarlo en oferta)</span></span><input id="antes" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.antes ?? "")}"></label>
+            <label><span>Oferta hasta <span class="muted">(vacío = sin fecha)</span></span><input id="ofertaHasta" type="date" value="${esc(p.ofertaHasta || "")}"></label>
+          </div>
+          <p class="muted small" id="ofertaInfo"></p>
           <div class="p-grid2">
             <label><span>Costo <span class="muted">(no se muestra)</span></span><input id="costo" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.costo ?? "")}"></label>
             <label>Moneda del costo<select id="costoMoneda"><option value="USD"${p.costoMoneda === "USD" ? " selected" : ""}>Dólares</option><option value="ARS"${p.costoMoneda === "ARS" ? " selected" : ""}>Pesos</option></select></label>
@@ -296,6 +302,11 @@
       toast("Fotos listas. Acordate de guardar.");
     };
 
+    const ofertaInfo = () => {
+      const pr = Number(val("precio")), an = Number(val("antes"));
+      $("ofertaInfo").textContent = an && pr && an > pr ? `Se va a mostrar como oferta: ${Math.round((1 - pr / an) * 100)}% off${val("ofertaHasta") ? ", hasta el " + val("ofertaHasta").split("-").reverse().join("/") : ""}.` : an && pr ? "El precio anterior tiene que ser mayor que el de venta para mostrarse como oferta." : "";
+    };
+    ["antes", "ofertaHasta"].forEach((id) => ($(id).oninput = ofertaInfo));
     const syncPrecio = () => { $("precioWrap").hidden = monedaSel() === "consultar"; ganancia(); };
     function ganancia() {
       const m = monedaSel(), pr = Number(val("precio")), co = Number(val("costo")), cm = $("costoMoneda").value;
@@ -307,7 +318,8 @@
       $("ganancia").classList.toggle("neg", g < 0);
     }
     document.querySelectorAll('input[name="moneda"]').forEach((r) => (r.onchange = syncPrecio));
-    ["precio", "costo", "costoMoneda"].forEach((id) => ($(id).oninput = ganancia));
+    ["precio", "costo", "costoMoneda"].forEach((id) => ($(id).oninput = () => { ganancia(); ofertaInfo(); }));
+    ofertaInfo();
     syncPrecio();
 
     let dirty = false;
@@ -342,7 +354,7 @@
       const datos = {
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
-        costo: val("costo"), costoMoneda: $("costoMoneda").value, stock: val("stock"), stockMin: val("stockMin"),
+        costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
         desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),

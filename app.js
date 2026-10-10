@@ -1,6 +1,6 @@
-// Portada: destacados, banners, catálogo, kits armables, altímetro y ficha de producto.
+// Portada: vitrina, destacados, banners, catálogo con filtros, páginas de categoría y marca, kits armables y ficha de producto.
 (() => {
-  const { $, esc, ars, byId, pesos, priceHTML, art, card, waLink, add, toast, isFav, toggleFav } = window.TDV;
+  const { $, esc, ars, byId, pesos, priceHTML, art, card, waLink, add, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa } = window.TDV;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const visibles = PRODUCTS.filter((p) => !p.agotado);
 
@@ -9,6 +9,9 @@
     $("#destacados").innerHTML = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map(card).join("");
     $("#tcpGrid").innerHTML = visibles.filter((p) => p.tcp).slice(0, 4).map(card).join("");
     $("#regalosGrid").innerHTML = visibles.filter((p) => p.regalo).slice(0, 4).map(card).join("");
+    const usados = visibles.filter((p) => p.reacond);
+    $("#usados").hidden = !usados.length;
+    $("#usadosGrid").innerHTML = usados.slice(0, 4).map(card).join("");
   };
 
   // ---------- Banners que rotan ----------
@@ -28,12 +31,16 @@
   showBanner(0); autoBanner();
 
   // ---------- Categorías ----------
-  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚" };
-  $("#cats").innerHTML = CATEGORIES.map((c) => `<button class="cat-card" data-goto="${c}"><span>${catEmoji[c] || "✈"}</span>${c}</button>`).join("");
+  $("#cats").innerHTML = CATEGORIES.map((c) => `<a class="cat-card" href="/categoria/${slug(c)}" data-ruta><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("");
 
   // ---------- Catálogo ----------
-  const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados" };
-  const FILTROS = ["Todos", "Más vendidos", "Nuevo ingreso", "Por encargo", "Favoritos", ...CATEGORIES];
+  const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados", brand: "", min: "", max: "", vista: "grid" };
+  try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
+  const hace30 = Date.now() - 30 * 864e5;
+  const esNovedad = (p) => p.nuevo || (p.creado && new Date(p.creado).getTime() > hace30);
+  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), "Por encargo", "Favoritos", ...CATEGORIES];
+  const marcasTodas = [...new Set(visibles.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  $("#brand").insertAdjacentHTML("beforeend", marcasTodas.map((m) => `<option>${esc(m)}</option>`).join(""));
   const chips = $("#chips");
   chips.innerHTML = FILTROS.map((f) => `<button class="chip" role="tab" data-f="${f}">${f === "Favoritos" ? "♥ Favoritos" : f}</button>`).join("");
   chips.addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { state.f = b.dataset.f; render(); } });
@@ -44,10 +51,14 @@
     chips.querySelectorAll(".chip").forEach((c) => { const on = c.dataset.f === state.f; c.classList.toggle("on", on); c.setAttribute("aria-selected", on); });
     const q = norm(state.q);
     const pass = {
-      "Todos": () => true, "Más vendidos": (p) => p.top, "Nuevo ingreso": (p) => p.nuevo, "Por encargo": (p) => p.encargo, "Favoritos": (p) => isFav(p.id),
+      "Todos": () => true, "Ofertas": enOferta, "Novedades del mes": esNovedad, "Más vendidos": (p) => p.top,
+      "Usados y reacondicionados": (p) => p.reacond, "Por encargo": (p) => p.encargo, "Favoritos": (p) => isFav(p.id),
     };
+    const min = Number(state.min) || 0, max = Number(state.max) || Infinity;
     let list = visibles.filter((p) => (pass[state.f] ? pass[state.f](p) : p.cat === state.f) &&
-      (!q || norm([p.name, p.brand, p.model, p.desc, p.cat].join(" ")).includes(q)));
+      (!state.brand || p.brand === state.brand) &&
+      (!state.min && !state.max || (pesos(p) !== null && pesos(p) >= min && pesos(p) <= max)) &&
+      (!q || q.split(/\s+/).every((w) => norm([p.name, p.brand, p.model, p.desc, p.cat].join(" ")).includes(w))));
     const precio = (p) => pesos(p) ?? Infinity;
     const sorters = {
       destacados: (a, b) => (a.destacado || (a.top ? 50 : 99)) - (b.destacado || (b.top ? 50 : 99)),
@@ -57,6 +68,8 @@
     };
     list.sort(sorters[state.sort]);
     $("#grid").innerHTML = list.map(card).join("");
+    $("#grid").classList.toggle("as-list", state.vista === "list");
+    $("#vGrid").setAttribute("aria-pressed", state.vista === "grid"); $("#vList").setAttribute("aria-pressed", state.vista === "list");
     $("#empty").hidden = list.length > 0;
     $("#empty").innerHTML = state.f === "Favoritos" && !state.q
       ? "Todavía no guardaste favoritos. Tocá el ♡ de cualquier producto."
@@ -64,13 +77,42 @@
   }
   $("#search").addEventListener("input", (e) => { state.q = e.target.value; render(); });
   $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+  $("#brand").addEventListener("change", (e) => { state.brand = e.target.value; render(); });
+  $("#pMin").addEventListener("input", (e) => { state.min = e.target.value; render(); });
+  $("#pMax").addEventListener("input", (e) => { state.max = e.target.value; render(); });
+  const setVista = (v) => { state.vista = v; try { localStorage.setItem("tdv-vista", v); } catch {} render(); };
+  $("#vGrid").onclick = () => setVista("grid"); $("#vList").onclick = () => setVista("list");
+
+  // ---------- Páginas de categoría, marca, ofertas, usados y novedades ----------
+  const baseHead = { kicker: "Catálogo", title: "Equipate como un profesional" };
+  const metaDesc = document.querySelector('meta[name="description"]'), baseDesc = metaDesc.content;
+  function ruta(path, push) {
+    let f = "Todos", brand = "", kicker = baseHead.kicker, title = baseHead.title, text = "", pageTitle = "";
+    const m = path.match(/^\/(categoria|marca)\/([\w-]+)/);
+    if (m && m[1] === "categoria") { const c = CATEGORIES.find((x) => slug(x) === m[2]); if (c) { f = c; kicker = "Categoría"; title = c; text = CAT_INFO[c] || ""; pageTitle = `${c} para pilotos`; } }
+    else if (m) { const b = marcasTodas.find((x) => slug(x) === m[2]); if (b) { brand = b; kicker = "Marca"; title = b; text = `Productos ${b} originales para pilotos, con envío a todo el país.`; pageTitle = `${b} en Argentina`; } }
+    else if (path === "/ofertas") { f = "Ofertas"; kicker = "Ofertas"; title = "Ofertas del momento"; text = "Precios rebajados por tiempo limitado."; pageTitle = "Ofertas"; }
+    else if (path === "/usados") { f = "Usados y reacondicionados"; kicker = "Usados"; title = "Usados y reacondicionados"; text = "Equipos revisados y probados, a mejor precio."; pageTitle = "Usados y reacondicionados"; }
+    else if (path === "/novedades") { f = "Novedades del mes"; kicker = "Novedades"; title = "Novedades del mes"; text = "Lo último que llegó a la tienda."; pageTitle = "Novedades"; }
+    else return false;
+    Object.assign(state, { f, brand, q: "", min: "", max: "" });
+    $("#search").value = ""; $("#brand").value = brand; $("#pMin").value = ""; $("#pMax").value = "";
+    $("#catKicker").textContent = kicker; $("#catTitle").textContent = title;
+    $("#catText").textContent = text; $("#catText").hidden = !text;
+    document.title = `${pageTitle} · Tienda de Vuelo`;
+    if (text) metaDesc.content = text;
+    if (push) history.pushState({ ruta: path }, "", path);
+    closeView(false); render();
+    $("#catalogo").scrollIntoView({ behavior: push && !reduceMotion ? "smooth" : "auto" });
+    return true;
+  }
+  const rutaBase = () => { $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; metaDesc.content = baseDesc; };
   document.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-goto]");
-    if (!b) return;
-    state.f = b.dataset.goto; render();
-    $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+    const a = e.target.closest("a[href^='/categoria/'], a[href^='/marca/'], a[href='/ofertas'], a[href='/usados'], a[href='/novedades']");
+    if (!a || e.metaKey || e.ctrlKey) return;
+    if (ruta(a.getAttribute("href"), true)) e.preventDefault();
   });
-  window.TDV_SEARCH = (q) => { state.q = q; state.f = "Todos"; $("#search").value = q; render(); closeView(); $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); };
+  window.TDV_SEARCH = (q) => { state.q = q; state.f = "Todos"; state.brand = ""; $("#brand").value = ""; rutaBase(); $("#search").value = q; render(); closeView(); $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); };
 
   // ---------- Kits armables ----------
   const kitSel = Object.fromEntries(KITS.map((k) => [k.id, new Set(k.items)]));
@@ -103,8 +145,7 @@
 
   // ---------- Marcas ----------
   const marcas = [...new Set(PRODUCTS.map((p) => p.brand).filter(Boolean))];
-  $("#brands").innerHTML = marcas.map((m) => `<button class="brand-chip" data-brand="${esc(m)}">${esc(m)}</button>`).join("");
-  $("#brands").addEventListener("click", (e) => { const b = e.target.closest("[data-brand]"); if (b) window.TDV_SEARCH(b.dataset.brand); });
+  $("#brands").innerHTML = marcas.map((m) => `<a class="brand-chip" href="/marca/${slug(m)}">${esc(m)}</a>`).join("");
 
   // ---------- Ficha de producto (/producto/id) ----------
   const view = $("#pview");
@@ -117,8 +158,8 @@
     if (view.hidden) lastScroll = scrollY;
     const fotos = p.fotos && p.fotos.length ? p.fotos : null;
     $("#pvGallery").innerHTML = fotos
-      ? `<div class="zoom" id="pvZoom"><img id="pvMain" src="${esc(fotos[0])}" alt="${esc(p.name)}"></div>
-         <div class="thumbs">${fotos.map((f, i) => `<button data-foto="${esc(f)}" aria-label="Foto ${i + 1}"><img src="${esc(f)}" alt=""></button>`).join("")}</div>`
+      ? `<div class="swipe" id="pvSwipe">${fotos.map((f, i) => `<div class="zoom"><img src="${esc(f)}" alt="${esc(p.name)} (foto ${i + 1})" ${i ? 'loading="lazy"' : ""}></div>`).join("")}</div>
+         ${fotos.length > 1 ? `<div class="thumbs">${fotos.map((f, i) => `<button data-foto="${i}" aria-label="Foto ${i + 1}"${i ? "" : ' aria-current="true"'}><img src="${esc(f)}" alt=""></button>`).join("")}</div>` : ""}`
       : art(p, true);
     $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
     $("#pvTitle").textContent = p.name;
@@ -127,6 +168,8 @@
       p.encargo && '<span class="tag tag-order">Por encargo · 15 a 30 días</span>',
       p.reacond && '<span class="tag">Reacondicionado</span>',
       p.nuevo && '<span class="tag tag-new">Nuevo ingreso</span>',
+      p.ultimas && '<span class="tag tag-order">Últimas unidades</span>',
+      enOferta(p) && `<span class="tag tag-sale">Oferta${p.ofertaHasta ? " hasta el " + p.ofertaHasta.split("-").reverse().slice(0, 2).join("/") : ""}</span>`,
     ].filter(Boolean).join("");
     $("#pvPrice").innerHTML = priceHTML(p, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar oficial del día.</p>' : "");
     $("#pvDesc").textContent = p.desc;
@@ -136,8 +179,22 @@
     $("#pvVariant").innerHTML = (p.variantes || []).map((v) => `<option>${esc(v)}</option>`).join("");
     const conPrecio = p.usd || p.ars;
     $("#pvAdd").hidden = !conPrecio;
-    $("#pvAsk").href = waLink(`¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`);
-    $("#pvAsk").textContent = conPrecio ? "Consultar por WhatsApp" : "Consultar precio por WhatsApp";
+    const consulta = `¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`;
+    $("#pvAsk").href = waLink(consulta);
+    $("#pvAsk").hidden = !conPrecio;
+    const loQuiero = () => {
+      const op = p.variantes ? $("#pvVariant").value : "";
+      const precio = p.usd ? `US$ ${p.usd.toLocaleString("es-AR")}` : p.ars ? ars(p.ars) : "";
+      $("#pvWant").href = waLink(`¡Hola! Lo quiero: ${p.name}${p.brand ? ` (${p.brand}${p.model ? " " + p.model : ""})` : ""}${op ? `\nOpción: ${op}` : ""}${precio ? `\nPrecio: ${precio}` : ""}\n${CONFIG.sitio}/producto/${p.id}`);
+    };
+    $("#pvVariant").onchange = loQuiero; loQuiero();
+    $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar precio por WhatsApp";
+    setWa(consulta);
+    const yt = (p.video || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/);
+    $("#pvVideo").hidden = !p.video;
+    $("#pvVideo").innerHTML = yt
+      ? `<div class="video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="Video de ${esc(p.name)}" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+      : p.video ? `<a class="btn btn-ghost" href="${esc(p.video)}" target="_blank" rel="noopener">▶ Ver video del producto</a>` : "";
     $("#pvShare").href = `https://wa.me/?text=${encodeURIComponent(`Mirá esto en Tienda de Vuelo: ${p.name} ${CONFIG.sitio}/producto/${p.id}`)}`;
     syncFav();
     // Se lleva junto con: productos de los kits donde está, o de la misma etapa
@@ -157,6 +214,7 @@
     view.hidden = true; current = null;
     document.body.classList.remove("viewing");
     document.title = baseTitle;
+    setWa();
     if (push) history.pushState({}, "", "/");
     window.scrollTo(0, lastScroll);
   }
@@ -164,9 +222,17 @@
   $("#pvFav").onclick = () => { toggleFav(current.id); };
   $("#pvBack").onclick = () => (history.state && history.length > 1 ? history.back() : closeView());
   $("#pvAdd").onclick = () => add({ id: current.id, variante: current.variantes ? $("#pvVariant").value : "" }, current.name);
-  $("#pvGallery").addEventListener("click", (e) => { const t = e.target.closest("[data-foto]"); if (t) $("#pvMain").src = t.dataset.foto; });
+  $("#pvGallery").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-foto]"); if (!t) return;
+    const sw = $("#pvSwipe"); sw.scrollTo({ left: sw.clientWidth * +t.dataset.foto, behavior: reduceMotion ? "auto" : "smooth" });
+  });
+  $("#pvGallery").addEventListener("scroll", (e) => {
+    const sw = e.target.closest?.("#pvSwipe") || (e.target.id === "pvSwipe" ? e.target : null); if (!sw) return;
+    const i = Math.round(sw.scrollLeft / sw.clientWidth);
+    document.querySelectorAll("#pvGallery [data-foto]").forEach((b) => b.setAttribute("aria-current", +b.dataset.foto === i));
+  }, true);
   $("#pvGallery").addEventListener("mousemove", (e) => {
-    const z = e.target.closest("#pvZoom"); if (!z) return;
+    const z = e.target.closest(".zoom"); if (!z || matchMedia("(hover: none)").matches) return;
     const r = z.getBoundingClientRect();
     z.style.setProperty("--zx", ((e.clientX - r.left) / r.width) * 100 + "%");
     z.style.setProperty("--zy", ((e.clientY - r.top) / r.height) * 100 + "%");
@@ -178,7 +244,8 @@
   });
   window.addEventListener("popstate", () => {
     const m = location.pathname.match(/^\/producto\/([\w-]+)/);
-    m ? openView(m[1], false) : closeView(false);
+    if (m) return openView(m[1], false);
+    if (!ruta(location.pathname, false)) { closeView(false); rutaBase(); Object.assign(state, { f: "Todos", brand: "" }); $("#brand").value = ""; render(); }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !view.hidden) closeView(); });
 
@@ -222,5 +289,5 @@
   rerender();
   const m = location.pathname.match(/^\/producto\/([\w-]+)/);
   if (m) openView(m[1], false);
-  if (state.q) $("#catalogo").scrollIntoView();
+  else if (!ruta(location.pathname, false) && state.q) $("#catalogo").scrollIntoView();
 })();
