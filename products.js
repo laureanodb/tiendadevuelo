@@ -8,6 +8,13 @@ const CONFIG = {
   dolarRespaldo: 1500,                   // si no se puede leer el dólar oficial del día
   sitio: "https://www.tiendadevuelo.com.ar",
   horario: { desde: 9, hasta: 21 },      // fuera de este horario la web avisa cuándo respondemos
+  googleResenas: "",                     // link para dejar reseña en Google (de tu perfil de empresa)
+  dataFiscal: "",                        // link del QR de Data Fiscal de ARCA (si tenés CUIT activo)
+  // Fechas de eventos de ofertas: mientras dure, la web muestra el aviso y destaca las ofertas cargadas en el panel.
+  eventos: [
+    { nombre: "Cyber Monday", desde: "2026-11-02", hasta: "2026-11-04" },
+    { nombre: "Hot Sale", desde: "2027-05-10", hasta: "2027-05-12" },
+  ],
 };
 
 // Texto de cada categoría para su página (/categoria/...): lo lee Google.

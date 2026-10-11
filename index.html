@@ -143,6 +143,19 @@
       </div>
     </section>
 
+    <!-- Guía de auriculares -->
+    <section class="wrap section-tight">
+      <a class="guide-cta" href="/guia-auriculares"><span class="gc-ico" aria-hidden="true">🎧</span><span><b>¿Qué auricular me conviene?</b><small>Respondé 4 preguntas y te recomendamos el ideal para cómo volás.</small></span><span class="gc-go">Empezar →</span></a>
+    </section>
+
+    <!-- Opiniones -->
+    <section class="section" id="opiniones" hidden>
+      <div class="wrap">
+        <div class="row-head"><div><span class="kicker">Opiniones verificadas</span><h2>Lo que dicen los que ya volaron con lo nuestro</h2></div></div>
+        <div class="reviews" id="opinionesGrid"></div>
+      </div>
+    </section>
+
     <!-- Usados -->
     <section class="section" id="usados" hidden>
       <div class="wrap">
@@ -217,6 +230,7 @@
         <div class="pv-info">
           <div class="pv-brand" id="pvBrand"></div>
           <h1 id="pvTitle"></h1>
+          <a class="pv-rating" id="pvRating" href="#pvResenasH" hidden></a>
           <div class="pv-tags" id="pvTags"></div>
           <div class="pv-price" id="pvPrice"></div>
           <p class="pv-desc" id="pvDesc"></p>
@@ -230,14 +244,31 @@
           </div>
           <div class="pv-mini">
             <button class="link-btn" id="pvFav">♡ Guardar en favoritos</button>
-            <a class="link-btn" id="pvAsk" target="_blank" rel="noopener">Hacer una pregunta</a>
+            <a class="link-btn" id="pvAsk" target="_blank" rel="noopener">Consultar por WhatsApp</a>
+            <button class="link-btn" id="pvCmp">⇄ Comparar</button>
+            <button class="link-btn" id="pvGift">🎁 Regalar</button>
             <a class="link-btn" id="pvShare" target="_blank" rel="noopener">Compartir por WhatsApp</a>
           </div>
           <h2 class="pv-sub">Características</h2>
           <ul class="specs" id="pvSpecs"></ul>
           <div class="pv-etapas" id="pvEtapas"></div>
           <div class="pv-video" id="pvVideo" hidden></div>
+          <div class="pv-docs" id="pvDocs" hidden></div>
+          <p class="pv-alq" id="pvAlq" hidden></p>
         </div>
+      </div>
+      <div class="pv-social">
+        <section aria-labelledby="pvResenasH"><h2 class="row-title" id="pvResenasH">Opiniones de clientes</h2><div id="pvResenas"></div></section>
+        <section aria-labelledby="pvPregH"><h2 class="row-title" id="pvPregH">Preguntas</h2><div id="pvPreguntas"></div>
+          <form class="form-card q-form" id="pvQForm">
+            <label for="qTxt">Hacé tu pregunta</label>
+            <textarea id="qTxt" rows="2" required minlength="5" maxlength="500" placeholder="Ej.: ¿Sirve para Cessna 152?"></textarea>
+            <div class="p-grid2-mini"><label>Tu nombre<input id="qNom" maxlength="60" autocomplete="given-name"></label><label><span>WhatsApp o email <span class="muted">(opcional, para avisarte)</span></span><input id="qCon" maxlength="80"></label></div>
+            <input id="qWeb" name="web" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+            <button class="btn btn-ghost" type="submit">Enviar pregunta</button>
+            <p class="muted small" id="qMsg" role="status"></p>
+          </form>
+        </section>
       </div>
       <div class="pv-related">
         <h2 class="row-title">Se lleva junto con</h2>

@@ -80,17 +80,20 @@
     productos = d.productos;
     ir(location.hash.slice(1) || "productos");
     // Cuenta los pedidos nuevos para mostrarlos en la pestaña
+    Promise.all([api("resenas"), api("preguntas")]).then(([r, g]) => { porRevisar = r.resenas.filter((x) => x.estado === "pendiente").length + g.preguntas.filter((x) => x.estado === "pendiente").length; const nav = app.querySelector(".p-tabs"); if (nav) nav.outerHTML = tabsHTML(nav.querySelector("[aria-current]")?.dataset.tab || "productos"); }).catch(() => {});
     cargarPedidos().then(() => { const nav = app.querySelector(".p-tabs"); if (nav) nav.outerHTML = tabsHTML(nav.querySelector("[aria-current]")?.dataset.tab || "productos"); }).catch(() => {});
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["actividad", "Actividad"]];
-  const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}</button>`).join("")}</nav>`;
-  let pendientes = 0, pedidosCache = null;
+  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"]];
+  const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
+  let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
     if (tab === "pedidos") return verPedidos();
     if (tab === "clientes") return verClientes();
     if (tab === "actividad") return verActividad();
+    if (tab === "opiniones") return verOpiniones();
+    if (tab === "respuestas") return verRespuestas();
     lista();
   }
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
@@ -226,7 +229,7 @@
           <label>Categoría<select id="cat">${CATEGORIES.map((c) => `<option${c === p.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
           <label>Descripción corta<textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
           <label><span>Características <span class="muted">(una por renglón)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
-          <label><span>Opciones para elegir <span class="muted">(una por renglón, ej.: Fichas GA dual)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
+          <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
         </section>
 
@@ -262,13 +265,28 @@
           <h2>En la web</h2>
           <label class="p-switch"><input type="checkbox" id="visible"${p.visible ? " checked" : ""}> Mostrar en la web</label>
           <div class="p-checks">
-            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"]]
+            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"], ["oficial", "Distribuidor oficial de la marca"]]
               .map(([k, t]) => `<label><input type="checkbox" id="f_${k}"${p[k] ? " checked" : ""}> ${t}</label>`).join("")}
           </div>
+          <label><span>Preventa: llega el <span class="muted">(vacío = no es preventa)</span></span><input id="llega" type="date" value="${esc(p.llega || "")}"></label>
           <label>Destacado en la portada<select id="destacado"><option value="">No</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${p.destacado === n ? " selected" : ""}>Lugar ${n}</option>`).join("")}</select></label>
           <fieldset class="p-checks"><legend>Ideal para</legend>
             ${Object.entries(ETAPAS).map(([k, t]) => `<label><input type="checkbox" data-etapa="${k}"${(p.etapas || []).includes(k) ? " checked" : ""}> ${t}</label>`).join("")}
           </fieldset>
+        </section>
+
+        <section class="p-card">
+          <h2>Manuales y fichas en PDF</h2>
+          <div id="docs"></div>
+          ${estado.fotos ? `<label class="btn btn-ghost p-upload">📄 Subir PDF<input type="file" id="docIn" accept="application/pdf" hidden></label><p class="muted small">Hasta 3 MB cada uno. Se muestran en la ficha para descargar.</p>` : ""}
+        </section>
+
+        <section class="p-card">
+          <h2>Alquiler</h2>
+          <div class="p-grid2">
+            <label><span>Precio por día <span class="muted">(vacío = no se alquila)</span></span><input id="alquiler" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.alquiler ?? "")}"></label>
+            <label>Moneda<select id="alqMon"><option value="ARS"${p.alquilerMoneda !== "USD" ? " selected" : ""}>Pesos</option><option value="USD"${p.alquilerMoneda === "USD" ? " selected" : ""}>Dólares</option></select></label>
+          </div>
         </section>
 
         <section class="p-card">
@@ -296,6 +314,25 @@
         </figure>`).join("") : `<p class="muted small">Sin fotos todavía.</p>`;
     }
     renderFotos();
+    let docs = [...(p.docs || [])];
+    const renderDocs = () => {
+      $("docs").innerHTML = docs.length ? docs.map((d, i) => `<div class="p-doc"><input value="${esc(d.nombre)}" data-docn="${i}" aria-label="Nombre del documento"><a href="${esc(d.url)}" target="_blank" rel="noopener">Ver</a><button type="button" class="icon-btn" data-docx="${i}" aria-label="Quitar">✕</button></div>`).join("") : '<p class="muted small">Sin documentos.</p>';
+    };
+    renderDocs();
+    $("docs").oninput = (e) => { const i = e.target.dataset.docn; if (i !== undefined) docs[i].nombre = e.target.value; };
+    $("docs").onclick = (e) => { const b = e.target.closest("[data-docx]"); if (b) { docs.splice(+b.dataset.docx, 1); renderDocs(); } };
+    if ($("docIn")) $("docIn").onchange = async (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      if (f.size > 3_000_000) { toast("El PDF pesa más de 3 MB."); return; }
+      toast("Subiendo PDF…");
+      try {
+        const data = await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = mal; r.readAsDataURL(f); });
+        const d = await api("foto", { method: "POST", body: { data, tipo: "application/pdf", producto: val("name") || p.id || "producto" } });
+        docs.push({ nombre: f.name.replace(/\.pdf$/i, "").replace(/[-_]+/g, " ").slice(0, 60) || "Manual", url: d.url }); renderDocs();
+        toast("PDF listo. Acordate de guardar.");
+      } catch (x) { toast(x.message); }
+    };
     $("fotos").onclick = (e) => {
       const t = e.target.closest("button"); if (!t) return;
       if (t.dataset.quitar) fotos.splice(+t.dataset.quitar, 1);
@@ -308,8 +345,8 @@
       for (const [i, f] of files.entries()) {
         toast(`Subiendo foto ${i + 1} de ${files.length}…`);
         try {
-          const data = await achicar(f);
-          const d = await api("foto", { method: "POST", body: { data, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
+          const [data, mini] = await Promise.all([achicar(f), achicar(f, 600, 0.8)]);
+          const d = await api("foto", { method: "POST", body: { data, mini, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
           fotos.push(d.url); renderFotos();
         } catch (x) { toast(x.message); }
       }
@@ -374,7 +411,8 @@
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
       };
-      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp"]) datos[k] = $("f_" + k).checked;
+      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp", "oficial"]) datos[k] = $("f_" + k).checked;
+      Object.assign(datos, { llega: val("llega"), alquiler: val("alquiler"), alquilerMoneda: $("alqMon").value, docs });
       $("guardar").disabled = true;
       try {
         await api("productos", { method: "POST", body: datos });
@@ -441,7 +479,7 @@
       "señado": `¡Hola ${nombre}! Recibimos la seña de tu pedido ${p.num}: el producto queda reservado. Podés seguirlo acá: ${link}`,
       pagado: `¡Hola ${nombre}! Recibimos el pago de tu pedido ${p.num}. Ya lo estamos preparando. Seguilo acá: ${link}`,
       enviado: `¡Hola ${nombre}! Tu pedido ${p.num} ya salió${p.envioEmpresa ? " por " + p.envioEmpresa : ""}.${p.envioCodigo ? " Código de seguimiento: " + p.envioCodigo + "." : ""} Seguilo acá: ${link} ¡Buen vuelo! ✈`,
-      entregado: `¡Hola ${nombre}! ¿Te llegó bien tu pedido ${p.num}? Gracias por comprar en Tienda de Vuelo. Si tenés un minuto, nos ayudaría mucho que nos cuentes qué te pareció. ✈`,
+      entregado: `¡Hola ${nombre}! ¿Te llegó bien tu pedido ${p.num}? Gracias por comprar en Tienda de Vuelo. Si tenés un minuto, contanos qué te pareció acá: ${sitio}/resena#${p.num}.${p.token} ✈`,
       cancelado: `¡Hola ${nombre}! Cancelamos tu pedido ${p.num}. Si fue un error o querés retomarlo, escribinos.`,
     };
     return m[p.estado] || m.nuevo;
@@ -602,6 +640,71 @@
     };
   }
 
+  // ---------- Opiniones: reseñas y preguntas ----------
+  async function verOpiniones() {
+    app.innerHTML = tabsHTML("opiniones") + '<p class="p-loading">Cargando…</p>';
+    let r, g;
+    try { [r, g] = await Promise.all([api("resenas"), api("preguntas")]); } catch (x) { app.innerHTML = tabsHTML("opiniones") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    porRevisar = r.resenas.filter((x) => x.estado === "pendiente").length + g.preguntas.filter((x) => x.estado === "pendiente").length;
+    const st = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+    const estR = { pendiente: "Para revisar", aprobada: "Publicada", rechazada: "Oculta" };
+    app.innerHTML = tabsHTML("opiniones") + `
+      <div class="p-head"><div><h1>Opiniones</h1><p class="muted">Las reseñas las dejan clientes con pedido pagado o entregado. Las preguntas se publican cuando las respondés.</p></div></div>
+      <div class="p-grid2 p-act">
+        <section class="p-card"><h2>Preguntas</h2>${g.preguntas.length ? g.preguntas.map((q) => `
+          <div class="p-op${q.estado === "pendiente" ? " nueva" : ""}">
+            <span class="muted small">${esc(q.productoNombre)} · ${fechaCorta(q.creado)}${q.nombre ? " · " + esc(q.nombre) : ""}${q.contacto ? " · " + esc(q.contacto) : ""}</span>
+            <b>${esc(q.pregunta)}</b>
+            <textarea rows="2" data-resp="${q.id}" placeholder="Tu respuesta (se publica en la ficha)">${esc(q.respuesta)}</textarea>
+            <div class="p-head-btns"><button class="btn btn-primary btn-sm" data-qok="${q.id}">${q.estado === "respondida" ? "Actualizar" : "Responder y publicar"}</button>${q.estado !== "oculta" ? `<button class="btn btn-ghost btn-sm" data-qhide="${q.id}">Ocultar</button>` : '<span class="muted small">Oculta</span>'}</div>
+          </div>`).join("") : '<p class="muted">Todavía no hay preguntas.</p>'}</section>
+        <section class="p-card"><h2>Reseñas</h2>${r.resenas.length ? r.resenas.map((x) => `
+          <div class="p-op${x.estado === "pendiente" ? " nueva" : ""}">
+            <span class="muted small">${esc(x.productoNombre)} · ${esc(x.nombre)} · ${esc(x.num)} · ${fechaCorta(x.creado)}</span>
+            <b class="p-stars">${st(x.estrellas)}</b>${x.texto ? `<p>${esc(x.texto)}</p>` : ""}
+            <div class="p-head-btns"><span class="p-estado">${estR[x.estado]}</span>${x.estado !== "aprobada" ? `<button class="btn btn-primary btn-sm" data-rok="${x.id}">Publicar</button>` : ""}${x.estado !== "rechazada" ? `<button class="btn btn-ghost btn-sm" data-rno="${x.id}">Ocultar</button>` : ""}</div>
+          </div>`).join("") : '<p class="muted">Todavía no hay reseñas. Llegan cuando mandás el aviso de "Entregado" con el link para opinar.</p>'}</section>
+      </div>`;
+    const act = async (fn, msg) => { try { await fn(); toast(msg); verOpiniones(); } catch (x) { toast(x.message); } };
+    app.querySelectorAll("[data-qok]").forEach((b) => (b.onclick = () => act(() => api("preguntas", { method: "POST", body: { id: b.dataset.qok, respuesta: app.querySelector(`[data-resp="${b.dataset.qok}"]`).value } }), "Respuesta publicada.")));
+    app.querySelectorAll("[data-qhide]").forEach((b) => (b.onclick = () => act(() => api("preguntas", { method: "POST", body: { id: b.dataset.qhide, estado: "oculta", respuesta: app.querySelector(`[data-resp="${b.dataset.qhide}"]`).value } }), "Pregunta oculta.")));
+    app.querySelectorAll("[data-rok]").forEach((b) => (b.onclick = () => act(() => api("resenas", { method: "POST", body: { id: b.dataset.rok, estado: "aprobada" } }), "Reseña publicada.")));
+    app.querySelectorAll("[data-rno]").forEach((b) => (b.onclick = () => act(() => api("resenas", { method: "POST", body: { id: b.dataset.rno, estado: "rechazada" } }), "Reseña oculta.")));
+  }
+
+  // ---------- Respuestas rápidas ----------
+  const PLANTILLAS = [
+    { titulo: "Datos para transferir", texto: "¡Gracias por tu compra! Te paso los datos para transferir:\nAlias: COMPLETAR.ALIAS\nCBU: COMPLETAR\nTitular: COMPLETAR\nCuando transfieras, mandame el comprobante por acá y te confirmo." },
+    { titulo: "Costo de envío", texto: "El envío a tu zona sale $COMPLETAR por COMPLETAR (Andreani / Correo Argentino). Llega en COMPLETAR días hábiles desde que despachamos." },
+    { titulo: "Hay stock", texto: "¡Sí, lo tenemos en stock! Si querés te lo reservo con una seña y lo despachamos en 48 h hábiles." },
+    { titulo: "Por encargo", texto: "Ese producto lo traemos por encargo: tarda entre 15 y 30 días. Para encargarlo pedimos una seña del COMPLETAR%. ¿Querés que te lo reserve?" },
+    { titulo: "Seña recibida", texto: "¡Recibimos la seña! El producto queda reservado a tu nombre. Te aviso cuando esté listo para despachar." },
+    { titulo: "Retiro en CABA", texto: "Podés retirarlo en CABA (zona COMPLETAR). ¿Qué día y horario te queda bien?" },
+  ];
+  async function verRespuestas() {
+    app.innerHTML = tabsHTML("respuestas") + '<p class="p-loading">Cargando…</p>';
+    let lista = PLANTILLAS;
+    try { const d = await api("ajustes?clave=plantillas"); if (Array.isArray(d.valor) && d.valor.length) lista = d.valor; } catch {}
+    const pintar = () => {
+      app.innerHTML = tabsHTML("respuestas") + `
+        <div class="p-head"><div><h1>Respuestas rápidas</h1><p class="muted">Mensajes listos para copiar y pegar en WhatsApp. Editalos a tu gusto y completá lo que dice COMPLETAR.</p></div>
+          <div class="p-head-btns"><a class="btn btn-ghost" href="/folleto" target="_blank" rel="noopener">Folleto con QR ↗</a><button class="btn btn-ghost" id="plNueva">＋ Nueva</button><button class="btn btn-primary" id="plGuardar">Guardar cambios</button></div></div>
+        <div class="p-list">${lista.map((x, i) => `
+          <section class="p-card p-pl"><input class="p-pl-t" data-plt="${i}" value="${esc(x.titulo)}" aria-label="Título">
+            <textarea rows="4" data-plx="${i}" aria-label="Mensaje">${esc(x.texto)}</textarea>
+            <div class="p-head-btns"><button class="btn btn-wa btn-sm" data-copy="${i}">Copiar</button><button class="btn btn-ghost btn-sm" data-pldel="${i}">Borrar</button>${/COMPLETAR/.test(x.texto) ? '<span class="muted small">⚠ Tiene datos para completar</span>' : ""}</div>
+          </section>`).join("")}</div>`;
+      app.querySelectorAll("[data-plt]").forEach((el) => (el.oninput = () => (lista[el.dataset.plt].titulo = el.value)));
+      app.querySelectorAll("[data-plx]").forEach((el) => (el.oninput = () => (lista[el.dataset.plx].texto = el.value)));
+      app.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => { try { await navigator.clipboard.writeText(lista[b.dataset.copy].texto); toast("Copiado. Pegalo en WhatsApp."); } catch { app.querySelector(`[data-plx="${b.dataset.copy}"]`).select(); } }));
+      app.querySelectorAll("[data-pldel]").forEach((b) => (b.onclick = () => { lista.splice(+b.dataset.pldel, 1); pintar(); }));
+      document.getElementById("plNueva").onclick = () => { lista = [...lista, { titulo: "Nueva respuesta", texto: "" }]; pintar(); };
+      document.getElementById("plGuardar").onclick = async () => { try { await api("ajustes", { method: "POST", body: { clave: "plantillas", valor: lista } }); toast("Respuestas guardadas."); } catch (x) { toast(x.message); } };
+    };
+    lista = lista.map((x) => ({ ...x }));
+    pintar();
+  }
+
   // ---------- Actividad ----------
   async function verActividad() {
     app.innerHTML = tabsHTML("actividad") + '<p class="p-loading">Cargando…</p>';
@@ -618,18 +721,18 @@
   }
 
   // Achica la foto en el celular antes de subirla (máx. 1600 px, JPG).
-  function achicar(file) {
+  function achicar(file, max = 1600, calidad = 0.85) {
     return new Promise((ok, mal) => {
       const img = new Image();
       img.onload = () => {
-        const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+        const k = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement("canvas");
         c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
         const ctx = c.getContext("2d");
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
         ctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(img.src);
-        ok(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
+        ok(c.toDataURL("image/jpeg", calidad).split(",")[1]);
       };
       img.onerror = () => mal(new Error("No se pudo leer la foto."));
       img.src = URL.createObjectURL(file);

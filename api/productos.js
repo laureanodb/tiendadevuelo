@@ -8,7 +8,9 @@ export default async function handler(req, res) {
     await ensureSchema();
     const { rows } = await q("select * from tdv_productos where visible order by orden, creado");
     const { rows: v } = await q(`select count(*)::int as n from tdv_pedidos where estado in ('pagado', 'enviado', 'entregado')`);
-    send(res, 200, { configurado: true, ventas: 2500 + v[0].n, productos: rows.map((r) => fromRow(r)).filter((p) => !p.agotado) });
+    const { rows: rr } = await q(`select producto, round(avg(estrellas)::numeric, 1)::float as prom, count(*)::int as n from tdv_resenas where estado = 'aprobada' group by producto`);
+    const notas = Object.fromEntries(rr.map((x) => [x.producto, x]));
+    send(res, 200, { configurado: true, ventas: 2500 + v[0].n, productos: rows.map((r) => fromRow(r)).filter((p) => !p.agotado).map((p) => notas[p.id] ? { ...p, rating: notas[p.id].prom, resenas: notas[p.id].n } : p) });
   } catch (e) {
     console.error(e);
     send(res, 200, { configurado: false, productos: [] });

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tenés un regalo · Tienda de Vuelo</title>
+  <meta name="description" content="Un regalo de Tienda de Vuelo.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="Tenés un regalo · Tienda de Vuelo">
+  <meta property="og:description" content="Un regalo de Tienda de Vuelo.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="regalo" data-wa="¡Hola! Recibí un regalo.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="wrap narrow prose gift-page" id="giftBox"><p class="muted">Abriendo tu regalo…</p></section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { art, esc, waLink, byId, opciones, $ } = window.TDV;
+      let d = null;
+      try { d = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1).replace(/-/g, "+").replace(/_/g, "/"))))); } catch {}
+      const p = d && byId[d.p];
+      if (!p) { $("#giftBox").innerHTML = `<h1>Ups, no encontramos el regalo</h1><p>Revisá el link o escribinos por WhatsApp y lo resolvemos.</p>`; return; }
+      const ops = opciones(p);
+      $("#giftBox").innerHTML = `<div class="gift-hero"><div class="gift-ribbon">🎁</div>
+        <span class="kicker">Un regalo para ${esc(d.para || "vos")}</span>
+        <h1>${esc(d.de || "Alguien")} te regaló ${esc(p.name)}</h1>
+        ${d.msg ? `<blockquote class="gift-msg">“${esc(d.msg)}”</blockquote>` : ""}
+        <div class="gift-prod">${art(p, true)}</div>
+        ${ops.length ? `<label class="gift-op">Elegí la opción<select id="gOp">${ops.map((o) => `<option>${esc(o.nombre)}</option>`).join("")}</select></label>` : ""}
+        <a class="btn btn-wa" id="gWant" target="_blank" rel="noopener">Recibir mi regalo</a>
+        <p class="muted small">Te escribimos para coordinar la entrega. <a href="/producto/${p.id}">Ver el producto</a></p></div>`;
+      const link = () => $("#gWant").href = waLink(`¡Hola! Recibí un regalo de ${d.de}: ${p.name}${ops.length ? ` (${$("#gOp").value})` : ""}. Quiero coordinar la entrega. ${location.href}`);
+      if (ops.length) $("#gOp").onchange = link; link();
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 // Portada: vitrina, destacados, banners, catálogo con filtros, páginas de categoría y marca, kits armables y ficha de producto.
 (() => {
-  const { $, esc, ars, byId, pesos, priceHTML, art, card, waLink, add, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa } = window.TDV;
+  const { $, esc, ars, byId, pesos, priceHTML, art, card, waLink, add, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, opciones, conOpcion, estrellas, fechaCorta, toggleComparar } = window.TDV;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const visibles = PRODUCTS.filter((p) => !p.agotado);
 
@@ -169,14 +169,23 @@
       p.reacond && '<span class="tag">Reacondicionado</span>',
       p.nuevo && '<span class="tag tag-new">Nuevo ingreso</span>',
       p.ultimas && '<span class="tag tag-order">Últimas unidades</span>',
+      p.oficial && '<span class="tag tag-oficial">✔ Distribuidor oficial</span>',
+      p.llega && `<span class="tag tag-order">Preventa · llega el ${fechaCorta(p.llega)}</span>`,
       enOferta(p) && `<span class="tag tag-sale">Oferta${p.ofertaHasta ? " hasta el " + p.ofertaHasta.split("-").reverse().slice(0, 2).join("/") : ""}</span>`,
     ].filter(Boolean).join("");
-    $("#pvPrice").innerHTML = priceHTML(p, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar oficial del día.</p>' : "");
     $("#pvDesc").textContent = p.desc;
     $("#pvSpecs").innerHTML = p.specs.map((s) => `<li>${esc(s)}</li>`).join("");
     $("#pvEtapas").innerHTML = p.etapas?.length ? `<span class="muted small">Ideal para:</span> ${p.etapas.map((e) => `<span class="tag">${ETAPAS[e]}</span>`).join("")}` : "";
     $("#pvVariantWrap").hidden = !p.variantes;
-    $("#pvVariant").innerHTML = (p.variantes || []).map((v) => `<option>${esc(v)}</option>`).join("");
+    const ops = opciones(p);
+    $("#pvVariant").innerHTML = ops.map((o) => `<option value="${esc(o.nombre)}">${esc(o.nombre)}${o.precio !== null && o.precio !== (p.usd || p.ars) ? ` — ${p.usd ? "US$ " + o.precio.toLocaleString("es-AR") : ars(o.precio)}` : ""}</option>`).join("");
+    const precioOpcion = () => {
+      const pp = p.variantes ? conOpcion(p, $("#pvVariant").value) : p;
+      $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar oficial del día.</p>' : "");
+      const o = ops.find((x) => x.nombre === $("#pvVariant").value);
+      const sw = $("#pvSwipe");
+      if (o && o.foto !== null && sw) sw.scrollTo({ left: sw.clientWidth * o.foto, behavior: reduceMotion ? "auto" : "smooth" });
+    };
     const conPrecio = p.usd || p.ars;
     $("#pvAdd").hidden = !conPrecio;
     const consulta = `¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`;
@@ -184,10 +193,20 @@
     $("#pvAsk").hidden = !conPrecio;
     const loQuiero = () => {
       const op = p.variantes ? $("#pvVariant").value : "";
-      const precio = p.usd ? `US$ ${p.usd.toLocaleString("es-AR")}` : p.ars ? ars(p.ars) : "";
-      $("#pvWant").href = waLink(`¡Hola! Lo quiero: ${p.name}${p.brand ? ` (${p.brand}${p.model ? " " + p.model : ""})` : ""}${op ? `\nOpción: ${op}` : ""}${precio ? `\nPrecio: ${precio}` : ""}\n${CONFIG.sitio}/producto/${p.id}`);
+      const pp = op ? conOpcion(p, op) : p;
+      const precio = pp.usd ? `US$ ${pp.usd.toLocaleString("es-AR")}` : pp.ars ? ars(pp.ars) : "";
+      $("#pvWant").href = waLink(`¡Hola! ${p.llega ? "Quiero reservar (preventa)" : "Lo quiero"}: ${p.name}${p.brand ? ` (${p.brand}${p.model ? " " + p.model : ""})` : ""}${op ? `\nOpción: ${op}` : ""}${precio ? `\nPrecio: ${precio}` : ""}\n${CONFIG.sitio}/producto/${p.id}`);
     };
-    $("#pvVariant").onchange = loQuiero; loQuiero();
+    $("#pvVariant").onchange = () => { loQuiero(); precioOpcion(); }; loQuiero(); precioOpcion();
+    $("#pvAdd").textContent = p.llega ? "Reservar (preventa)" : "Agregar al carrito";
+    $("#pvRating").hidden = !p.rating;
+    if (p.rating) $("#pvRating").innerHTML = `<span class="stars">${estrellas(p.rating)}</span> ${p.rating} · ${p.resenas} ${p.resenas === 1 ? "opinión" : "opiniones"}`;
+    $("#pvCmp").textContent = TDV_cmpTxt(p.id);
+    $("#pvDocs").hidden = !(p.docs && p.docs.length);
+    $("#pvDocs").innerHTML = (p.docs || []).map((d) => `<a class="doc" href="${esc(d.url)}" target="_blank" rel="noopener">📄 ${esc(d.nombre)}</a>`).join("");
+    $("#pvAlq").hidden = !p.alquiler;
+    if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por día</b>. <a href="/alquiler">Ver alquileres</a>`;
+    cargarSocial(p);
     $("#pvWant").dataset.quiero = p.id; $("#pvAsk").dataset.consulta = p.id;
     $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar precio por WhatsApp";
     setWa(consulta);
@@ -223,6 +242,7 @@
   $("#pvFav").onclick = () => { toggleFav(current.id); };
   $("#pvBack").onclick = () => (history.state && history.length > 1 ? history.back() : closeView());
   $("#pvAdd").onclick = () => add({ id: current.id, variante: current.variantes ? $("#pvVariant").value : "" }, current.name);
+  document.addEventListener("click", (e) => { if (e.target.closest("#pvRating")) { e.preventDefault(); $("#pvResenasH").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); } });
   $("#pvGallery").addEventListener("click", (e) => {
     const t = e.target.closest("[data-foto]"); if (!t) return;
     const sw = $("#pvSwipe"); sw.scrollTo({ left: sw.clientWidth * +t.dataset.foto, behavior: reduceMotion ? "auto" : "smooth" });
@@ -249,6 +269,71 @@
     if (!ruta(location.pathname, false)) { closeView(false); rutaBase(); Object.assign(state, { f: "Todos", brand: "" }); $("#brand").value = ""; render(); }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !view.hidden) closeView(); });
+
+  // ---------- Comparar y regalar desde la ficha ----------
+  const TDV_cmpTxt = (id) => (JSON.parse(localStorage.getItem("tdv-cmp") || "[]").includes(id) ? "⇄ En comparación" : "⇄ Comparar");
+  $("#pvCmp").onclick = () => { toggleComparar(current.id); $("#pvCmp").textContent = TDV_cmpTxt(current.id); };
+  $("#pvGift").onclick = () => regalar(current);
+  function regalar(p) {
+    const m = document.createElement("div");
+    m.className = "cmp-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-label", "Regalar");
+    m.innerHTML = `<form class="cmp-card gift-card" id="giftForm"><div class="drawer-head"><h3>🎁 Regalar ${esc(p.name)}</h3><button type="button" class="icon-btn" id="gClose" aria-label="Cerrar">✕</button></div>
+      <div class="gift-body"><p class="muted">Armamos un link de regalo: la persona lo abre, ve tu mensaje${p.variantes ? " y elige la opción" : ""}, y nos escribe para recibirlo. Vos coordinás el pago con nosotros por WhatsApp.</p>
+      <label>Tu nombre<input id="gDe" required maxlength="40"></label>
+      <label>Para<input id="gPara" required maxlength="40"></label>
+      <label>Mensaje<textarea id="gMsg" rows="3" maxlength="300" placeholder="¡Feliz primer solo! Que tengas muchas horas de vuelo."></textarea></label>
+      <button class="btn btn-primary" type="submit">Crear link de regalo</button>
+      <div id="gOut"></div></div></form>`;
+    document.body.appendChild(m);
+    m.querySelector("#gClose").onclick = () => m.remove();
+    m.addEventListener("click", (e) => { if (e.target === m) m.remove(); });
+    m.querySelector("#giftForm").onsubmit = (e) => {
+      e.preventDefault();
+      const datos = { p: p.id, de: $("#gDe").value.trim(), para: $("#gPara").value.trim(), msg: $("#gMsg").value.trim() };
+      const cod = btoa(unescape(encodeURIComponent(JSON.stringify(datos)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const link = `${CONFIG.sitio}/regalo#${cod}`;
+      $("#gOut").innerHTML = `<div class="gift-link"><input readonly value="${esc(link)}" aria-label="Link de regalo"><button type="button" class="btn btn-ghost btn-sm" id="gCopy">Copiar</button></div>
+        <a class="btn btn-wa btn-block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`¡${datos.para}, tenés un regalo de ${datos.de}! 🎁✈ Abrilo acá: ${link}`)}">Mandárselo por WhatsApp</a>
+        <a class="btn btn-ghost btn-block" target="_blank" rel="noopener" href="${waLink(`¡Hola! Quiero regalar ${p.name} a ${datos.para}. Link del regalo: ${link}`)}">Coordinar el pago con la tienda</a>`;
+      $("#gCopy").onclick = async () => { try { await navigator.clipboard.writeText(link); $("#gCopy").textContent = "Copiado ✓"; } catch { m.querySelector(".gift-link input").select(); } };
+    };
+    $("#gDe").focus();
+  }
+
+  // ---------- Opiniones y preguntas del producto ----------
+  const fechaLarga = (d) => new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+  async function cargarSocial(p) {
+    $("#pvResenas").innerHTML = '<p class="muted">Cargando…</p>'; $("#pvPreguntas").innerHTML = "";
+    $("#qMsg").textContent = ""; $("#pvQForm").reset();
+    try {
+      const [r, q] = await Promise.all([fetch(`/api/resenas?producto=${p.id}`).then((x) => x.json()), fetch(`/api/preguntas?producto=${p.id}`).then((x) => x.json())]);
+      if (current !== p) return;
+      $("#pvResenas").innerHTML = r.resenas?.length
+        ? `<div class="reviews">${r.resenas.map((x) => `<figure class="review"><div class="stars">${estrellas(x.estrellas)}</div>${x.texto ? `<blockquote>${esc(x.texto)}</blockquote>` : ""}<figcaption>${esc(x.nombre)} · <span class="verif">✔ Compra verificada</span> · ${fechaLarga(x.fecha)}</figcaption></figure>`).join("")}</div>`
+        : '<p class="muted">Todavía no hay opiniones. Las dejan clientes que compraron este producto.</p>';
+      $("#pvPreguntas").innerHTML = q.preguntas?.length
+        ? `<dl class="qa">${q.preguntas.map((x) => `<dt>${esc(x.pregunta)}</dt><dd>${esc(x.respuesta)}</dd>`).join("")}</dl>` : "";
+    } catch { $("#pvResenas").innerHTML = '<p class="muted">Todavía no hay opiniones.</p>'; }
+  }
+  $("#pvQForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector("button"); btn.disabled = true;
+    try {
+      const r = await fetch("/api/preguntas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ producto: current.id, pregunta: $("#qTxt").value, nombre: $("#qNom").value, contacto: $("#qCon").value, web: $("#qWeb").value }) });
+      const d = await r.json();
+      $("#qMsg").textContent = r.ok ? "¡Gracias! Te respondemos pronto y la respuesta se publica acá." : d.mensaje || "No se pudo enviar.";
+      if (r.ok) $("#pvQForm").reset();
+    } catch { $("#qMsg").textContent = "No se pudo enviar. Probá de nuevo."; }
+    btn.disabled = false;
+  };
+
+  // ---------- Opiniones en la portada ----------
+  fetch("/api/resenas").then((r) => r.json()).then((d) => {
+    if (!d.resenas?.length) return;
+    $("#opiniones").hidden = false;
+    $("#opinionesGrid").innerHTML = d.resenas.map((x) => `<figure class="review"><div class="stars">${estrellas(x.estrellas)}</div><blockquote>${esc(x.texto)}</blockquote>
+      <figcaption>${esc(x.nombre)} · <span class="verif">✔ Compra verificada</span>${x.productoNombre ? ` · <a href="/producto/${esc(x.producto)}">${esc(x.productoNombre)}</a>` : ""}</figcaption></figure>`).join("");
+  }).catch(() => {});
 
   // ---------- Vitrina de la portada ----------
   let vi = 0, vTimer;

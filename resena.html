@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dejá tu opinión · Tienda de Vuelo</title>
+  <meta name="description" content="Contanos qué te pareció tu compra.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="Dejá tu opinión · Tienda de Vuelo">
+  <meta property="og:description" content="Contanos qué te pareció tu compra.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="resena" data-wa="¡Hola! Quería dejar mi opinión.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Tu opinión</span>
+      <h1>¿Qué te pareció tu compra?</h1>
+      <p>Tu opinión ayuda a otros pilotos a elegir. Se publica con tu nombre y la inicial del apellido.</p>
+    </div></section>
+    <section class="wrap narrow prose" id="rsBox"><p class="muted">Cargando tu pedido…</p></section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { esc, $ } = window.TDV;
+      const m = location.hash.match(/^#(TDV-\d{6}-\d{3,5})\.([a-z0-9]+)$/);
+      if (!m) { $("#rsBox").innerHTML = "<p>Abrí el link que te mandamos por WhatsApp para dejar tu opinión.</p>"; return; }
+      fetch(`/api/seguimiento?n=${m[1]}&c=${m[2]}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((p) => {
+        const items = p.items.filter((i) => i.id);
+        if (!items.length) { $("#rsBox").innerHTML = "<p>Este pedido no tiene productos para opinar.</p>"; return; }
+        $("#rsBox").innerHTML = `<form id="rsF" class="form-card">${items.map((i, k) => `
+          <fieldset class="rs-item"><legend>${esc(i.name)}</legend>
+            <div class="rate" role="radiogroup" aria-label="Estrellas para ${esc(i.name)}">${[5, 4, 3, 2, 1].map((n) => `<input type="radio" id="r${k}-${n}" name="r${k}" value="${n}"${k === 0 ? " required" : ""}><label for="r${k}-${n}" title="${n} estrellas">★</label>`).join("")}</div>
+            <textarea name="t${k}" rows="2" maxlength="800" placeholder="Contanos cómo te fue (opcional)"></textarea></fieldset>`).join("")}
+          <label>Tu nombre<input id="rsNom" required maxlength="60" value="${esc(p.nombre || "")}"></label>
+          <button class="btn btn-primary" type="submit">Publicar mi opinión</button><p class="muted small" id="rsMsg" role="status"></p></form>`;
+        $("#rsF").onsubmit = async (e) => {
+          e.preventDefault();
+          const f = new FormData(e.target);
+          const resenas = items.map((i, k) => ({ producto: i.id, estrellas: f.get("r" + k), texto: f.get("t" + k) })).filter((x) => x.estrellas);
+          const r = await fetch("/api/resenas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ num: m[1], token: m[2], nombre: $("#rsNom").value, resenas }) });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok) $("#rsBox").innerHTML = `<div class="cart-empty done"><div>✈️</div><h4>¡Gracias!</h4><p>Tu opinión se publica en cuanto la revisemos.</p><p><a class="btn btn-ghost" href="/">Volver a la tienda</a></p></div>`;
+          else $("#rsMsg").textContent = d.mensaje || "No se pudo guardar.";
+        };
+      }).catch(() => { $("#rsBox").innerHTML = "<p>No encontramos ese pedido. Revisá el link o escribinos.</p>"; });
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

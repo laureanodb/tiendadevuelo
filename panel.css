@@ -116,3 +116,13 @@ body.panel { background: var(--bg-2); }
 .p-rank small { width: 100%; color: var(--muted); }
 .p-act { align-items: start; }
 @media (max-width: 640px) { .p-stats { grid-template-columns: 1fr 1fr; } .p-stats .p-stat:last-child { grid-column: 1 / -1; } }
+.p-doc { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.p-doc input { flex: 1; min-width: 0; }
+.p-doc a { color: var(--accent); font-weight: 600; font-size: 14px; }
+.p-op { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.p-op:last-child { border-bottom: 0; }
+.p-op.nueva { background: #fffaf0; margin: 0 -12px; padding: 12px; border-radius: 12px; }
+.p-op p { margin: 0; }
+.p-stars { color: var(--sun); letter-spacing: 2px; }
+.p-pl { gap: 10px; }
+.p-pl-t { font-weight: 700 !important; }

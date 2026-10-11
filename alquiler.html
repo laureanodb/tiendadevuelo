@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alquiler de equipos de aviación · Tienda de Vuelo</title>
+  <meta name="description" content="Alquiler de auriculares, GPS y equipos de aviación por día en Argentina. Retiro en CABA o envío.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/alquiler">
+  <meta property="og:title" content="Alquiler de equipos de aviación · Tienda de Vuelo">
+  <meta property="og:description" content="Alquiler de auriculares, GPS y equipos de aviación por día en Argentina. Retiro en CABA o envío.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="alquiler" data-wa="¡Hola! Quería consultar por un alquiler.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Alquiler</span>
+      <h1>Alquilá tu equipo</h1>
+      <p>Probá antes de comprar o llevalo para un viaje. Alquiler por día, con seña, retiro en CABA o envío.</p>
+    </div></section>
+    <section class="wrap prose">
+      <div class="grid grid-4" id="alqGrid"></div>
+      <h2 id="alqForm">Pedí tu alquiler</h2>
+      <form class="form-card" id="alqF" style="max-width:640px">
+        <label>Equipo<select id="aProd"></select></label>
+        <div class="p-grid2-mini"><label>Desde<input id="aDesde" type="date" required></label><label>Hasta<input id="aHasta" type="date" required></label></div>
+        <label>Tu nombre<input id="aNom" required autocomplete="name"></label>
+        <button class="btn btn-primary" type="submit">Pedir por WhatsApp</button>
+        <p class="muted small">Te confirmamos disponibilidad, seña y condiciones antes de reservar.</p>
+      </form>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { card, esc, ars, waLink, $ } = window.TDV;
+      const alq = PRODUCTS.filter((p) => p.alquiler);
+      const precio = (p) => (p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)) + " por día";
+      $("#alqGrid").innerHTML = alq.length ? alq.map((p) => card(p).replace(/<div class="price[\s\S]*?<\/div>/, `<div class="price"><b>${precio(p)}</b></div>`)).join("")
+        : `<p class="muted" style="grid-column:1/-1">Estamos armando el catálogo de alquiler. Contanos qué equipo necesitás y te decimos si lo tenemos.</p>`;
+      $("#aProd").innerHTML = (alq.length ? alq.map((p) => `<option>${esc(p.name)} — ${precio(p)}</option>`).join("") : "") + `<option>Otro (lo cuento por WhatsApp)</option>`;
+      const hoy = new Date().toISOString().slice(0, 10); $("#aDesde").min = $("#aHasta").min = hoy;
+      $("#alqF").onsubmit = (e) => { e.preventDefault(); window.open(waLink(`¡Hola! Soy ${$("#aNom").value}. Quiero alquilar: ${$("#aProd").value}\nDesde ${$("#aDesde").value.split("-").reverse().join("/")} hasta ${$("#aHasta").value.split("-").reverse().join("/")}.`), "_blank", "noopener"); };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

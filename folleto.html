@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Folleto · Tienda de Vuelo</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    @page { size: A5; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9eef4; font: 14px/1.45 Inter, Arial, sans-serif; color: #0c2340; }
+    .barra { text-align: center; padding: 14px; }
+    .barra button { font: 600 15px Inter, sans-serif; padding: 10px 20px; border-radius: 999px; border: 0; background: #0e8be0; color: #fff; cursor: pointer; }
+    .hoja { width: 148mm; min-height: 210mm; margin: 0 auto 30px; background: #fff; padding: 14mm 12mm; display: flex; flex-direction: column; gap: 6mm; box-shadow: 0 10px 30px rgba(12,35,64,.15); }
+    .marca { display: flex; align-items: center; gap: 10px; } .marca img { width: 54px; } .marca b { font: 700 24px Outfit, sans-serif; display: block; line-height: 1; } .marca small { color: #0e8be0; letter-spacing: .35em; font-weight: 600; font-size: 10px; }
+    h1 { font: 700 30px/1.05 Outfit, sans-serif; margin: 0; } h1 span { color: #0e8be0; }
+    ul { margin: 0; padding-left: 18px; } li { margin: 3px 0; }
+    .kits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .kit { border: 1.5px solid #e3edf6; border-radius: 10px; padding: 8px 10px; } .kit b { display: block; font-family: Outfit, sans-serif; }
+    .qr { display: flex; align-items: center; gap: 14px; margin-top: auto; padding: 12px; border-radius: 14px; background: #f2f8fe; }
+    .qr #qr img, .qr #qr canvas { width: 34mm !important; height: 34mm !important; }
+    .qr p { margin: 0; } .qr b { font: 700 17px Outfit, sans-serif; }
+    @media print { body { background: #fff; } .barra { display: none; } .hoja { box-shadow: none; margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="barra"><button onclick="window.print()">Imprimir o guardar en PDF</button></div>
+  <article class="hoja">
+    <div class="marca"><img src="/logo.svg" alt=""><span><b>Tienda de Vuelo</b><small>PILOT SHOP</small></span></div>
+    <h1>Todo para tu <span>próximo vuelo</span>.</h1>
+    <ul>
+      <li>Auriculares pasivos y ANR, GPS y aviónica originales.</li>
+      <li>Kneeboards, E6B, plotters, cartas y libros de vuelo.</li>
+      <li>Alas, charreteras y accesorios para pilotos y tripulantes.</li>
+      <li>Envíos a todo el país · en el día en CABA · retiro en CABA.</li>
+    </ul>
+    <div class="kits" id="kits"></div>
+    <div class="qr"><div id="qr"></div><p><b>tiendadevuelo.com.ar</b><br>Escaneá y mirá el catálogo.<br>WhatsApp <span id="wa"></span></p></div>
+  </article>
+  <script src="/products.js"></script>
+  <script>
+    document.getElementById("wa").textContent = CONFIG.whatsappVisible;
+    document.getElementById("kits").innerHTML = KITS.map((k) => `<div class="kit"><b>${k.emoji} ${k.name}</b>${k.tagline}</div>`).join("");
+    new QRCode(document.getElementById("qr"), { text: CONFIG.sitio + "/?desde=folleto", width: 256, height: 256, colorDark: "#0c2340", colorLight: "#f2f8fe" });
+  </script>
+</body>
+</html>

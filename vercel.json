@@ -82,5 +82,11 @@
       "destination": "/#regalos",
       "permanent": false
     }
-  ]
+  ],
+  "functions": {
+    "api/asistente.js": {
+      "includeFiles": "products.js",
+      "maxDuration": 60
+    }
+  }
 }

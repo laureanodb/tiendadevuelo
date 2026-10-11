@@ -47,6 +47,23 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists antes numeric`);
     await q(`alter table tdv_productos add column if not exists oferta_hasta date`);
     await q(`alter table tdv_productos add column if not exists video text not null default ''`);
+    await q(`alter table tdv_productos add column if not exists llega date`);
+    await q(`alter table tdv_productos add column if not exists oficial boolean not null default false`);
+    await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
+    await q(`alter table tdv_productos add column if not exists alquiler numeric`);
+    await q(`alter table tdv_productos add column if not exists alquiler_moneda text not null default 'ARS'`);
+    await q(`create table if not exists tdv_resenas (
+      id bigserial primary key, num text not null, producto text not null, nombre text not null default '',
+      estrellas integer not null, texto text not null default '', estado text not null default 'pendiente',
+      creado timestamptz not null default now(), unique (num, producto)
+    )`);
+    await q(`create table if not exists tdv_preguntas (
+      id bigserial primary key, producto text not null, nombre text not null default '', contacto text not null default '',
+      pregunta text not null, respuesta text not null default '', estado text not null default 'pendiente',
+      creado timestamptz not null default now(), respondido timestamptz
+    )`);
+    await q(`create table if not exists tdv_ajustes (clave text primary key, valor jsonb not null default '{}')`);
+    for (const t of ["tdv_resenas", "tdv_preguntas", "tdv_ajustes"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     await q(`alter table tdv_productos enable row level security`).catch(() => {});
     await q(`create table if not exists tdv_pedidos (
       num text primary key,
@@ -92,18 +109,21 @@ export function fromRow(r, admin = false) {
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
     regalo: r.regalo, tcp: r.tcp, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
+    oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
   // Oferta vigente: precio anterior cargado y fecha de fin no vencida (hora de Argentina).
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const hasta = r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null;
   const precio = num(r.usd) ?? num(r.ars);
+  const llega = r.llega ? new Date(r.llega).toISOString().slice(0, 10) : null;
+  if (llega && llega >= hoy) p.llega = llega;
   if (num(r.antes) && precio && num(r.antes) > precio && (!hasta || hasta >= hoy)) { p.antes = num(r.antes); p.ofertaHasta = hasta; }
   if (!admin) {
     p.agotado = r.stock !== null && r.stock <= 0 && !r.encargo;
     p.ultimas = r.stock !== null && r.stock > 0 && r.stock < 3;
     return p;
   }
-  return { ...p, antes: num(r.antes), ofertaHasta: r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
+  return { ...p, llega: r.llega ? new Date(r.llega).toISOString().slice(0, 10) : null, antes: num(r.antes), ofertaHasta: r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
     visible: r.visible, proveedor: r.proveedor, notas: r.notas, orden: r.orden, actualizado: r.actualizado };
 }
 
@@ -123,6 +143,9 @@ export function toRow(p) {
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
     antes: money(p.antes), oferta_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(p.ofertaHasta || "")) ? p.ofertaHasta : null,
     video: /^https:\/\//.test(str(p.video, 300)) ? str(p.video, 300) : "",
+    llega: /^\d{4}-\d{2}-\d{2}$/.test(String(p.llega || "")) ? p.llega : null,
+    oficial: !!p.oficial, alquiler: money(p.alquiler), alquiler_moneda: p.alquilerMoneda === "USD" ? "USD" : "ARS",
+    docs: JSON.stringify((Array.isArray(p.docs) ? p.docs : []).filter((d) => d && /^https:\/\//.test(String(d.url)) || /^http:\/\/localhost[:/]/.test(String(d && d.url))).slice(0, 6).map((d) => ({ nombre: str(d.nombre, 80) || "Documento", url: str(d.url, 400) }))),
     visible: p.visible !== false, proveedor: str(p.proveedor, 120), notas: str(p.notas, 1000), orden: int(p.orden) ?? 0,
   };
 }
@@ -165,6 +188,15 @@ export function conSesion(req) {
 }
 
 // ---------- Utilidades de respuesta ----------
+// ---------- Ajustes guardados (plantillas, configuración) ----------
+export async function ajuste(clave, def = {}) {
+  const { rows } = await q("select valor from tdv_ajustes where clave = $1", [clave]);
+  return rows.length ? rows[0].valor : def;
+}
+export async function guardarAjuste(clave, valor) {
+  await q("insert into tdv_ajustes (clave, valor) values ($1, $2) on conflict (clave) do update set valor = excluded.valor", [clave, JSON.stringify(valor)]);
+}
+
 // ---------- Pedidos y clientes ----------
 export const ESTADOS = ["nuevo", "señado", "pagado", "enviado", "entregado", "cancelado"];
 export const VENDIDOS = ["pagado", "enviado", "entregado"];

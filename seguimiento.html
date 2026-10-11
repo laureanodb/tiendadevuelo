@@ -54,7 +54,7 @@
           box.innerHTML += `<h2>Detalle</h2><div class="table-wrap"><table><tbody>${p.items.map((i) => `<tr><td>${i.qty} × ${esc(i.name)}${i.sub ? `<br><small class="muted">${esc(i.sub)}</small>` : ""}</td><td class="num">${esc(i.label || "")}</td></tr>`).join("")}
             ${p.totalArs ? `<tr><td><b>Total aproximado</b> <small class="muted">(sin envío)</small></td><td class="num"><b>${ars(p.totalArs)}</b></td></tr>` : ""}</tbody></table></div>
             <p class="muted small">Entrega: ${esc(p.entrega || "")}${p.franja && p.entrega && p.entrega.includes("día") ? " · " + esc(p.franja) : ""}</p>
-            <div class="cta-row no-print"><button class="btn btn-ghost" onclick="window.print()">Guardar comprobante (PDF)</button><a class="btn btn-wa" href="${waLink(`¡Hola! Quería consultar por mi pedido ${p.num}.`)}" target="_blank" rel="noopener">Consultar por WhatsApp</a></div>`;
+            <div class="cta-row no-print">${["pagado", "enviado", "entregado"].includes(p.estado) ? `<a class="btn btn-primary" href="/resena#${p.num}.${token}">⭐ Dejá tu opinión</a>` : ""}<button class="btn btn-ghost" onclick="window.print()">Guardar comprobante (PDF)</button><a class="btn btn-wa" href="${waLink(`¡Hola! Quería consultar por mi pedido ${p.num}.`)}" target="_blank" rel="noopener">Consultar por WhatsApp</a></div>`;
           const c = document.getElementById("copiar");
           if (c) c.onclick = async () => { try { await navigator.clipboard.writeText(p.envioCodigo); c.textContent = "Copiado ✓"; } catch {} };
         } catch {

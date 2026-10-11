@@ -16,18 +16,40 @@
     if (d && d.venta) { dolar = d.venta; store.set("tdv-dolar", { venta: d.venta }); document.dispatchEvent(new Event("tdv:precios")); renderCart(); }
   }).catch(() => {});
 
+  // Opciones con precio o foto propios: "Ficha LEMO | 1350 | foto 2"
+  const numAR = (t) => { t = String(t).replace(/[^\d.,]/g, ""); if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, "").replace(",", "."); else t = t.replace(",", "."); return Number(t); };
+  const opciones = (p) => (p.variantes || []).map((v) => {
+    const partes = String(v).split("|").map((x) => x.trim());
+    const o = { nombre: partes[0], precio: null, foto: null };
+    for (const x of partes.slice(1)) { const f = x.match(/^foto\s*(\d+)$/i); if (f) o.foto = +f[1] - 1; else if (/\d/.test(x) && numAR(x) > 0) o.precio = numAR(x); }
+    return o;
+  });
+  // Producto con el precio de la opción elegida (misma moneda que el producto)
+  const conOpcion = (p, nombre) => {
+    const o = opciones(p).find((x) => x.nombre === nombre);
+    if (!o || o.precio === null) return p;
+    return p.usd ? { ...p, usd: o.precio, antes: null } : { ...p, ars: o.precio, antes: null };
+  };
+  const desde = (p) => { const ps = opciones(p).map((o) => o.precio).filter((x) => x !== null); return ps.length && ps.some((x) => x !== (p.usd || p.ars)); };
+
   // Precio en pesos de un producto (null = a consultar)
   const pesos = (p) => p.usd ? Math.round((p.usd * dolar) / 100) * 100 : (p.ars ?? null);
   const enOferta = (p) => !!(p.antes && (p.usd || p.ars) && p.antes > (p.usd || p.ars));
   const priceHTML = (p, big) => {
     const antes = enOferta(p) ? `<s>${p.usd ? usd(p.antes) : ars(p.antes)}</s>` : "";
+    const d = !big && desde(p) ? '<span class="from">Desde</span>' : "";
+    if (p.usd && d) { const min = Math.min(p.usd, ...opciones(p).map((o) => o.precio ?? Infinity)); return `<div class="price">${d}<b>${usd(min)}</b><span class="ars">≈ ${ars(Math.round(min * dolar / 100) * 100)}</span></div>`; }
+    if (p.ars && d) { const min = Math.min(p.ars, ...opciones(p).map((o) => o.precio ?? Infinity)); return `<div class="price">${d}<b>${ars(min)}</b></div>`; }
     if (p.usd) return `<div class="price${big ? " price-big" : ""}">${antes}<b>${usd(p.usd)}</b><span class="ars">≈ ${ars(pesos(p))}</span></div>`;
     if (p.ars) return `<div class="price${big ? " price-big" : ""}">${antes}<b>${ars(p.ars)}</b></div>`;
     return `<div class="price${big ? " price-big" : ""}"><b class="consult">Consultar precio</b></div>`;
   };
 
   const art = (p, big) => {
-    if (p.fotos && p.fotos.length) return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(p.fotos[0])}" alt="${esc(p.name)}" loading="lazy"></div>`;
+    if (p.fotos && p.fotos.length) {
+      const f = p.fotos[0], mini = !big && /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f) ? f.replace(/\.jpg$/, "-t.jpg") : f;
+      return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(mini)}" alt="${esc(p.name)}" loading="lazy"${mini !== f ? ` onerror="this.onerror=null;this.src='${esc(f)}'"` : ""}></div>`;
+    }
     const [a, b] = CAT_COLORS[p.cat] || ["#0e8be0", "#d6ebfc"];
     return `<div class="art${big ? " art-big" : ""}" style="--a:${a};--b:${b}">
       <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[p.icon]}</svg>
@@ -37,6 +59,7 @@
   const badges = (p) => [
     enOferta(p) && `<span class="badge badge-sale">-${Math.round((1 - (p.usd || p.ars) / p.antes) * 100)}%</span>`,
     p.ultimas && '<span class="badge badge-last">Últimas unidades</span>',
+    p.llega && '<span class="badge badge-order">Preventa</span>',
     p.top && '<span class="badge">Más vendido</span>',
     p.nuevo && '<span class="badge badge-new">Nuevo ingreso</span>',
     p.encargo && '<span class="badge badge-order">Por encargo</span>',
@@ -56,16 +79,64 @@
     toast(isFav(id) ? "♥ Guardado en favoritos" : "Quitado de favoritos");
   };
 
+  const estrellas = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${n >= i - 0.25 ? "on" : n >= i - 0.75 ? "half" : ""}">★</span>`).join("");
+  const fechaCorta = (f) => f.split("-").reverse().slice(0, 2).join("/");
+
+  // ---------- Comparador ----------
+  let comparar = store.get("tdv-cmp", []).filter((id) => byId[id]);
+  const enComparar = (id) => comparar.includes(id);
+  function toggleComparar(id) {
+    if (enComparar(id)) comparar = comparar.filter((x) => x !== id);
+    else { if (comparar.length >= 3) { toast("Podés comparar hasta 3 productos."); return; } comparar = [...comparar, id]; }
+    store.set("tdv-cmp", comparar);
+    document.querySelectorAll(`[data-cmp="${id}"]`).forEach((b) => { b.classList.toggle("on", enComparar(id)); b.setAttribute("aria-pressed", enComparar(id)); });
+    barraComparar();
+  }
+  function barraComparar() {
+    let bar = $("#cmpBar");
+    if (!comparar.length) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement("div"); bar.id = "cmpBar"; bar.className = "cmp-bar"; document.body.appendChild(bar); }
+    bar.innerHTML = `<span>${comparar.map((id) => `<b>${esc(byId[id].name)}</b>`).join(" · ")}</span>
+      <button class="btn btn-primary btn-sm" id="cmpGo" ${comparar.length < 2 ? "disabled" : ""}>${comparar.length < 2 ? "Elegí otro para comparar" : "Comparar " + comparar.length}</button>
+      <button class="icon-btn" id="cmpClear" aria-label="Limpiar comparación">✕</button>`;
+    $("#cmpGo").onclick = verComparacion;
+    $("#cmpClear").onclick = () => { const ids = [...comparar]; comparar = []; store.set("tdv-cmp", []); ids.forEach((id) => document.querySelectorAll(`[data-cmp="${id}"]`).forEach((b) => b.classList.remove("on"))); barraComparar(); };
+  }
+  function verComparacion() {
+    const ps = comparar.map((id) => byId[id]);
+    const fila = (t, f) => `<tr><th scope="row">${t}</th>${ps.map((p) => `<td>${f(p)}</td>`).join("")}</tr>`;
+    const m = document.createElement("div");
+    m.className = "cmp-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-label", "Comparación de productos");
+    m.innerHTML = `<div class="cmp-card"><div class="drawer-head"><h3>Comparación</h3><button class="icon-btn" id="cmpClose" aria-label="Cerrar">✕</button></div>
+      <div class="table-wrap cmp-table"><table><thead><tr><th></th>${ps.map((p) => `<th scope="col"><a href="/producto/${p.id}">${art(p)}<span>${esc(p.name)}</span></a></th>`).join("")}</tr></thead><tbody>
+      ${fila("Precio", (p) => priceHTML(p))}
+      ${fila("Marca y modelo", (p) => esc([p.brand, p.model].filter(Boolean).join(" ") || "—"))}
+      ${fila("Opiniones", (p) => p.rating ? `<span class="stars-sm">${estrellas(p.rating)}</span> ${p.rating} (${p.resenas})` : "—")}
+      ${fila("Características", (p) => `<ul>${(p.specs || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`)}
+      ${fila("Opciones", (p) => esc(opciones(p).map((o) => o.nombre).join(", ") || "—"))}
+      ${fila("Ideal para", (p) => esc((p.etapas || []).map((e) => ETAPAS[e]).join(", ") || "—"))}
+      ${fila("Entrega", (p) => p.llega ? `Preventa, llega el ${fechaCorta(p.llega)}` : p.encargo ? "Por encargo, 15 a 30 días" : "En stock")}
+      ${fila("", (p) => p.usd || p.ars ? `<button class="btn btn-primary btn-sm" data-add="${p.id}">Agregar</button>` : `<a class="btn btn-ghost btn-sm" href="/producto/${p.id}">Consultar</a>`)}
+      </tbody></table></div></div>`;
+    document.body.appendChild(m);
+    const cerrar = () => m.remove();
+    m.querySelector("#cmpClose").onclick = cerrar;
+    m.addEventListener("click", (e) => { if (e.target === m) cerrar(); });
+    m.querySelector("#cmpClose").focus();
+  }
+
   const card = (p, i = 0) => `
     <article class="card" style="--i:${i}">
       <div class="badges">${badges(p)}</div>
+      <button class="cmp${enComparar(p.id) ? " on" : ""}" data-cmp="${p.id}" aria-label="Comparar ${esc(p.name)}" aria-pressed="${enComparar(p.id)}" title="Comparar">⇄</button>
       <button class="fav${isFav(p.id) ? " on" : ""}" data-fav="${p.id}" aria-label="${isFav(p.id) ? "Quitar de" : "Guardar en"} favoritos" aria-pressed="${isFav(p.id)}">${isFav(p.id) ? "♥" : "♡"}</button>
       <a class="card-art" href="/producto/${p.id}" data-view="${p.id}" aria-label="Ver ${esc(p.name)}">${art(p)}</a>
       <div class="card-body">
         <span class="card-cat">${esc(p.brand || p.cat)}</span>
         <h3><a href="/producto/${p.id}" data-view="${p.id}">${esc(p.name)}</a></h3>
+        ${p.rating ? `<div class="stars-sm" aria-label="${p.rating} de 5 estrellas">${estrellas(p.rating)} <span>(${p.resenas})</span></div>` : ""}
         ${priceHTML(p)}
-        ${p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
+        ${p.llega ? `<div class="note">Preventa · llega el ${fechaCorta(p.llega)}</div>` : p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
       </div>
       ${p.usd || p.ars ? `<button class="add" data-add="${p.id}">Agregar <span aria-hidden="true">+</span></button>`
         : `<a class="add" href="${waLink(`¡Hola! Quiero consultar el precio de: ${p.name}`)}" target="_blank" rel="noopener" data-consulta="${p.id}">Consultar</a>`}
@@ -94,6 +165,12 @@
   }
   const ahoraAR = () => new Date(Date.now() + (new Date().getTimezoneOffset() - 180) * 60000);
   const habil = (d) => d.getDay() !== 0 && d.getDay() !== 6 && !feriados(d.getFullYear()).has(ymd(d));
+  function diasHabiles(n) {
+    const out = [], x = ahoraAR(), dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+    if (x.getHours() >= 17) x.setDate(x.getDate() + 1);
+    while (out.length < n) { if (habil(x) || x.getDay() === 6 && !feriados(x.getFullYear()).has(ymd(x))) out.push(`${dias[x.getDay()]} ${x.getDate()}/${x.getMonth() + 1}`); x.setDate(x.getDate() + 1); }
+    return out;
+  }
   function avisoDespacho() {
     const hoy = ahoraAR();
     if (habil(hoy)) return "";
@@ -103,6 +180,7 @@
   }
   const patrias = { "05-25": "¡Feliz 25 de Mayo!", "06-20": "¡Feliz Día de la Bandera!", "07-09": "¡Feliz Día de la Independencia!" };
   const patria = patrias[ymd(ahoraAR()).slice(5)] || "";
+  const evento_ = (CONFIG.eventos || []).find((e) => ymd(ahoraAR()) >= e.desde && ymd(ahoraAR()) <= e.hasta && PRODUCTS.some(enOferta));
   // Horario de respuesta
   const fueraDeHora = () => { const hr = ahoraAR().getHours(); return hr < CONFIG.horario.desde || hr >= CONFIG.horario.hasta; };
   const avisoHorario = () => fueraDeHora() ? `Te respondemos a partir de las ${CONFIG.horario.desde} h` : "";
@@ -128,6 +206,7 @@
   const despacho = avisoDespacho();
   const metar = ["METAR SABE", "CAVOK", "ENVÍOS A TODO EL PAÍS", "DESPACHO EN 48 H", "ENVÍO EN EL DÍA EN CABA", `${CONFIG.ventas} VENTAS`, "PRODUCTOS ORIGINALES", "ROGER, TE ESPERAMOS"];
   $("#siteHeader").outerHTML = `
+    ${evento_ ? `<a class="notice notice-sale" href="/ofertas">🔥 ${esc(evento_.nombre)}: ofertas hasta el ${fechaCorta(evento_.hasta)} → Ver ofertas</a>` : ""}
     ${despacho || patria ? `<div class="notice${patria ? " notice-ar" : ""}">${esc(patria ? patria + (despacho ? " · " + despacho : "") : despacho)}</div>` : ""}
     <div class="metar" aria-label="Novedades"><div class="metar-track">${[...metar, ...metar].map((t) => `<span>${t}</span>`).join("")}</div></div>
     <header class="nav" id="nav">
@@ -156,6 +235,7 @@
         <a href="${h("#kits")}">Kits</a>
         <a href="${h("#tripulantes")}">Tripulantes</a>
         <a href="${h("#regalos")}">Regalos</a>
+        ${PRODUCTS.some((p) => p.alquiler) ? `<a href="/alquiler"${page === "alquiler" ? ' aria-current="page"' : ""}>Alquiler</a>` : ""}
         <a href="/envios"${page === "envios" ? ' aria-current="page"' : ""}>Envíos</a>
         <a href="/contacto"${page === "contacto" ? ' aria-current="page"' : ""}>Contacto</a>
         <a href="${h("#preguntas")}">Preguntas</a>
@@ -172,13 +252,14 @@
         </div>
         <div>
           <h4>Tienda</h4>
-          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h4>Contacto</h4>
           <a href="${waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.")}" target="_blank" rel="noopener">WhatsApp ${esc(CONFIG.whatsappVisible)}</a>
           <a href="mailto:${CONFIG.email}">${CONFIG.email}</a>
           <span class="muted">${esc(CONFIG.ciudad)}</span>
+          ${CONFIG.googleResenas ? `<a href="${esc(CONFIG.googleResenas)}" target="_blank" rel="noopener">⭐ Dejanos tu reseña en Google</a>` : ""}
         </div>
         <div>
           <h4>Legales</h4>
@@ -190,6 +271,7 @@
       </div>
       <div class="wrap pay-row" aria-label="Medios de pago"><span class="muted small">Pagás con:</span>
         <span class="pay">🏦 Transferencia</span><span class="pay">💵 Efectivo al retirar</span><span class="pay">💲 Dólares</span><span class="pay">₿ Cripto</span><span class="pay">🔒 Seña para reservar</span></div>
+      ${CONFIG.dataFiscal ? `<div class="wrap"><a href="${esc(CONFIG.dataFiscal)}" target="_blank" rel="noopener" class="data-fiscal">Data Fiscal</a></div>` : ""}
       <div class="wrap foot-bottom">© ${new Date().getFullYear()} Tienda de Vuelo · ${esc(CONFIG.ciudad)}</div>
     </footer>
     ${avisoHorario() ? `<div class="wa-bubble" id="waBubble">${esc(avisoHorario())}. Dejanos tu mensaje 👋</div>` : ""}
@@ -267,11 +349,12 @@
       const full = items.reduce((s, p) => s + (pesos(p) || 0), 0);
       return { name: k.name, sub: items.map((p) => p.name).join(", "), unit: full * (1 - k.off), emoji: k.emoji, label: ars(full * (1 - k.off)) };
     }
-    const p = byId[l.id];
+    const p = conOpcion(byId[l.id], l.variante);
     return { name: p.name, sub: l.variante || "", unit: pesos(p) || 0, p, label: p.usd ? `${usd(p.usd)} (≈ ${ars(pesos(p))})` : ars(p.ars) };
   };
   const total = () => cart.reduce((s, l) => s + lineInfo(l).unit * l.qty, 0);
   const hasUsd = () => cart.some((l) => !l.kit && byId[l.id].usd);
+  const usdDe = (l) => (!l.kit && byId[l.id].usd ? conOpcion(byId[l.id], l.variante).usd : null);
 
   function add(line, label) {
     const found = cart.find((l) => keyOf(l) === keyOf(line));
@@ -350,13 +433,17 @@
           <label class="opt"><input type="radio" name="entrega" value="Envío en el día (CABA)" ${datos.entrega === "Envío en el día (CABA)" ? "checked" : ""}> Envío en el día (CABA)</label>
           <label class="opt"><input type="radio" name="entrega" value="Retiro en CABA" ${datos.entrega === "Retiro en CABA" ? "checked" : ""}> Retiro en CABA (coordinamos por WhatsApp)</label>
         </fieldset>
+        <div id="fTurnoWrap" class="p-grid2-mini">
+          <label>Día de retiro<select id="fDia">${diasHabiles(6).map((d) => `<option>${d}</option>`).join("")}</select></label>
+          <label>Horario<select id="fHora"><option>10 a 13 h</option><option>14 a 17 h</option><option>17 a 20 h</option></select></label>
+        </div>
         <label id="fFranjaWrap">Franja horaria<select id="fFranja"><option>Mañana (9 a 13 h)</option><option>Tarde (14 a 19 h)</option></select></label>
         <label id="fDirWrap">Dirección, ciudad y código postal<input id="fDir" autocomplete="street-address" value="${esc(datos.dir || "")}"></label>
         <label><span>DNI o CUIT <span class="muted">(opcional, si necesitás factura)</span></span><input id="fDni" inputmode="numeric" value="${esc(datos.dni || "")}"></label>
         <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2"></textarea></label>
       </form>`;
     foot.innerHTML = totalBlock + `<div class="foot-btns"><button class="btn btn-ghost" id="toItems">← Volver</button><button class="btn btn-primary" id="send" form="orderForm" type="submit">Enviar pedido por WhatsApp</button></div>`;
-    const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; };
+    const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA"; };
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
@@ -365,8 +452,9 @@
   function sendOrder() {
     const d = {
       nombre: $("#fNombre").value.trim(), tel: $("#fTel").value.trim(), dni: $("#fDni").value.trim(),
-      entrega: document.querySelector('input[name="entrega"]:checked').value, franja: $("#fFranja").value, dir: $("#fDir").value.trim(), notas: $("#fNotas").value.trim(),
+      entrega: document.querySelector('input[name="entrega"]:checked').value, dir: $("#fDir").value.trim(), notas: $("#fNotas").value.trim(),
     };
+    d.franja = d.entrega === "Envío en el día (CABA)" ? $("#fFranja").value : d.entrega === "Retiro en CABA" ? `${$("#fDia").value}, ${$("#fHora").value}` : "";
     Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir });
     store.set("tdv-datos", datos);
     const now = new Date();
@@ -379,13 +467,13 @@
       return `• ${l.qty} x ${i.name}${i.sub ? ` (${i.sub})` : ""} — ${l.kit ? ars(i.unit * l.qty) : i.label}${link}`;
     });
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())} + envío\n\n` +
-      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.entrega === "Envío en el día (CABA)" ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}` : "") +
+      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {
       fetch("/api/pedido", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({
-        num, token, totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (!l.kit && byId[l.id].usd ? byId[l.id].usd * l.qty : 0), 0) || null,
-        cliente: d, items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, kit: l.kit || "", name: i.name, sub: i.sub, qty: l.qty, label: i.label, unitArs: Math.round(i.unit), usd: !l.kit && byId[l.id].usd ? byId[l.id].usd : null }; }),
+        num, token, totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (usdDe(l) || 0) * l.qty, 0) || null,
+        cliente: d, items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, kit: l.kit || "", name: i.name, sub: i.sub, qty: l.qty, label: i.label, unitArs: Math.round(i.unit), usd: usdDe(l) }; }),
       }) }).catch(() => {});
     } catch {}
     const pedidos = store.get("tdv-pedidos", []);
@@ -417,16 +505,56 @@
     if (c) evento(c.dataset.quiero ? "lo_quiero" : "consulta", "", c.dataset.quiero || c.dataset.consulta);
   });
   document.addEventListener("click", (e) => {
+    const cm = e.target.closest("[data-cmp]");
+    if (cm) { e.preventDefault(); toggleComparar(cm.dataset.cmp); return; }
     const t = e.target.closest("[data-add],[data-inc],[data-dec],[data-fav]");
     if (!t) return;
-    if (t.dataset.add) { const p = byId[t.dataset.add]; add({ id: p.id, variante: p.variantes ? p.variantes[0] : "" }, p.name); }
+    if (t.dataset.add) { const p = byId[t.dataset.add]; add({ id: p.id, variante: p.variantes ? opciones(p)[0].nombre : "" }, p.name); }
     else if (t.dataset.inc) changeQty(t.dataset.inc, 1);
     else if (t.dataset.dec) changeQty(t.dataset.dec, -1);
     else if (t.dataset.fav) { e.preventDefault(); toggleFav(t.dataset.fav); }
   });
 
+  // ---------- Asistente con IA (solo si está activado en el servidor) ----------
+  async function asistente() {
+    try { const r = await fetch("/api/asistente"); if (!r.ok || !(await r.json()).activo) return; } catch { return; }
+    let hist = store.get("tdv-chat", []).slice(-16), abierto = false;
+    const btn = document.createElement("button");
+    btn.className = "ai-float"; btn.setAttribute("aria-label", "Abrir el asistente"); btn.innerHTML = '<span aria-hidden="true">✈</span> ¿Te ayudo a elegir?';
+    const box = document.createElement("section");
+    box.className = "ai-box"; box.hidden = true; box.setAttribute("aria-label", "Asistente de Tienda de Vuelo");
+    box.innerHTML = `<div class="drawer-head"><h3>Asistente</h3><button class="icon-btn" id="aiClose" aria-label="Cerrar">✕</button></div>
+      <div class="ai-msgs" id="aiMsgs" aria-live="polite"></div>
+      <form class="ai-form" id="aiForm"><input id="aiQ" autocomplete="off" maxlength="600" placeholder="Ej.: ¿qué auricular me conviene para el curso?" aria-label="Tu pregunta"><button class="btn btn-primary btn-sm" type="submit">Enviar</button></form>
+      <p class="ai-note">Respuestas generadas con IA a partir del catálogo. Para comprar o confirmar stock, <a href="${waLink("¡Hola! Vengo del asistente de la web.")}" target="_blank" rel="noopener">escribinos por WhatsApp</a>.</p>`;
+    document.body.append(btn, box);
+    const fmt = (t) => esc(t).replace(/\[([^\]]+)\]\((\/producto\/[\w-]+)\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+    const pintar = (pensando) => {
+      $("#aiMsgs").innerHTML = (hist.length ? "" : `<div class="ai-m ai-a">¡Hola! Soy el asistente de Tienda de Vuelo. Contame qué volás o qué necesitás y te recomiendo del catálogo.</div>`) +
+        hist.map((m) => `<div class="ai-m ${m.role === "user" ? "ai-u" : "ai-a"}">${fmt(m.content)}</div>`).join("") + (pensando ? '<div class="ai-m ai-a ai-dots"><span></span><span></span><span></span></div>' : "");
+      $("#aiMsgs").scrollTop = 1e9;
+    };
+    const toggle = (v) => { abierto = v; box.hidden = !v; btn.hidden = v; if (v) { pintar(); $("#aiQ").focus(); } };
+    btn.onclick = () => toggle(true);
+    box.querySelector("#aiClose").onclick = () => toggle(false);
+    $("#aiForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const q = $("#aiQ").value.trim(); if (!q) return;
+      $("#aiQ").value = ""; hist.push({ role: "user", content: q }); pintar(true);
+      try {
+        const r = await fetch("/api/asistente", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mensajes: hist }) });
+        const d = await r.json();
+        hist.push({ role: "assistant", content: d.texto || "No pude responder ahora." });
+      } catch { hist.push({ role: "assistant", content: "No pude responder ahora. Probá de nuevo o escribinos por WhatsApp." }); }
+      hist = hist.slice(-16); store.set("tdv-chat", hist); pintar();
+    };
+    box.addEventListener("click", (e) => { if (e.target.closest("a[href^='/producto/']")) toggle(false); });
+  }
+
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, get favs() { return favs; } };
   renderCart();
+  barraComparar();
+  asistente();
   window.dispatchEvent(new Event("tdv:listo"));
 })();

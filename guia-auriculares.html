@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>¿Qué auricular de aviación me conviene? · Tienda de Vuelo</title>
+  <meta name="description" content="Guía para elegir auricular de aviación: pasivo o ANR, fichas GA, LEMO o helicóptero, Bluetooth y presupuesto. Recomendación en 5 preguntas.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/guia-auriculares">
+  <meta property="og:title" content="¿Qué auricular de aviación me conviene? · Tienda de Vuelo">
+  <meta property="og:description" content="Guía para elegir auricular de aviación: pasivo o ANR, fichas GA, LEMO o helicóptero, Bluetooth y presupuesto. Recomendación en 5 preguntas.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="guia" data-wa="¡Hola! Quería consultar qué auricular me conviene.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Guía</span>
+      <h1>¿Qué auricular me conviene?</h1>
+      <p>Cinco preguntas y te recomendamos el ideal para cómo volás. Si te quedan dudas, escribinos: te atienden pilotos.</p>
+    </div></section>
+    <section class="wrap narrow prose">
+      <form id="quiz" class="quiz">
+        <fieldset><legend>1. ¿En qué etapa estás?</legend>
+          <label><input type="radio" name="etapa" value="alumno" required> Estoy haciendo el curso</label>
+          <label><input type="radio" name="etapa" value="privado"> Piloto privado</label>
+          <label><input type="radio" name="etapa" value="comercial"> Comercial, instructor o línea</label></fieldset>
+        <fieldset><legend>2. ¿Cuánto volás?</legend>
+          <label><input type="radio" name="horas" value="pocas" required> Menos de 5 horas por mes</label>
+          <label><input type="radio" name="horas" value="medias"> Entre 5 y 20 horas por mes</label>
+          <label><input type="radio" name="horas" value="muchas"> Más de 20 horas por mes</label></fieldset>
+        <fieldset><legend>3. ¿Qué volás?</legend>
+          <label><input type="radio" name="avion" value="ga" required> Avioneta (fichas comunes)</label>
+          <label><input type="radio" name="avion" value="lemo"> Avión con ficha de panel (LEMO)</label>
+          <label><input type="radio" name="avion" value="heli"> Helicóptero</label></fieldset>
+        <fieldset><legend>4. ¿Cuánto querés invertir?</legend>
+          <label><input type="radio" name="plata" value="400" required> Hasta US$ 400</label>
+          <label><input type="radio" name="plata" value="1000"> Hasta US$ 1.000</label>
+          <label><input type="radio" name="plata" value="9999"> Quiero lo mejor</label></fieldset>
+        <fieldset><legend>5. ¿Querés Bluetooth para música, llamadas o apps?</legend>
+          <label><input type="radio" name="bt" value="si" required> Sí</label>
+          <label><input type="radio" name="bt" value="no"> No me importa</label></fieldset>
+        <button class="btn btn-primary" type="submit">Ver mi recomendación</button>
+      </form>
+      <div id="resultado" hidden></div>
+      <h2>Lo que conviene saber</h2>
+      <ul>
+        <li><b>Pasivo (PNR):</b> aísla el ruido con almohadillas y presión. Es más barato y no usa pilas. Alcanza para el curso y para volar poco.</li>
+        <li><b>Activo (ANR):</b> además cancela el ruido grave del motor con electrónica. Cansa mucho menos en vuelos largos y cuida tus oídos si volás seguido.</li>
+        <li><b>Fichas:</b> las avionetas usan dos fichas (GA dual). Muchos aviones modernos usan una ficha de panel (LEMO). Los helicópteros usan otra (U-174). Hay adaptadores.</li>
+      </ul>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { card, pesos, $ } = window.TDV;
+      const dolar = (p) => (p.usd ? p.usd : p.ars ? pesos(p) / (pesos({ usd: 1 }) || 1500) : Infinity);
+      const texto = (p) => [p.name, p.desc, ...(p.specs || []), ...(p.variantes || [])].join(" ").toLowerCase();
+      const auris = PRODUCTS.filter((p) => !p.agotado && (p.icon === "headset" || /auricular/i.test(p.name)));
+      $("#quiz").onsubmit = (e) => {
+        e.preventDefault();
+        const r = Object.fromEntries(new FormData(e.target));
+        const tope = Number(r.plata), quiereAnr = r.horas !== "pocas" || r.etapa === "comercial";
+        const puntaje = (p) => {
+          const t = texto(p), anr = /\banr\b|activa/.test(t), bt = /bluetooth/.test(t), precio = dolar(p);
+          let s = 0, por = [];
+          if (precio <= tope) { s += 30; } else s -= 40 * Math.min(3, precio / tope - 1 + 0.3);
+          if (quiereAnr && anr) { s += 25; por.push("cancelación activa de ruido, que cansa mucho menos si volás seguido"); }
+          if (!quiereAnr && !anr) { s += 15; por.push("es pasivo: simple, liviano y sin pilas, ideal para tu ritmo de vuelo"); }
+          if (r.bt === "si" && bt) { s += 12; por.push("tiene Bluetooth"); }
+          if (r.bt === "si" && !bt) s -= 8;
+          if ((p.etapas || []).includes(r.etapa)) s += 8;
+          if (r.avion === "lemo" && /lemo/.test(t)) { s += 10; por.push("viene con ficha LEMO"); }
+          if (r.avion === "heli" && /helic|u-174/.test(t)) { s += 10; por.push("tiene versión para helicóptero"); }
+          if (r.etapa === "alumno" && p.reacond) { s += 6; por.push("reacondicionado: la forma más económica de empezar con uno de marca"); }
+          if (tope >= 9999 && precio > 900) s += 10;
+          return { p, s, por };
+        };
+        const top = auris.map(puntaje).sort((a, b) => b.s - a.s).slice(0, 2);
+        const extra = r.avion === "heli" ? PRODUCTS.find((p) => /adaptador/i.test(p.name) && /helic/i.test(p.name)) : null;
+        $("#resultado").hidden = false;
+        $("#resultado").innerHTML = top.length ? `<h2>Te recomendamos</h2><div class="grid grid-2">${top.map((x) => card(x.p)).join("")}</div>
+          <ul>${top.map((x) => `<li><b>${x.p.name}:</b> ${x.por.length ? x.por.join("; ") : "buena relación precio y calidad para lo que buscás"}.</li>`).join("")}</ul>
+          ${extra ? `<p>Para helicóptero también te puede servir el <a href="/producto/${extra.id}">${extra.name}</a>.</p>` : ""}
+          <p class="muted">¿Querés que lo veamos juntos? <a href="${window.TDV.waLink("¡Hola! Hice la guía de auriculares y quería consultar.")}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p>`
+          : `<p>Ahora no tenemos auriculares cargados que coincidan. Escribinos y te conseguimos uno por encargo.</p>`;
+        $("#resultado").scrollIntoView({ behavior: "smooth" });
+      };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
