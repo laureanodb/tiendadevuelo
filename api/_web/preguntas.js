@@ -1,5 +1,5 @@
 // Preguntas por producto: cualquiera pregunta; se publica cuando respondés desde el panel.
-import { DB_URL, body, ensureSchema, q, send } from "./_lib.js";
+import { DB_URL, body, ensureSchema, q, send } from "../_lib.js";
 
 export default async function handler(req, res) {
   if (!DB_URL) return send(res, 200, { preguntas: [] });

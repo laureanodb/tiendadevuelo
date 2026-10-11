@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import vm from "node:vm";
 import Anthropic from "@anthropic-ai/sdk";
-import { DB_URL, body, ensureSchema, fromRow, q, send } from "./_lib.js";
+import { DB_URL, body, ensureSchema, fromRow, q, send } from "../_lib.js";
 
 const KEY = process.env.ANTHROPIC_API_KEY || "";
 const LIMITE_IP_DIA = 40, LIMITE_DIA = 600, MAX_MENSAJES = 16;
@@ -12,7 +12,7 @@ const LIMITE_IP_DIA = 40, LIMITE_DIA = 600, MAX_MENSAJES = 16;
 function datosWeb() {
   const ctx = { window: {} };
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(new URL("../products.js", import.meta.url), "utf8") + ";this.__d={CONFIG,PRODUCTS,CATEGORIES,ETAPAS}", ctx);
+  vm.runInContext(fs.readFileSync(new URL("../../products.js", import.meta.url), "utf8") + ";this.__d={CONFIG,PRODUCTS,CATEGORIES,ETAPAS}", ctx);
   return ctx.__d;
 }
 

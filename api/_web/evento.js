@@ -1,5 +1,5 @@
 // Registro liviano de actividad: búsquedas sin resultado y consultas por producto.
-import { DB_URL, body, ensureSchema, q, send } from "./_lib.js";
+import { DB_URL, body, ensureSchema, q, send } from "../_lib.js";
 
 const TIPOS = ["busqueda_vacia", "consulta", "lo_quiero"];
 export default async function handler(req, res) {

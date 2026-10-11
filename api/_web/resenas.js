@@ -1,5 +1,5 @@
 // Reseñas verificadas: solo puede opinar quien compró (con el link de su pedido). Se publican cuando las aprobás.
-import { DB_URL, VENDIDOS, body, ensureSchema, q, send } from "./_lib.js";
+import { DB_URL, VENDIDOS, body, ensureSchema, q, send } from "../_lib.js";
 
 const corto = (n) => { const [a, b] = String(n || "").trim().split(/\s+/); return a ? a + (b ? " " + b[0].toUpperCase() + "." : "") : "Cliente"; };
 

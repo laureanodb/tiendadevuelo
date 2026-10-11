@@ -1,5 +1,5 @@
 // Catálogo público: lo lee la web. Sin costos, stock ni notas internas.
-import { DB_URL, ensureSchema, fromRow, q, send } from "./_lib.js";
+import { DB_URL, ensureSchema, fromRow, q, send } from "../_lib.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "public, s-maxage=15, stale-while-revalidate=120");

@@ -84,7 +84,7 @@
     }
   ],
   "functions": {
-    "api/asistente.js": {
+    "api/[fn].js": {
       "includeFiles": "products.js",
       "maxDuration": 60
     }

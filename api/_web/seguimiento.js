@@ -1,5 +1,5 @@
 // El cliente ve el estado de su pedido con el número y la clave del link. Sin dirección ni teléfono.
-import { DB_URL, ensureSchema, q, send } from "./_lib.js";
+import { DB_URL, ensureSchema, q, send } from "../_lib.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");

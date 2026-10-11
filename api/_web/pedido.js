@@ -1,5 +1,5 @@
 // La web guarda cada pedido al mandarlo por WhatsApp, para verlo en el panel y que el cliente lo siga.
-import { DB_URL, body, ensureSchema, q, send, telWa } from "./_lib.js";
+import { DB_URL, body, ensureSchema, q, send, telWa } from "../_lib.js";
 
 const s = (v, n = 200) => String(v ?? "").trim().slice(0, n);
 const n = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Math.max(0, Number(v)));
