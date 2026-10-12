@@ -1,7 +1,7 @@
 // Panel: ajustes guardados (por ahora, las respuestas rápidas).
 import { ajuste, body, guardarAjuste, panel, send } from "../_lib.js";
 
-const CLAVES = ["plantillas", "pago"];
+const CLAVES = ["plantillas", "pago", "precios"];
 export default panel(async (req, res) => {
   const clave = String(req.query.clave || body(req).clave || "");
   if (!CLAVES.includes(clave)) return send(res, 400, { error: "clave" });

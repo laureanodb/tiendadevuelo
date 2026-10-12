@@ -8,6 +8,7 @@
     clearTimeout(t);
     const d = await r.json();
     if (d.pago) CONFIG.pago = d.pago;
+    if (d.dolar) { CONFIG.dolarTipo = d.dolar.tipo; CONFIG.dolarManual = d.dolar.manual; }
     if (d.ventas) CONFIG.ventas = "+" + Number(d.ventas).toLocaleString("es-AR");
     if (d.configurado && d.productos.length) {
       PRODUCTS.splice(0, PRODUCTS.length, ...d.productos.map((p) => ({

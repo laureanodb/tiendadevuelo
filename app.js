@@ -38,8 +38,13 @@
   try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
   const hace30 = Date.now() - 30 * 864e5;
   const esNovedad = (p) => p.nuevo || (p.creado && new Date(p.creado).getTime() > hace30);
-  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), "Por encargo", "Favoritos", ...CATEGORIES];
+  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), "Por encargo", "Favoritos", ...CATEGORIES];
   const marcasTodas = [...new Set(visibles.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  // Franja de marcas: primero las que somos distribuidor oficial
+  const oficiales = new Set(visibles.filter((p) => p.oficial).map((p) => p.brand));
+  const marcasOrden = [...marcasTodas].sort((a, b) => (oficiales.has(b) ? 1 : 0) - (oficiales.has(a) ? 1 : 0));
+  $("#marcas").innerHTML = marcasOrden.map((m) => `<a class="marca${oficiales.has(m) ? " oficial" : ""}" href="/marca/${slug(m)}"><b>${esc(m)}</b>${oficiales.has(m) ? "<small>✔ Distribuidor oficial</small>" : ""}</a>`).join("");
+  $("#marcasSec").hidden = marcasTodas.length < 3;
   $("#brand").insertAdjacentHTML("beforeend", marcasTodas.map((m) => `<option>${esc(m)}</option>`).join(""));
   const chips = $("#chips");
   chips.innerHTML = FILTROS.map((f) => `<button class="chip" role="tab" data-f="${f}">${f === "Favoritos" ? "♥ Favoritos" : f}</button>`).join("");
@@ -52,7 +57,7 @@
     const q = norm(state.q);
     const pass = {
       "Todos": () => true, "Ofertas": enOferta, "Novedades del mes": esNovedad, "Más vendidos": (p) => p.top,
-      "Usados y reacondicionados": (p) => p.reacond, "Por encargo": (p) => p.encargo, "Favoritos": (p) => isFav(p.id),
+      "Usados y reacondicionados": (p) => p.reacond, "Liquidación": (p) => p.liquidacion, "Por encargo": (p) => p.encargo, "Favoritos": (p) => isFav(p.id),
     };
     const min = Number(state.min) || 0, max = Number(state.max) || Infinity;
     let list = visibles.filter((p) => (pass[state.f] ? pass[state.f](p) : p.cat === state.f) &&
@@ -105,6 +110,7 @@
     if (m && m[1] === "categoria") { const c = CATEGORIES.find((x) => slug(x) === m[2]); if (c) { f = c; kicker = "Categoría"; title = c; text = CAT_INFO[c] || ""; pageTitle = `${c} para pilotos`; } }
     else if (m) { const b = marcasTodas.find((x) => slug(x) === m[2]); if (b) { brand = b; kicker = "Marca"; title = b; text = `Productos ${b} originales para pilotos, con envío a todo el país.`; pageTitle = `${b} en Argentina`; } }
     else if (path === "/ofertas") { f = "Ofertas"; kicker = "Ofertas"; title = "Ofertas del momento"; text = "Precios rebajados por tiempo limitado."; pageTitle = "Ofertas"; }
+    else if (path === "/liquidacion") { f = "Liquidación"; kicker = "Liquidación"; title = "Liquidación"; text = "Saldos y últimas unidades a precio de liquidación, hasta agotar stock."; pageTitle = "Liquidación"; }
     else if (path === "/usados") { f = "Usados y reacondicionados"; kicker = "Usados"; title = "Usados y reacondicionados"; text = "Equipos revisados y probados, a mejor precio."; pageTitle = "Usados y reacondicionados"; }
     else if (path === "/novedades") { f = "Novedades del mes"; kicker = "Novedades"; title = "Novedades del mes"; text = "Lo último que llegó a la tienda."; pageTitle = "Novedades"; }
     else return false;
@@ -121,7 +127,7 @@
   }
   const rutaBase = () => { $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; metaDesc.content = baseDesc; };
   document.addEventListener("click", (e) => {
-    const a = e.target.closest("a[href^='/categoria/'], a[href^='/marca/'], a[href='/ofertas'], a[href='/usados'], a[href='/novedades']");
+    const a = e.target.closest("a[href^='/categoria/'], a[href^='/marca/'], a[href='/ofertas'], a[href='/usados'], a[href='/novedades'], a[href='/liquidacion']");
     if (!a || e.metaKey || e.ctrlKey) return;
     if (ruta(a.getAttribute("href"), true)) e.preventDefault();
   });
@@ -197,7 +203,7 @@
     $("#pvVariant").innerHTML = ops.map((o) => `<option value="${esc(o.nombre)}">${esc(o.nombre)}${o.precio !== null && o.precio !== (p.usd || p.ars) ? ` — ${p.usd ? "US$ " + o.precio.toLocaleString("es-AR") : ars(o.precio)}` : ""}</option>`).join("");
     const precioOpcion = () => {
       const pp = p.variantes ? conOpcion(p, $("#pvVariant").value) : p;
-      $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar oficial del día.</p>' : "");
+      $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar del día.</p>' : "");
       const o = ops.find((x) => x.nombre === $("#pvVariant").value);
       const sw = $("#pvSwipe");
       if (o && o.foto !== null && sw) sw.scrollTo({ left: sw.clientWidth * o.foto, behavior: reduceMotion ? "auto" : "smooth" });
@@ -221,7 +227,12 @@
     $("#pvDocs").hidden = !(p.docs && p.docs.length);
     $("#pvDocs").innerHTML = (p.docs || []).map((d) => `<a class="doc" href="${esc(d.url)}" target="_blank" rel="noopener">📄 ${esc(d.nombre)}</a>`).join("");
     $("#pvAlq").hidden = !p.alquiler;
-    if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por día</b>. <a href="/alquiler">Ver alquileres</a>`;
+    $("#pvExtra").innerHTML = [
+      p.reacond && "♻️ <b>Usado o reacondicionado:</b> revisado y probado. Tiene la garantía legal de 3 meses.",
+      "🎁 Cada pedido va con un regalito de la tienda.",
+      `💬 ¿Lo viste más barato en otra tienda? <a href="${waLink(`¡Hola! Vi el ${p.name} más barato en otro lado. ¿Lo pueden revisar?`)}" target="_blank" rel="noopener">Escribinos y lo revisamos</a>.`,
+    ].filter(Boolean).map((x) => `<li>${x}</li>`).join("");
+    if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por semana</b>, con depósito en garantía. <a href="/alquiler">Ver alquileres</a>`;
     cargarSocial(p);
     $("#pvWant").dataset.quiero = p.id; $("#pvAsk").dataset.consulta = p.id;
     $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar precio por WhatsApp";

@@ -6,7 +6,13 @@
   const usd = (n) => "US$ " + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 });
   let productos = [], estado = {}, filtro = "Todos", busca = "", dolar = 1500;
 
-  fetch("https://dolarapi.com/v1/dolares/oficial").then((r) => r.json()).then((d) => { if (d.venta) dolar = d.venta; }).catch(() => {});
+  // El mismo dólar que usa la web (se elige en Ajustes)
+  async function cargarDolar() {
+    let v = {};
+    try { v = (await api("ajustes?clave=precios")).valor || {}; } catch {}
+    if (v.dolar === "manual" && Number(v.manual) > 0) { dolar = Number(v.manual); return; }
+    try { const d = await (await fetch(`https://dolarapi.com/v1/dolares/${["bolsa", "blue"].includes(v.dolar) ? v.dolar : "oficial"}`)).json(); if (d.venta) dolar = d.venta; } catch {}
+  }
 
   // ---------- Avisos y llamadas al servidor ----------
   let tt;
@@ -17,8 +23,8 @@
   }
   async function api(path, opts = {}) {
     const r = await fetch("/api/panel/" + path, {
-      ...opts, headers: opts.body ? { "content-type": "application/json" } : {}, credentials: "same-origin",
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      ...opts, headers: opts.method && opts.method !== "GET" ? { "content-type": "application/json" } : {}, credentials: "same-origin",
+      body: opts.method && opts.method !== "GET" ? JSON.stringify(opts.body || {}) : undefined,
     });
     let d = {};
     try { d = await r.json(); } catch {}
@@ -76,6 +82,7 @@
   document.getElementById("salir").onclick = async () => { await api("sesion", { method: "DELETE" }).catch(() => {}); login(); };
 
   async function cargar() {
+    cargarDolar();
     const d = await api("productos");
     productos = d.productos;
     ir(location.hash.slice(1) || "productos");
@@ -267,7 +274,7 @@
           <h2>En la web</h2>
           <label class="p-switch"><input type="checkbox" id="visible"${p.visible ? " checked" : ""}> Mostrar en la web</label>
           <div class="p-checks">
-            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"], ["oficial", "Distribuidor oficial de la marca"]]
+            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"], ["oficial", "Distribuidor oficial de la marca"], ["liquidacion", "Liquidación (sección de saldos)"]]
               .map(([k, t]) => `<label><input type="checkbox" id="f_${k}"${p[k] ? " checked" : ""}> ${t}</label>`).join("")}
           </div>
           <label><span>Preventa: llega el <span class="muted">(vacío = no es preventa)</span></span><input id="llega" type="date" value="${esc(p.llega || "")}"></label>
@@ -286,7 +293,7 @@
         <section class="p-card">
           <h2>Alquiler</h2>
           <div class="p-grid2">
-            <label><span>Precio por día <span class="muted">(vacío = no se alquila)</span></span><input id="alquiler" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.alquiler ?? "")}"></label>
+            <label><span>Precio de alquiler por semana <span class="muted">(vacío = no se alquila)</span></span><input id="alquiler" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.alquiler ?? "")}"></label>
             <label>Moneda<select id="alqMon"><option value="ARS"${p.alquilerMoneda !== "USD" ? " selected" : ""}>Pesos</option><option value="USD"${p.alquilerMoneda === "USD" ? " selected" : ""}>Dólares</option></select></label>
           </div>
         </section>
@@ -367,7 +374,7 @@
       const enPesos = (v, mon) => (mon === "USD" ? v * dolar : v);
       const g = enPesos(pr, m) - enPesos(co, cm);
       const pct = (g / enPesos(co, cm)) * 100;
-      $("ganancia").innerHTML = `Ganancia: <b>${m === "USD" && cm === "USD" ? usd(pr - co) : ars(g)}</b> por unidad (${pct.toFixed(0)}% sobre el costo)${m !== cm ? " · al dólar oficial de hoy" : ""}`;
+      $("ganancia").innerHTML = `Ganancia: <b>${m === "USD" && cm === "USD" ? usd(pr - co) : ars(g)}</b> por unidad (${pct.toFixed(0)}% sobre el costo)${m !== cm ? " · al dólar de hoy" : ""}`;
       $("ganancia").classList.toggle("neg", g < 0);
     }
     document.querySelectorAll('input[name="moneda"]').forEach((r) => (r.onchange = syncPrecio));
@@ -390,7 +397,7 @@
     $("cancel").onclick = salir;
 
     if ($("del")) $("del").onclick = () => {
-      $("delBox").innerHTML = `<span>¿Borrar <b>${esc(p.name)}</b>? No se puede deshacer.</span>
+      $("delBox").innerHTML = `<span>¿Borrar <b>${esc(p.name)}</b>? Si te arrepentís, lo recuperás desde Actividad → Historial.</span>
         <div class="p-head-btns"><button type="button" class="btn btn-ghost" id="delNo">No</button><button type="button" class="btn p-btn-danger" id="delSi">Sí, borrar</button></div>`;
       $("delNo").onclick = () => editar(productos.find((x) => x.id === p.id));
       $("delSi").onclick = async () => {
@@ -413,7 +420,7 @@
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
       };
-      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp", "oficial"]) datos[k] = $("f_" + k).checked;
+      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp", "oficial", "liquidacion"]) datos[k] = $("f_" + k).checked;
       Object.assign(datos, { llega: val("llega"), alquiler: val("alquiler"), alquilerMoneda: $("alqMon").value, docs });
       $("guardar").disabled = true;
       try {
@@ -457,6 +464,9 @@
         <div class="p-stat"><span>Mes anterior</span><b>${monto(r.anterior)}</b><small>&nbsp;</small></div>
       </div>
       <p class="muted small">Las ventas cuentan lo que anotás como cobrado en pedidos pagados, enviados o entregados. Pesos y dólares por separado.</p>
+      ${(() => { const s = d.pedidos.filter((p) => p.estado === "señado"); if (!s.length) return "";
+        const deben = s.reduce((t, p) => t + Math.max(0, (p.totalArs || 0) - (p.cobradoArs || 0) - (p.cobradoUsd || 0) * dolar), 0);
+        return `<button class="p-alert p-deben" data-fp="Señado">💰 Te deben ≈ <b>${ars(deben)}</b> de ${s.length} ${s.length === 1 ? "pedido señado" : "pedidos señados"}. Tocá para verlos.</button>`; })()}
       ${(() => { const v = d.pedidos.filter((p) => p.nps !== null && p.nps !== undefined); if (!v.length) return "";
         const prom = v.filter((p) => p.nps >= 9).length, det = v.filter((p) => p.nps <= 6).length, nps = Math.round(((prom - det) / v.length) * 100);
         const coments = v.filter((p) => p.npsComent).slice(0, 5);
@@ -528,7 +538,7 @@
           <h2>Cliente</h2>
           <p class="p-cli"><b>${esc(c.nombre)}</b><br>
             <a href="https://wa.me/${esc(p.tel)}" target="_blank" rel="noopener">${esc(c.tel)}</a>${c.dni ? ` · DNI/CUIT ${esc(c.dni)}` : ""}<br>
-            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}
+            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.aerodromo ? " · " + esc(c.aerodromo) : ""}${c.empresa ? `<br>Correo: ${esc(c.empresa)} · ${esc(c.modo || "")}` : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}${c.escuela ? "<br>Escuela: " + esc(c.escuela) : ""}
             ${c.notas ? `<br><i>“${esc(c.notas)}”</i>` : ""}</p>
         </section>
         <section class="p-card">
@@ -779,8 +789,8 @@
     const esteMes = porMes[ahora] || 0, anioAntes = porMes[ahora - 12] || 0;
     const gan = ganMes[ahora] || 0, cub = cubierto[ahora] || 0;
     app.innerHTML = tabsHTML("ventas") + `
-      <div class="p-head"><div><h1>Ventas</h1><p class="muted">Pesos y dólares sumados al dólar oficial de hoy (${ars(dolar)}).</p></div>
-        <div class="p-head-btns"><button class="btn btn-ghost" data-csv="pedidos">⬇ Pedidos</button><button class="btn btn-ghost" data-csv="productos">⬇ Productos y stock</button><button class="btn btn-ghost" data-csv="clientes">⬇ Clientes</button></div></div>
+      <div class="p-head"><div><h1>Ventas</h1><p class="muted">Pesos y dólares sumados al dólar de hoy (${ars(dolar)}).</p></div>
+        <div class="p-head-btns"><button class="btn btn-ghost" data-csv="pedidos">⬇ Pedidos</button><button class="btn btn-ghost" data-csv="productos">⬇ Productos y stock</button><button class="btn btn-ghost" data-csv="clientes">⬇ Clientes</button><button class="btn btn-ghost" data-csv="suscriptores">⬇ Suscriptores</button></div></div>
       <div class="p-stats">
         <div class="p-stat"><span>Este mes</span><b>${ars(esteMes)}</b><small>${anioAntes ? `${esteMes >= anioAntes ? "▲" : "▼"} ${Math.abs(Math.round((esteMes / anioAntes - 1) * 100))}% vs. hace un año` : "&nbsp;"}</small></div>
         <div class="p-stat"><span>Ganancia estimada del mes</span><b>${cub ? ars(gan) : "—"}</b><small>${cub ? `Margen ${Math.round((gan / cub) * 100)}% · ${Math.round((cub / Math.max(esteMes, cub)) * 100)}% con costo cargado` : "Cargá el costo de los productos"}</small></div>
@@ -791,9 +801,46 @@
       <div class="p-grid2 p-act">
         <section class="p-card"><h2>Por categoría</h2><p class="muted small">Últimos 12 meses, al precio de cada pedido.</p>${barras(cats)}</section>
         <section class="p-card"><h2>Por marca</h2><p class="muted small">Las 8 que más venden.</p>${barras(marcas)}</section>
-      </div>`;
+      </div>
+      <section class="p-card" id="gastosBox"><h2>Gastos del negocio</h2><p class="p-loading">Cargando…</p></section>`;
+    verGastos(cub ? gan : null);
     app.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => exportar(b.dataset.csv).catch((x) => toast(x.message))));
   }
+
+  async function verGastos(ganancia) {
+    const box = document.getElementById("gastosBox");
+    if (!box) return;
+    let d;
+    try { d = await api("gastos"); } catch { box.querySelector(".p-loading").textContent = "No se pudieron cargar."; return; }
+    const hoy = new Date().toISOString().slice(0, 10), mes = hoy.slice(0, 7);
+    const enPesos = (g) => (g.moneda === "USD" ? g.monto * dolar : g.monto);
+    const delMes = d.gastos.filter((g) => g.fecha.startsWith(mes)), totalMes = delMes.reduce((s, g) => s + enPesos(g), 0);
+    box.innerHTML = `<h2>Gastos del negocio</h2>
+      <div class="p-stats">
+        <div class="p-stat"><span>Gastos del mes</span><b>${ars(totalMes)}</b><small>${delMes.length} ${delMes.length === 1 ? "gasto" : "gastos"}</small></div>
+        <div class="p-stat"><span>Resultado del mes</span><b>${ganancia === null ? "—" : ars(ganancia - totalMes)}</b><small>${ganancia === null ? "Cargá el costo de los productos" : "Ganancia estimada menos gastos"}</small></div>
+      </div>
+      <form class="p-gasto" id="gastoForm">
+        <input id="gFecha" type="date" value="${hoy}" aria-label="Fecha" required>
+        <input id="gConcepto" placeholder="Concepto (ej.: envío Andreani)" maxlength="120" aria-label="Concepto" required>
+        <select id="gCat" aria-label="Categoría">${d.categorias.map((c) => `<option>${c}</option>`).join("")}</select>
+        <input id="gMonto" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Monto" aria-label="Monto" required>
+        <select id="gMon" aria-label="Moneda"><option value="ARS">$</option><option value="USD">US$</option></select>
+        <button class="btn btn-primary btn-sm">Agregar</button>
+      </form>
+      ${d.gastos.length ? `<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th class="num">Monto</th><th></th></tr></thead><tbody>${d.gastos.slice(0, 40).map((g) => `
+        <tr><td>${g.fecha.split("-").reverse().join("/")}</td><td>${esc(g.concepto)}</td><td>${esc(g.categoria)}</td><td class="num">${g.moneda === "USD" ? usd(g.monto) : ars(g.monto)}</td><td><button class="link-btn" data-gdel="${g.id}" aria-label="Borrar gasto">Borrar</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Todavía no cargaste gastos. Sumá envíos, publicidad, embalaje e impuestos para ver el resultado real.</p>'}`;
+    document.getElementById("gastoForm").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("gastos", { method: "POST", body: { fecha: $id("gFecha").value, concepto: $id("gConcepto").value, categoria: $id("gCat").value, monto: $id("gMonto").value, moneda: $id("gMon").value } }); toast("Gasto agregado."); verGastos(ganancia); }
+      catch (x) { toast(x.message); }
+    };
+    box.querySelectorAll("[data-gdel]").forEach((b) => (b.onclick = async () => {
+      if (b.dataset.ok !== "1") { b.dataset.ok = "1"; b.textContent = "¿Seguro?"; return; }
+      try { await api("gastos?id=" + b.dataset.gdel, { method: "DELETE" }); verGastos(ganancia); } catch (x) { toast(x.message); }
+    }));
+  }
+  const $id = (id) => document.getElementById(id);
 
   // Archivos para Excel (separados por punto y coma, como lo abre Excel en castellano)
   async function exportar(que) {
@@ -809,6 +856,9 @@
     } else if (que === "productos") {
       filas = [["Código", "Nombre", "Marca", "Modelo", "Categoría", "Precio US$", "Precio $", "Costo", "Moneda del costo", "Stock", "Stock mínimo", "Proveedor", "Visible"],
         ...productos.map((p) => [p.id, p.name, p.brand, p.model, p.cat, num(p.usd), num(p.ars), num(p.costo), p.costoMoneda, num(p.stock), num(p.stockMin), p.proveedor, p.visible ? "Sí" : "No"])];
+    } else if (que === "suscriptores") {
+      const d = await api("gastos?suscriptores=1");
+      filas = [["Mail", "Desde", "Fecha"], ...d.suscriptores.map((x) => [x.email, x.origen, fecha(x.creado)])];
     } else {
       const d = await api("clientes");
       filas = [["Nombre", "Teléfono", "DNI/CUIT", "Cumpleaños", "Escuela", "Nivel", "Compras", "Total $", "Total US$", "Último pedido", "Notas"],
@@ -826,11 +876,16 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {};
-    try { v = (await api("ajustes?clave=pago")).valor || {}; } catch {}
-    const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
+    let v = {}, vp = {};
+    try { [v, vp] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios")])).map((x) => x.valor || {}); } catch {}
+    const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
     app.innerHTML = tabsHTML("ajustes") + `
       <div class="p-head"><div><h1>Ajustes</h1><p class="muted">Lo que cargues acá aparece al cliente cuando hace un pedido y en la página de seguimiento, con botón para copiar.</p></div></div>
+      <form class="p-card p-form" id="dolarForm"><h2>Dólar para pasar a pesos</h2>
+        <div class="p-grid2"><label>Cuál usar<select id="dlTipo">${[["oficial", "Oficial"], ["bolsa", "MEP"], ["blue", "Blue"], ["manual", "Un valor fijo que pongo yo"]].map(([k, t]) => `<option value="${k}"${(vp.dolar || "oficial") === k ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label id="dlManWrap">Valor fijo ($ por dólar)<input id="dlMan" type="number" min="1" step="1" inputmode="numeric" value="${esc(vp.manual || "")}"></label></div>
+        <p class="muted small">La web toma el valor de venta del día y redondea siempre para arriba (a la centena, o al millar en precios grandes).</p>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
       <form class="p-card p-form" id="pagoForm"><h2>Datos de pago</h2>
         <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
         <p class="muted small">Dejá vacío lo que no uses. Revisá bien el CBU y las direcciones cripto: un error hace que el dinero vaya a otra cuenta.</p>
@@ -842,13 +897,20 @@
           <li>Elegí <b>Programar feed</b>, pegá la dirección y poné que se actualice <b>todos los días</b>.</li>
           <li>Moneda: <b>ARS</b>. Listo: vas a poder etiquetar productos en Instagram y Facebook.</li>
           <li>Para WhatsApp: en la app de WhatsApp Business → <b>Herramientas para la empresa</b> → <b>Catálogo</b> → conectá el mismo catálogo de Meta.</li></ol>
-        <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al oficial del día.</p></section>`;
+        <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al dólar del día.</p></section>`;
     document.getElementById("feedCopy").onclick = async () => { try { await navigator.clipboard.writeText(document.getElementById("feedUrl").value); toast("Copiado."); } catch { document.getElementById("feedUrl").select(); } };
+    const syncDl = () => { document.getElementById("dlManWrap").hidden = document.getElementById("dlTipo").value !== "manual"; };
+    document.getElementById("dlTipo").onchange = syncDl; syncDl();
+    document.getElementById("dolarForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const valor = { dolar: document.getElementById("dlTipo").value, manual: Number(document.getElementById("dlMan").value) || null };
+      if (valor.dolar === "manual" && !valor.manual) return toast("Poné el valor del dólar.");
+      try { await api("ajustes", { method: "POST", body: { clave: "precios", valor } }); toast("Listo. La web ya usa ese dólar."); cargarDolar(); } catch (x) { toast(x.message); }
+    };
     document.getElementById("pagoForm").onsubmit = async (e) => {
       e.preventDefault();
       const valor = Object.fromEntries(C.map(([k]) => [k, document.getElementById("pg_" + k).value.trim()]));
-      if (valor.cbu && !/^\d{22}$/.test(valor.cbu.replace(/\s/g, ""))) return toast("El CBU o CVU tiene que tener 22 números.");
-      valor.cbu = valor.cbu.replace(/\s/g, "");
+      for (const k of ["cbu", "cbuUsd"]) { valor[k] = valor[k].replace(/\s/g, ""); if (valor[k] && !/^\d{22}$/.test(valor[k])) return toast("El CBU o CVU tiene que tener 22 números."); }
       try { await api("ajustes", { method: "POST", body: { clave: "pago", valor } }); toast("Datos de pago guardados. Ya se ven en la web."); } catch (x) { toast(x.message); }
     };
   }

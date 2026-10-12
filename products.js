@@ -5,9 +5,10 @@ const CONFIG = {
   email: "info@tiendadevuelo.com.ar",
   ciudad: "CABA, Buenos Aires",
   ventas: "+2.500",                      // ventas realizadas
-  dolarRespaldo: 1500,                   // si no se puede leer el dólar oficial del día
+  dolarRespaldo: 1500,                   // si no se puede leer el dólar del día
   sitio: "https://www.tiendadevuelo.com.ar",
   horario: { desde: 9, hasta: 21 },      // fuera de este horario la web avisa cuándo respondemos
+  instagram: "tiendadevueloar",
   googleResenas: "",                     // link para dejar reseña en Google (de tu perfil de empresa)
   dataFiscal: "",                        // link del QR de Data Fiscal de ARCA (si tenés CUIT activo)
   // Fechas de eventos de ofertas: mientras dure, la web muestra el aviso y destaca las ofertas cargadas en el panel.
@@ -68,11 +69,11 @@ const CAT_COLORS = {
   "Libros y regalos": ["#b7791f", "#f9ecd2"],
 };
 
-// Precio: `usd` (se muestra en dólares y en pesos al oficial del día), `ars` (solo pesos) o ninguno (a consultar).
+// Precio: `usd` (se muestra en dólares y en pesos al dólar del día), `ars` (solo pesos) o ninguno (a consultar).
 // Marcas: `nuevo` (nuevo ingreso), `top` (más vendido), `encargo` (llega en 15 a 30 días), `reacond` (reacondicionado),
 // `destacado` (orden en la portada), `regalo`, `tcp` (para tripulantes), `variantes`, `fotos` (rutas de imágenes cuando estén).
 const PRODUCTS = [
-  { id: "auricular-anr-premium", name: "Auricular ANR premium", brand: "Bose", model: "A30", cat: "Comunicaciones", icon: "headset", usd: 1299, top: true, destacado: 1,
+  { id: "auricular-anr-premium", name: "Auricular ANR premium", brand: "Bose", model: "A30", cat: "Comunicaciones", icon: "headset", usd: 1299, top: true, destacado: 1, oficial: true,
     etapas: ["privado", "comercial"],
     desc: "Cancelación activa de ruido, el más liviano y cómodo para vuelos largos.",
     specs: ["Tipo: Cancelación activa de ruido (ANR)", "Bluetooth: Sí", "Fichas: GA dual", "Garantía: Oficial del fabricante"],

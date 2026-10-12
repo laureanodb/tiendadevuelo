@@ -66,7 +66,7 @@ for (const f of paginas) {
     if (u === "/" || u.startsWith("/_vercel/") || u.startsWith("/api/")) continue;
     const limpio = u.replace(/^\//, "").replace(/\/$/, "");
     if (!limpio) continue;
-    const ok = existe(limpio) || existe(limpio + ".html") || /^(producto|categoria|marca)\//.test(limpio) || ["ofertas", "usados", "novedades", "carrito", "catalogo.csv"].includes(limpio) || redirige(limpio);
+    const ok = existe(limpio) || existe(limpio + ".html") || /^(producto|categoria|marca)\//.test(limpio) || ["ofertas", "usados", "novedades", "carrito", "catalogo.csv", "liquidacion"].includes(limpio) || redirige(limpio);
     if (!ok) mal(`${f}: enlace a ${u}, que no existe`);
   }
 }

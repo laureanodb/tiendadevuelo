@@ -33,6 +33,10 @@
     {
       "source": "/catalogo.csv",
       "destination": "/api/catalogo"
+    },
+    {
+      "source": "/liquidacion",
+      "destination": "/"
     }
   ],
   "redirects": [
@@ -97,5 +101,11 @@
       "includeFiles": "products.js",
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/resumen",
+      "schedule": "0 23 * * *"
+    }
+  ]
 }

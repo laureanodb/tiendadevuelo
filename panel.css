@@ -159,3 +159,7 @@ body.panel { background: var(--bg-2); }
 .p-hbar i { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
 .p-hbar b { font-variant-numeric: tabular-nums; font-size: 13px; }
 details summary { cursor: pointer; }
+.p-deben { cursor: pointer; background: #fff8db; border-color: #f2dc8c; color: #6b5300; }
+.p-gasto { display: grid; grid-template-columns: 140px 1fr 140px 120px 76px auto; gap: 8px; margin: 12px 0; }
+.p-gasto input, .p-gasto select { min-width: 0; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--line); font: inherit; background: #fff; }
+@media (max-width: 760px) { .p-gasto { grid-template-columns: 1fr 1fr; } .p-gasto #gConcepto { grid-column: 1 / -1; } }

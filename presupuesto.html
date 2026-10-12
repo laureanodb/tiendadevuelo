@@ -58,7 +58,7 @@
             ${r.lineas.map((l) => `<tr><td>${l.qty}</td><td>${esc(l.name)}${l.sub ? `<br><small class="muted">${esc(l.sub)}</small>` : ""}</td><td class="num">${l.usd ? usd(l.usd) + "<br><small class=\"muted\">≈ " + ars(l.unit) + "</small>" : ars(l.unit)}</td><td class="num">${ars(l.unit * l.qty)}</td></tr>`).join("")}
           </tbody><tfoot><tr><td colspan="3"><b>Total${r.hasUsd ? " aproximado" : ""}</b></td><td class="num"><b>${ars(r.total)}</b></td></tr></tfoot></table></div>
           <ul class="quote-notas">
-            ${r.hasUsd ? `<li>Los productos en dólares se convierten al dólar oficial del día (${ars(r.dolar)}). Se pueden pagar en dólares.</li>` : ""}
+            ${r.hasUsd ? `<li>Los productos en dólares se convierten al dólar del día (${ars(r.dolar)}). Se pueden pagar en dólares.</li>` : ""}
             <li>No incluye el envío: se cotiza según el destino. Envíos a todo el país y en el día en CABA.</li>
             <li>Formas de pago: transferencia, efectivo al retirar, dólares o cripto. Sin cuotas.</li>
             <li>Garantía oficial del fabricante. Sujeto a disponibilidad de stock al confirmar.</li>

@@ -13,6 +13,8 @@ const RUTAS = {
   catalogo: () => import("./_web/catalogo.js"),
   envios: () => import("./_web/envios.js"),
   salud: () => import("./_web/salud.js"),
+  resumen: () => import("./_web/resumen.js"),
+  suscribir: () => import("./_web/suscribir.js"),
 };
 
 export default async function handler(req, res) {

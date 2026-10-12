@@ -51,6 +51,7 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists oficial boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
+    await q(`alter table tdv_productos add column if not exists liquidacion boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists alquiler_moneda text not null default 'ARS'`);
     await q(`create table if not exists tdv_resenas (
       id bigserial primary key, num text not null, producto text not null, nombre text not null default '',
@@ -103,9 +104,14 @@ export function ensureSchema() {
       id bigserial primary key, creado timestamptz not null default now(), tipo text not null, ref text not null default '',
       nombre text not null default '', resumen text not null default '', antes jsonb, deshecho boolean not null default false
     )`);
+    await q(`create table if not exists tdv_gastos (
+      id bigserial primary key, fecha date not null default current_date, concepto text not null, categoria text not null default 'Otros',
+      monto numeric not null, moneda text not null default 'ARS', creado timestamptz not null default now()
+    )`);
+    await q(`create table if not exists tdv_suscriptores (email text primary key, nombre text not null default '', origen text not null default '', creado timestamptz not null default now())`);
     await q(`create table if not exists tdv_limites (id bigserial primary key, clave text not null, creado timestamptz not null default now())`);
     await q(`create index if not exists tdv_limites_clave on tdv_limites (clave, creado)`);
-    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios"]) await q(`alter table ${t} enable row level security`).catch(() => {});
+    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios", "tdv_gastos", "tdv_suscriptores"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       for (const [id, pub] of [["productos", true], ["comprobantes", false]]) {
         await fetch(`${SUPA_URL}/storage/v1/bucket`, {
@@ -124,7 +130,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -155,7 +161,7 @@ export function toRow(p) {
     name: str(p.name, 120), brand: str(p.brand, 60), model: str(p.model, 60), cat: str(p.cat, 40) || "Accesorios", icon: str(p.icon, 30) || "tag",
     usd: money(p.usd), ars: money(p.ars), costo: money(p.costo), costo_moneda: p.costoMoneda === "ARS" ? "ARS" : "USD",
     stock: int(p.stock), stock_min: int(p.stockMin),
-    encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp,
+    encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion,
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
     antes: money(p.antes), oferta_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(p.ofertaHasta || "")) ? p.ofertaHasta : null,
@@ -238,6 +244,18 @@ export async function guardarAjuste(clave, valor) {
   await q("insert into tdv_ajustes (clave, valor) values ($1, $2) on conflict (clave) do update set valor = excluded.valor", [clave, JSON.stringify(valor)]);
 }
 
+// ---------- Avisos a tu WhatsApp (CallMeBot: gratis, solo para tu propio número) ----------
+export const avisosListos = () => !!(env.AVISOS_WHATSAPP && env.CALLMEBOT_KEY);
+export async function avisar(texto) {
+  if (!avisosListos()) return false;
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch(`https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(env.AVISOS_WHATSAPP)}&text=${encodeURIComponent(texto)}&apikey=${encodeURIComponent(env.CALLMEBOT_KEY)}`, { signal: ctl.signal });
+    clearTimeout(t);
+    return r.ok;
+  } catch (e) { console.error("aviso", e.message); return false; }
+}
+
 // ---------- Historial de cambios (con opción de deshacer) ----------
 export async function anotar(tipo, ref, nombre, resumen, antes = null) {
   await q("insert into tdv_cambios (tipo, ref, nombre, resumen, antes) values ($1, $2, $3, $4, $5)",
@@ -274,7 +292,25 @@ export function pedidoAdmin(r) {
 }
 
 // Datos de pago que se muestran al cliente (los cargás en el panel → Ajustes).
-export const CAMPOS_PAGO = ["titular", "banco", "alias", "cbu", "cuit", "usdtTrc20", "usdtBep20"];
+export const CAMPOS_PAGO = ["titular", "banco", "alias", "cbu", "cuit", "usdtTrc20", "usdtBep20", "aliasUsd", "cbuUsd"];
+// Qué dólar se usa para pasar a pesos: oficial, MEP ("bolsa"), blue o un valor fijo que cargás vos.
+export async function ajusteDolar() {
+  const v = await ajuste("precios", {});
+  const tipo = ["oficial", "bolsa", "blue", "manual"].includes(v.dolar) ? v.dolar : "oficial";
+  const manual = Number(v.manual) > 0 ? Number(v.manual) : null;
+  return tipo === "manual" && !manual ? { tipo: "oficial" } : { tipo, ...(tipo === "manual" ? { manual } : {}) };
+}
+export async function valorDolar() {
+  const d = await ajusteDolar();
+  if (d.tipo === "manual") return d.manual;
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 2500);
+    const r = await (await fetch(`https://dolarapi.com/v1/dolares/${d.tipo}`, { signal: ctl.signal })).json();
+    clearTimeout(t);
+    return Number(r.venta) || 1500;
+  } catch { return 1500; }
+}
+export const redondear = (n) => (n >= 20000 ? Math.ceil(n / 1000) * 1000 : Math.ceil(n / 100) * 100);
 export async function pagoPublico() {
   const v = await ajuste("pago", {});
   const o = {};

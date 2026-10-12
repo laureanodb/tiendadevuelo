@@ -10,11 +10,14 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
 
-  // ---------- Dólar oficial del día ----------
-  let dolar = store.get("tdv-dolar", null)?.venta || CONFIG.dolarRespaldo;
-  fetch("https://dolarapi.com/v1/dolares/oficial").then((r) => r.json()).then((d) => {
-    if (d && d.venta) { dolar = d.venta; store.set("tdv-dolar", { venta: d.venta }); document.dispatchEvent(new Event("tdv:precios")); renderCart(); }
+  // ---------- Dólar del día (oficial, MEP, blue o fijo: se elige en el panel → Ajustes) ----------
+  const tipoDolar = CONFIG.dolarTipo || "oficial";
+  let dolar = tipoDolar === "manual" && CONFIG.dolarManual ? CONFIG.dolarManual : store.get("tdv-dolar-" + tipoDolar, null)?.venta || CONFIG.dolarRespaldo;
+  if (tipoDolar !== "manual") fetch(`https://dolarapi.com/v1/dolares/${tipoDolar}`).then((r) => r.json()).then((d) => {
+    if (d && d.venta) { dolar = d.venta; store.set("tdv-dolar-" + tipoDolar, { venta: d.venta }); document.dispatchEvent(new Event("tdv:precios")); renderCart(); }
   }).catch(() => {});
+  // Siempre para arriba: a la centena, o al millar en precios grandes
+  const redondear = (n) => (n >= 20000 ? Math.ceil(n / 1000) * 1000 : Math.ceil(n / 100) * 100);
 
   // Opciones con precio o foto propios: "Ficha LEMO | 1350 | foto 2"
   const numAR = (t) => { t = String(t).replace(/[^\d.,]/g, ""); if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, "").replace(",", "."); else t = t.replace(",", "."); return Number(t); };
@@ -33,12 +36,12 @@
   const desde = (p) => { const ps = opciones(p).map((o) => o.precio).filter((x) => x !== null); return ps.length && ps.some((x) => x !== (p.usd || p.ars)); };
 
   // Precio en pesos de un producto (null = a consultar)
-  const pesos = (p) => p.usd ? Math.round((p.usd * dolar) / 100) * 100 : (p.ars ?? null);
+  const pesos = (p) => p.usd ? redondear(p.usd * dolar) : (p.ars ?? null);
   const enOferta = (p) => !!(p.antes && (p.usd || p.ars) && p.antes > (p.usd || p.ars));
   const priceHTML = (p, big) => {
     const antes = enOferta(p) ? `<s>${p.usd ? usd(p.antes) : ars(p.antes)}</s>` : "";
     const d = !big && desde(p) ? '<span class="from">Desde</span>' : "";
-    if (p.usd && d) { const min = Math.min(p.usd, ...opciones(p).map((o) => o.precio ?? Infinity)); return `<div class="price">${d}<b>${usd(min)}</b><span class="ars">≈ ${ars(Math.round(min * dolar / 100) * 100)}</span></div>`; }
+    if (p.usd && d) { const min = Math.min(p.usd, ...opciones(p).map((o) => o.precio ?? Infinity)); return `<div class="price">${d}<b>${usd(min)}</b><span class="ars">≈ ${ars(redondear(min * dolar))}</span></div>`; }
     if (p.ars && d) { const min = Math.min(p.ars, ...opciones(p).map((o) => o.precio ?? Infinity)); return `<div class="price">${d}<b>${ars(min)}</b></div>`; }
     if (p.usd) return `<div class="price${big ? " price-big" : ""}">${antes}<b>${usd(p.usd)}</b><span class="ars">≈ ${ars(pesos(p))}</span></div>`;
     if (p.ars) return `<div class="price${big ? " price-big" : ""}">${antes}<b>${ars(p.ars)}</b></div>`;
@@ -64,6 +67,7 @@
     p.nuevo && '<span class="badge badge-new">Nuevo ingreso</span>',
     p.encargo && '<span class="badge badge-order">Por encargo</span>',
     p.reacond && '<span class="badge badge-re">Reacondicionado</span>',
+    p.liquidacion && '<span class="badge badge-sale">Liquidación</span>',
   ].filter(Boolean).slice(0, 2).join("");
 
   // ---------- Favoritos ----------
@@ -240,7 +244,7 @@
           <div class="mega" role="menu">${CATEGORIES.map((c) => `<a role="menuitem" href="/categoria/${slug(c)}"><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("")}
             <a role="menuitem" href="/usados"><span>♻️</span>Usados y reacondicionados</a><a role="menuitem" href="/novedades"><span>✨</span>Novedades del mes</a></div>
         </div>
-        ${PRODUCTS.some(enOferta) ? '<a href="/ofertas" class="link-sale">Ofertas</a>' : ""}
+        ${PRODUCTS.some(enOferta) ? '<a href="/ofertas" class="link-sale">Ofertas</a>' : ""}${PRODUCTS.some((p) => p.liquidacion && !p.agotado) ? '<a href="/liquidacion" class="link-sale">Liquidación</a>' : ""}
         <a href="${h("#kits")}">Kits</a>
         <a href="${h("#tripulantes")}">Tripulantes</a>
         <a href="${h("#regalos")}">Regalos</a>
@@ -257,6 +261,7 @@
         <div>
           <a href="/" class="brand">${logoSVG()}<span class="brand-text"><b>Tienda de Vuelo</b><small>Pilot shop</small></span></a>
           <p class="muted">Equipamiento original para pilotos, alumnos y tripulantes.</p>
+          <form class="news" id="newsForm"><label for="newsMail">Novedades y ofertas por mail</label><div><input id="newsMail" type="email" required placeholder="tu@mail.com" autocomplete="email"><input name="web" tabindex="-1" autocomplete="off" class="trampa" aria-hidden="true"><button class="btn btn-primary btn-sm">Sumarme</button></div><p class="small" id="newsMsg" role="status"></p></form>
           <p class="made"><svg viewBox="0 0 9 6" width="22" height="15" aria-hidden="true"><rect width="9" height="6" fill="#74acdf"/><rect y="2" width="9" height="2" fill="#fff"/><circle cx="4.5" cy="3" r=".6" fill="#f6b40e"/></svg> Hecho en Argentina</p>
         </div>
         <div>
@@ -267,6 +272,7 @@
           <h4>Contacto</h4>
           <a href="${waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.")}" target="_blank" rel="noopener">WhatsApp ${esc(CONFIG.whatsappVisible)}</a>
           <a href="mailto:${CONFIG.email}">${CONFIG.email}</a>
+          ${CONFIG.instagram ? `<a href="https://www.instagram.com/${esc(CONFIG.instagram)}/" target="_blank" rel="noopener">Instagram @${esc(CONFIG.instagram)}</a>` : ""}
           <span class="muted">${esc(CONFIG.ciudad)}</span>
           ${CONFIG.googleResenas ? `<a href="${esc(CONFIG.googleResenas)}" target="_blank" rel="noopener">⭐ Dejanos tu reseña en Google</a>` : ""}
         </div>
@@ -353,10 +359,11 @@
   function pagoHTML(monto) {
     const g = CONFIG.pago || {};
     const banco = g.alias || g.cbu;
-    if (!banco && !g.usdtTrc20 && !g.usdtBep20) return "";
+    if (!banco && !g.usdtTrc20 && !g.usdtBep20 && !g.aliasUsd && !g.cbuUsd) return "";
     return `<div class="pay-box"><h4>Cómo pagar</h4>
       ${monto ? `<p class="small">Total aproximado: <b>${ars(monto)}</b> + envío. Esperá nuestra confirmación del monto final antes de transferir.</p>` : ""}
       ${banco ? `<p class="pay-k">Transferencia${g.banco ? " · " + esc(g.banco) : ""}</p>${g.alias ? copiable("Alias", g.alias) : ""}${g.cbu ? copiable("CBU / CVU", g.cbu) : ""}${g.titular ? `<p class="muted small">Titular: ${esc(g.titular)}${g.cuit ? " · CUIT " + esc(g.cuit) : ""}</p>` : ""}` : ""}
+      ${g.aliasUsd || g.cbuUsd ? `<p class="pay-k">Transferencia en dólares</p>${g.aliasUsd ? copiable("Alias", g.aliasUsd) : ""}${g.cbuUsd ? copiable("CBU", g.cbuUsd) : ""}` : ""}
       ${g.usdtTrc20 || g.usdtBep20 ? `<p class="pay-k">Cripto (USDT)</p>${g.usdtTrc20 ? copiable("Red TRC20", g.usdtTrc20) : ""}${g.usdtBep20 ? copiable("Red BEP20", g.usdtBep20) : ""}<p class="muted small">Revisá bien la red antes de enviar.</p>` : ""}
       <p class="muted small">También aceptamos efectivo al retirar y dólares. Mandanos el comprobante por WhatsApp o subilo en la página de seguimiento.</p></div>`;
   }
@@ -365,6 +372,19 @@
     if (!b) return;
     try { await navigator.clipboard.writeText(b.dataset.copiar); b.textContent = "Copiado ✓"; setTimeout(() => (b.textContent = "Copiar"), 2000); }
     catch { const r = document.createRange(); r.selectNodeContents(b.previousElementSibling); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  });
+
+  // ---------- Suscripción por mail (pie de página) ----------
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "newsForm") return;
+    e.preventDefault();
+    const f = e.target, msg = f.querySelector("#newsMsg");
+    try {
+      const r = await fetch("/api/suscribir", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: f.querySelector("#newsMail").value, web: f.querySelector('[name="web"]').value, origen: document.body.dataset.page || "" }) });
+      const d = await r.json().catch(() => ({}));
+      msg.textContent = r.ok ? "¡Listo! Te avisamos de novedades y ofertas." : d.mensaje || "No se pudo. Probá de nuevo.";
+      if (r.ok) f.querySelector("#newsMail").value = "";
+    } catch { msg.textContent = "No se pudo. Probá de nuevo."; }
   });
 
   // ---------- Carrito ----------
@@ -418,6 +438,7 @@
   }
 
   const datos = store.get("tdv-datos", {});
+  const ENTREGAS = [["Envío a domicilio", "Envío por correo (a domicilio o sucursal)"], ["Envío en el día (CABA)", "Envío en el día (CABA)"], ["Retiro en CABA", "Retiro en CABA (coordinamos por WhatsApp)"], ["Entrega en aeródromo", "Entrega en aeródromo (San Fernando, Morón y otros, a coordinar)"]];
   const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
   const regaloPara = () => { try { const n = sessionStorage.getItem("tdv-regalo-para"); return n ? `Regalo para ${n} (de su lista de deseos)` : ""; } catch { return ""; } };
   const carritoId = () => { let id = store.get("tdv-cid", ""); if (!id) { id = azar(); store.set("tdv-cid", id); } return id; };
@@ -437,7 +458,7 @@
     }
     const t = total();
     const totalBlock = `<div class="total-row"><span>Total${hasUsd() ? " aprox." : ""}</span><b>${ars(t)}</b></div>
-      <p class="muted small">${hasUsd() ? "Productos en dólares convertidos al oficial del día. " : ""}El envío se cotiza aparte según destino.</p>`;
+      <p class="muted small">${hasUsd() ? "Productos en dólares convertidos al dólar del día. " : ""}El envío se cotiza aparte según destino.</p>`;
 
     if (step === "items") {
       $("#drawerTitle").textContent = "Tu carrito";
@@ -483,10 +504,13 @@
         <label>Nombre y apellido<input id="fNombre" required autocomplete="name" value="${esc(datos.nombre || "")}"></label>
         <label>Teléfono<input id="fTel" required type="tel" autocomplete="tel" value="${esc(datos.tel || "")}"></label>
         <fieldset><legend>Entrega</legend>
-          <label class="opt"><input type="radio" name="entrega" value="Envío a domicilio" ${datos.entrega !== "Retiro en CABA" && datos.entrega !== "Envío en el día (CABA)" ? "checked" : ""}> Envío a domicilio</label>
-          <label class="opt"><input type="radio" name="entrega" value="Envío en el día (CABA)" ${datos.entrega === "Envío en el día (CABA)" ? "checked" : ""}> Envío en el día (CABA)</label>
-          <label class="opt"><input type="radio" name="entrega" value="Retiro en CABA" ${datos.entrega === "Retiro en CABA" ? "checked" : ""}> Retiro en CABA (coordinamos por WhatsApp)</label>
+          ${ENTREGAS.map(([v, t]) => `<label class="opt"><input type="radio" name="entrega" value="${v}" ${(ENTREGAS.some((x) => x[0] === datos.entrega) ? datos.entrega : ENTREGAS[0][0]) === v ? "checked" : ""}> ${t}</label>`).join("")}
         </fieldset>
+        <div id="fCorreoWrap" class="p-grid2-mini">
+          <label>Empresa<select id="fEmpresa">${["Me da igual", "Andreani", "Correo Argentino", "OCA", "Vía Cargo"].map((x) => `<option${x === datos.empresa ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+          <label>Entrega<select id="fModo">${["A domicilio", "A sucursal del correo"].map((x) => `<option${x === datos.modo ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+        </div>
+        <label id="fAeroWrap">Aeródromo<select id="fAero">${["San Fernando", "Morón", "Otro (lo aclaro en notas)"].map((x) => `<option>${x}</option>`).join("")}</select></label>
         <div id="fTurnoWrap" class="p-grid2-mini">
           <label>Día de retiro<select id="fDia">${diasHabiles(6).map((d) => `<option>${d}</option>`).join("")}</select></label>
           <label>Horario<select id="fHora"><option>10 a 13 h</option><option>14 a 17 h</option><option>17 a 20 h</option></select></label>
@@ -495,11 +519,21 @@
         <label id="fProvWrap">Provincia<select id="fProv"><option value="">Elegí la provincia</option>${PROVINCIAS.map((x) => `<option${x === datos.provincia ? " selected" : ""}>${x}</option>`).join("")}</select></label>
         <label id="fDirWrap">Dirección, ciudad y código postal<input id="fDir" autocomplete="street-address" value="${esc(datos.dir || "")}"></label>
         <label><span>DNI o CUIT <span class="muted">(opcional, si necesitás factura)</span></span><input id="fDni" inputmode="numeric" value="${esc(datos.dni || "")}"></label>
+        <div class="p-grid2-mini">
+          <label><span>Tu cumpleaños <span class="muted">(opcional)</span></span><input id="fCumple" type="date" value="${esc(datos.cumple || "")}"></label>
+          <label><span>Escuela o aeroclub <span class="muted">(opcional)</span></span><input id="fEscuela" maxlength="80" value="${esc(datos.escuela || "")}"></label>
+        </div>
         <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2">${esc(regaloPara())}</textarea></label>
         <p class="muted small">Usamos tus datos solo para tu pedido. Si no llegás a terminarlo, puede que te escribamos para ayudarte.</p>
       </form>`;
     foot.innerHTML = totalBlock + `<div class="foot-btns"><button class="btn btn-ghost" id="toItems">← Volver</button><button class="btn btn-primary" id="send" form="orderForm" type="submit">Enviar pedido por WhatsApp</button></div>`;
-    const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fProvWrap").hidden = v !== "Envío a domicilio"; $("#fProv").required = v === "Envío a domicilio"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA"; };
+    const syncDir = () => {
+      const v = document.querySelector('input[name="entrega"]:checked').value, correo = v === "Envío a domicilio", sinDir = v === "Retiro en CABA" || v === "Entrega en aeródromo";
+      $("#fDirWrap").hidden = sinDir; $("#fDir").required = !sinDir; $("#fProvWrap").hidden = !correo; $("#fProv").required = correo; $("#fCorreoWrap").hidden = !correo;
+      $("#fAeroWrap").hidden = v !== "Entrega en aeródromo"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA";
+      $("#fDir").previousSibling.textContent = correo && $("#fModo").value === "A sucursal del correo" ? "Ciudad y código postal (buscamos la sucursal más cercana)" : "Dirección, ciudad y código postal";
+    };
+    $("#fModo").onchange = syncDir;
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
@@ -517,9 +551,13 @@
       nombre: $("#fNombre").value.trim(), tel: $("#fTel").value.trim(), dni: $("#fDni").value.trim(),
       entrega: document.querySelector('input[name="entrega"]:checked').value, dir: $("#fDir").value.trim(), notas: $("#fNotas").value.trim(),
     };
-    d.provincia = d.entrega === "Envío a domicilio" ? $("#fProv").value : "CABA";
+    const correo = d.entrega === "Envío a domicilio";
+    d.provincia = correo ? $("#fProv").value : d.entrega === "Entrega en aeródromo" ? "Buenos Aires" : "CABA";
+    if (correo) { d.empresa = $("#fEmpresa").value; d.modo = $("#fModo").value; }
+    if (d.entrega === "Entrega en aeródromo") d.aerodromo = $("#fAero").value;
+    d.cumple = $("#fCumple").value; d.escuela = $("#fEscuela").value.trim();
     d.franja = d.entrega === "Envío en el día (CABA)" ? $("#fFranja").value : d.entrega === "Retiro en CABA" ? `${$("#fDia").value}, ${$("#fHora").value}` : "";
-    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir, provincia: d.entrega === "Envío a domicilio" ? d.provincia : datos.provincia });
+    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir, provincia: correo ? d.provincia : datos.provincia, empresa: d.empresa || datos.empresa, modo: d.modo || datos.modo, cumple: d.cumple, escuela: d.escuela });
     store.set("tdv-datos", datos);
     const now = new Date();
     const num = `TDV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
@@ -531,7 +569,8 @@
       return `• ${l.qty} x ${i.name}${i.sub ? ` (${i.sub})` : ""} — ${l.kit ? ars(i.unit * l.qty) : i.label}${link}`;
     });
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())} + envío\n\n` +
-      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}${d.entrega === "Envío a domicilio" ? ", " + d.provincia : ""}` : "") +
+      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.aerodromo ? ` · ${d.aerodromo}` : "") +
+      (correo ? `\nCorreo: ${d.empresa} · ${d.modo}` : "") + (d.entrega !== "Retiro en CABA" && d.entrega !== "Entrega en aeródromo" ? `\nDirección: ${d.dir}${correo ? ", " + d.provincia : ""}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {
