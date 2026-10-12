@@ -7,6 +7,7 @@
     const r = await fetch("/api/productos", { signal: ctl.signal });
     clearTimeout(t);
     const d = await r.json();
+    if (d.pago) CONFIG.pago = d.pago;
     if (d.ventas) CONFIG.ventas = "+" + Number(d.ventas).toLocaleString("es-AR");
     if (d.configurado && d.productos.length) {
       PRODUCTS.splice(0, PRODUCTS.length, ...d.productos.map((p) => ({

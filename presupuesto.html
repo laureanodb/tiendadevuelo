@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presupuesto · Tienda de Vuelo</title>
+  <meta name="description" content="Presupuesto de tu pedido en Tienda de Vuelo, válido por 48 horas.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="Presupuesto · Tienda de Vuelo">
+  <meta property="og:description" content="Presupuesto de tu pedido en Tienda de Vuelo, válido por 48 horas.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="presupuesto" data-wa="¡Hola! Tengo una consulta sobre un presupuesto.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero no-print"><div class="wrap narrow">
+      <span class="kicker">Presupuesto</span>
+      <h1>Tu presupuesto</h1>
+      <p>Completá a nombre de quién va y guardalo en PDF o mandalo por WhatsApp. Vale por 48 horas.</p>
+    </div></section>
+    <section class="wrap narrow" id="psBox"><p class="muted">Armando el presupuesto…</p></section>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { esc, ars, usd, resumenCarrito, waLink } = window.TDV;
+      const box = document.getElementById("psBox");
+      const r = resumenCarrito();
+      if (!r.lineas.length) { box.innerHTML = '<p>Tu carrito está vacío. <a href="/#catalogo">Elegí productos</a> y volvé acá para descargar el presupuesto.</p>'; return; }
+      const hoy = new Date(), vence = new Date(hoy.getTime() + 48 * 3600e3);
+      const dos = (n) => String(n).padStart(2, "0");
+      const num = `P-${String(hoy.getFullYear()).slice(2)}${dos(hoy.getMonth() + 1)}${dos(hoy.getDate())}-${Math.floor(Math.random() * 9000) + 1000}`;
+      const f = (d) => d.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+      box.innerHTML = `
+        <form class="form-card no-print ps-form" id="psForm">
+          <label>A nombre de <span class="muted">(persona, escuela o empresa)</span><input id="psNom" maxlength="80" autocomplete="name"></label>
+          <label>DNI o CUIT <span class="muted">(opcional)</span><input id="psDoc" maxlength="20" inputmode="numeric"></label>
+        </form>
+        <article class="quote" aria-label="Presupuesto">
+          <header class="quote-head">
+            <div class="quote-brand"><img src="/logo.svg" alt="" width="44" height="44"><div><b>Tienda de Vuelo</b><span>Pilot shop · ${esc(CONFIG.ciudad)}</span></div></div>
+            <div class="quote-num"><b>Presupuesto ${num}</b><span>${f(hoy)}</span><span>Válido hasta el ${f(vence)}, ${dos(vence.getHours())}:${dos(vence.getMinutes())} h</span></div>
+          </header>
+          <p class="quote-para" id="psPara" hidden></p>
+          <div class="table-wrap"><table class="quote-table"><thead><tr><th>Cant.</th><th>Producto</th><th class="num">Precio unitario</th><th class="num">Subtotal</th></tr></thead><tbody>
+            ${r.lineas.map((l) => `<tr><td>${l.qty}</td><td>${esc(l.name)}${l.sub ? `<br><small class="muted">${esc(l.sub)}</small>` : ""}</td><td class="num">${l.usd ? usd(l.usd) + "<br><small class=\"muted\">≈ " + ars(l.unit) + "</small>" : ars(l.unit)}</td><td class="num">${ars(l.unit * l.qty)}</td></tr>`).join("")}
+          </tbody><tfoot><tr><td colspan="3"><b>Total${r.hasUsd ? " aproximado" : ""}</b></td><td class="num"><b>${ars(r.total)}</b></td></tr></tfoot></table></div>
+          <ul class="quote-notas">
+            ${r.hasUsd ? `<li>Los productos en dólares se convierten al dólar oficial del día (${ars(r.dolar)}). Se pueden pagar en dólares.</li>` : ""}
+            <li>No incluye el envío: se cotiza según el destino. Envíos a todo el país y en el día en CABA.</li>
+            <li>Formas de pago: transferencia, efectivo al retirar, dólares o cripto. Sin cuotas.</li>
+            <li>Garantía oficial del fabricante. Sujeto a disponibilidad de stock al confirmar.</li>
+          </ul>
+          <footer class="quote-foot">${esc(CONFIG.sitio.replace("https://", ""))} · WhatsApp ${esc(CONFIG.whatsappVisible)} · ${esc(CONFIG.email)}</footer>
+        </article>
+        <div class="cta-row no-print"><button class="btn btn-primary" id="psPdf">Guardar en PDF o imprimir</button><a class="btn btn-wa" id="psWa" target="_blank" rel="noopener">Confirmar por WhatsApp</a></div>`;
+      const para = document.getElementById("psPara");
+      const sync = () => {
+        const n = document.getElementById("psNom").value.trim(), d = document.getElementById("psDoc").value.trim();
+        para.hidden = !n; para.innerHTML = n ? `Para: <b>${esc(n)}</b>${d ? " · " + esc(d) : ""}` : "";
+        document.getElementById("psWa").href = waLink(`¡Hola Tienda de Vuelo! Quiero confirmar el presupuesto ${num}${n ? " a nombre de " + n : ""}:\n\n${r.lineas.map((l) => `• ${l.qty} x ${l.name}${l.sub ? " (" + l.sub + ")" : ""}`).join("\n")}\n\nTotal aprox.: ${ars(r.total)} + envío`);
+      };
+      document.getElementById("psForm").addEventListener("input", sync); sync();
+      document.getElementById("psPdf").onclick = () => window.print();
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

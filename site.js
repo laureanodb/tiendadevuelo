@@ -84,6 +84,12 @@
 
   // ---------- Comparador ----------
   let comparar = store.get("tdv-cmp", []).filter((id) => byId[id]);
+  // Características "Clave: valor" → ficha técnica en tabla (también la usa el comparador)
+  function fichaTecnica(p) {
+    const tabla = [], sueltas = [];
+    for (const s of p.specs || []) { const m = String(s).match(/^([^:]{2,32}):\s*(.+)$/); if (m) tabla.push([m[1].trim(), m[2].trim()]); else sueltas.push(s); }
+    return { tabla, sueltas };
+  }
   const enComparar = (id) => comparar.includes(id);
   function toggleComparar(id) {
     if (enComparar(id)) comparar = comparar.filter((x) => x !== id);
@@ -112,7 +118,10 @@
       ${fila("Precio", (p) => priceHTML(p))}
       ${fila("Marca y modelo", (p) => esc([p.brand, p.model].filter(Boolean).join(" ") || "—"))}
       ${fila("Opiniones", (p) => p.rating ? `<span class="stars-sm">${estrellas(p.rating)}</span> ${p.rating} (${p.resenas})` : "—")}
-      ${fila("Características", (p) => `<ul>${(p.specs || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`)}
+      ${(() => { const fichas = ps.map(fichaTecnica), claves = [];
+        for (const f of fichas) for (const [k] of f.tabla) if (!claves.some((c) => c.toLowerCase() === k.toLowerCase())) claves.push(k);
+        return claves.map((k) => `<tr><th scope="row">${esc(k)}</th>${fichas.map((f) => `<td>${esc((f.tabla.find(([x]) => x.toLowerCase() === k.toLowerCase()) || [, "—"])[1])}</td>`).join("")}</tr>`).join("") +
+          (fichas.some((f) => f.sueltas.length) ? fila("Características", (p) => `<ul>${fichaTecnica(p).sueltas.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`) : ""); })()}
       ${fila("Opciones", (p) => esc(opciones(p).map((o) => o.nombre).join(", ") || "—"))}
       ${fila("Ideal para", (p) => esc((p.etapas || []).map((e) => ETAPAS[e]).join(", ") || "—"))}
       ${fila("Entrega", (p) => p.llega ? `Preventa, llega el ${fechaCorta(p.llega)}` : p.encargo ? "Por encargo, 15 a 30 días" : "En stock")}
@@ -336,8 +345,44 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 2400);
   }
 
+  // ---------- Datos de pago (se cargan en el panel → Ajustes) ----------
+  const b64 = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const deB64 = (t) => JSON.parse(decodeURIComponent(escape(atob(t.replace(/-/g, "+").replace(/_/g, "/")))));
+  const azar = (n = 12) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (x) => "abcdefghijkmnpqrstuvwxyz23456789"[x % 32]).join("");
+  const copiable = (t, v) => `<div class="pay-line"><span class="muted small">${esc(t)}</span><b>${esc(v)}</b><button type="button" class="link-btn" data-copiar="${esc(v)}">Copiar</button></div>`;
+  function pagoHTML(monto) {
+    const g = CONFIG.pago || {};
+    const banco = g.alias || g.cbu;
+    if (!banco && !g.usdtTrc20 && !g.usdtBep20) return "";
+    return `<div class="pay-box"><h4>Cómo pagar</h4>
+      ${monto ? `<p class="small">Total aproximado: <b>${ars(monto)}</b> + envío. Esperá nuestra confirmación del monto final antes de transferir.</p>` : ""}
+      ${banco ? `<p class="pay-k">Transferencia${g.banco ? " · " + esc(g.banco) : ""}</p>${g.alias ? copiable("Alias", g.alias) : ""}${g.cbu ? copiable("CBU / CVU", g.cbu) : ""}${g.titular ? `<p class="muted small">Titular: ${esc(g.titular)}${g.cuit ? " · CUIT " + esc(g.cuit) : ""}</p>` : ""}` : ""}
+      ${g.usdtTrc20 || g.usdtBep20 ? `<p class="pay-k">Cripto (USDT)</p>${g.usdtTrc20 ? copiable("Red TRC20", g.usdtTrc20) : ""}${g.usdtBep20 ? copiable("Red BEP20", g.usdtBep20) : ""}<p class="muted small">Revisá bien la red antes de enviar.</p>` : ""}
+      <p class="muted small">También aceptamos efectivo al retirar y dólares. Mandanos el comprobante por WhatsApp o subilo en la página de seguimiento.</p></div>`;
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-copiar]");
+    if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.copiar); b.textContent = "Copiado ✓"; setTimeout(() => (b.textContent = "Copiar"), 2000); }
+    catch { const r = document.createRange(); r.selectNodeContents(b.previousElementSibling); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  });
+
   // ---------- Carrito ----------
   let cart = store.get("tdv-cart", []).filter((l) => (l.kit ? KITS.some((k) => k.id === l.kit) : byId[l.id]));
+  // Carrito compartido: /carrito#datos arma el mismo carrito en otro teléfono
+  if (location.pathname === "/carrito" && location.hash.length > 1) {
+    try {
+      const traidas = deB64(location.hash.slice(1)).map(([id, v, qty]) => id.startsWith("k:") ? { kit: id.slice(2), items: String(v).split(","), qty } : { id, variante: v || "", qty })
+        .filter((l) => (l.kit ? KITS.some((k) => k.id === l.kit) && l.items.every((x) => byId[x]) : byId[l.id])).map((l) => ({ ...l, qty: Math.min(99, Math.max(1, parseInt(l.qty) || 1)) }));
+      if (traidas.length) { cart = traidas; store.set("tdv-cart", cart); setTimeout(() => { openCart(); toast("✈ Te compartieron este carrito"); }, 300); }
+    } catch {}
+    history.replaceState(null, "", "/");
+  }
+  const linkCarrito = () => `${CONFIG.sitio}/carrito#${b64(cart.map((l) => (l.kit ? ["k:" + l.kit, l.items.join(","), l.qty] : [l.id, l.variante || "", l.qty])))}`;
+  // Resumen para el presupuesto
+  function resumenCarrito() {
+    return { lineas: cart.map((l) => { const i = lineInfo(l); return { name: i.name, sub: i.sub, qty: l.qty, unit: i.unit, label: i.label, usd: usdDe(l) }; }), total: total(), hasUsd: hasUsd(), dolar };
+  }
   let step = "items";
   const save = () => store.set("tdv-cart", cart);
   const keyOf = (l) => l.kit ? `${l.kit}:${l.items.join(",")}` : `${l.id}|${l.variante || ""}`;
@@ -373,6 +418,8 @@
   }
 
   const datos = store.get("tdv-datos", {});
+  const regaloPara = () => { try { const n = sessionStorage.getItem("tdv-regalo-para"); return n ? `Regalo para ${n} (de su lista de deseos)` : ""; } catch { return ""; } };
+  const carritoId = () => { let id = store.get("tdv-cid", ""); if (!id) { id = azar(); store.set("tdv-cid", id); } return id; };
   function renderCart() {
     const count = cart.reduce((s, l) => s + l.qty, 0);
     $("#cartCount").textContent = count;
@@ -417,8 +464,14 @@
         .sort((a, b) => (b.etapas || []).filter((x) => etapas.has(x)).length - (a.etapas || []).filter((x) => etapas.has(x)).length || pesos(a) - pesos(b)).slice(0, 3);
       if (extra.length) body.innerHTML += `<div class="upsell"><h4>Te puede servir también</h4>${extra.map((p) => `
         <div class="upsell-item">${art(p)}<span><b>${esc(p.name)}</b>${priceHTML(p)}</span><button class="icon-btn" data-add="${p.id}" aria-label="Agregar ${esc(p.name)}">+</button></div>`).join("")}</div>`;
-      foot.innerHTML = totalBlock + (despacho ? `<p class="small notice-inline">${esc(despacho)}</p>` : "") + `<button class="btn btn-primary btn-block" id="toDatos">Continuar</button>`;
+      foot.innerHTML = totalBlock + (despacho ? `<p class="small notice-inline">${esc(despacho)}</p>` : "") + `<button class="btn btn-primary btn-block" id="toDatos">Continuar</button>
+        <div class="cart-extra"><button type="button" class="link-btn" id="shareCart">Compartir carrito</button><a class="link-btn" href="/presupuesto">Descargar presupuesto</a></div>`;
       $("#toDatos").onclick = () => { step = "datos"; renderCart(); };
+      $("#shareCart").onclick = async () => {
+        const url = linkCarrito(), texto = "Mirá lo que elegí en Tienda de Vuelo ✈";
+        if (navigator.share) { try { await navigator.share({ title: "Mi carrito", text: texto, url }); return; } catch (x) { if (x.name === "AbortError") return; } }
+        try { await navigator.clipboard.writeText(url); toast("Link copiado. Pegalo donde quieras."); } catch { window.open(`https://wa.me/?text=${encodeURIComponent(texto + " " + url)}`, "_blank", "noopener"); }
+      };
       return;
     }
 
@@ -440,13 +493,21 @@
         <label id="fFranjaWrap">Franja horaria<select id="fFranja"><option>Mañana (9 a 13 h)</option><option>Tarde (14 a 19 h)</option></select></label>
         <label id="fDirWrap">Dirección, ciudad y código postal<input id="fDir" autocomplete="street-address" value="${esc(datos.dir || "")}"></label>
         <label><span>DNI o CUIT <span class="muted">(opcional, si necesitás factura)</span></span><input id="fDni" inputmode="numeric" value="${esc(datos.dni || "")}"></label>
-        <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2"></textarea></label>
+        <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2">${esc(regaloPara())}</textarea></label>
+        <p class="muted small">Usamos tus datos solo para tu pedido. Si no llegás a terminarlo, puede que te escribamos para ayudarte.</p>
       </form>`;
     foot.innerHTML = totalBlock + `<div class="foot-btns"><button class="btn btn-ghost" id="toItems">← Volver</button><button class="btn btn-primary" id="send" form="orderForm" type="submit">Enviar pedido por WhatsApp</button></div>`;
     const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA"; };
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
+    const borrador = () => {
+      const nombre = $("#fNombre").value.trim(), tel = $("#fTel").value.trim();
+      if (!nombre || tel.replace(/\D/g, "").length < 8) return;
+      try { fetch("/api/carrito", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({
+        id: carritoId(), nombre, tel, total: Math.round(total()), items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, name: i.name, sub: i.sub, qty: l.qty }; }) }) }).catch(() => {}); } catch {}
+    };
+    $("#fTel").addEventListener("change", borrador); $("#fNombre").addEventListener("change", borrador);
   }
 
   function sendOrder() {
@@ -472,7 +533,7 @@
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {
       fetch("/api/pedido", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({
-        num, token, totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (usdDe(l) || 0) * l.qty, 0) || null,
+        num, token, carrito: carritoId(), totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (usdDe(l) || 0) * l.qty, 0) || null,
         cliente: d, items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, kit: l.kit || "", name: i.name, sub: i.sub, qty: l.qty, label: i.label, unitArs: Math.round(i.unit), usd: usdDe(l) }; }),
       }) }).catch(() => {});
     } catch {}
@@ -480,11 +541,13 @@
     pedidos.unshift({ num, token, fecha: now.toISOString(), total: total(), items: cart.map((l) => ({ ...l })) });
     store.set("tdv-pedidos", pedidos.slice(0, 20));
     window.open(waLink(msg), "_blank", "noopener");
-    cart = []; save(); step = "listo";
+    const montoPedido = Math.round(total());
+    cart = []; save(); step = "listo"; store.set("tdv-cid", "");
     $("#cartCount").textContent = "0"; $("#cartCount").classList.remove("show");
     $("#drawerTitle").textContent = "¡Pedido enviado!";
     $("#drawerBody").innerHTML = `<div class="cart-empty done"><div>✈️</div><h4>Gracias, ${esc(d.nombre.split(" ")[0])}</h4>
       <p>Tu pedido <b>${num}</b> se abrió en WhatsApp. Enviá el mensaje y te confirmamos stock, envío y forma de pago.</p>
+      ${pagoHTML(montoPedido)}
       <p><a class="btn btn-ghost" href="/seguimiento#${num}.${token}">Seguí tu pedido</a></p>
       ${avisoHorario() ? `<p class="small">${esc(avisoHorario())}.</p>` : ""}
       <p class="muted small">¿No se abrió WhatsApp? Escribinos al ${esc(CONFIG.whatsappVisible)} con el número de pedido.</p></div>`;
@@ -552,7 +615,7 @@
   }
 
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, resumenCarrito, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   asistente();

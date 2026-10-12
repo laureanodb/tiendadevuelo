@@ -1,5 +1,5 @@
 // El cliente ve el estado de su pedido con el número y la clave del link. Sin dirección ni teléfono.
-import { DB_URL, ensureSchema, q, send } from "../_lib.js";
+import { DB_URL, ensureSchema, pagoPublico, q, send } from "../_lib.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -15,6 +15,7 @@ export default async function handler(req, res) {
       num: r.num, creado: r.creado, estado: r.estado, nombre: String(r.cliente.nombre || "").split(" ")[0],
       entrega: r.cliente.entrega, franja: r.cliente.franja, items: r.items, totalArs: r.total_ars === null ? null : Number(r.total_ars),
       envioEmpresa: r.envio_empresa, envioCodigo: r.envio_codigo, historial: r.historial,
+      comprobantes: (r.comprobantes || []).length, nps: r.nps !== null, pago: ["nuevo", "señado"].includes(r.estado) ? await pagoPublico() : null,
     });
   } catch (e) { console.error(e); send(res, 500, { error: "interno" }); }
 }

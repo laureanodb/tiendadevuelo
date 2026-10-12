@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "node tests/revisar.mjs --vercel",
   "cleanUrls": true,
   "rewrites": [
     {
@@ -23,6 +24,10 @@
     },
     {
       "source": "/novedades",
+      "destination": "/"
+    },
+    {
+      "source": "/carrito",
       "destination": "/"
     }
   ],

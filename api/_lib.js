@@ -90,12 +90,25 @@ export function ensureSchema() {
       creado timestamptz not null default now()
     )`);
     await q(`create index if not exists tdv_eventos_creado on tdv_eventos (creado desc)`);
-    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos"]) await q(`alter table ${t} enable row level security`).catch(() => {});
+    await q(`alter table tdv_pedidos add column if not exists comprobantes jsonb not null default '[]'`);
+    await q(`alter table tdv_pedidos add column if not exists nps integer`);
+    await q(`alter table tdv_pedidos add column if not exists nps_coment text not null default ''`);
+    await q(`alter table tdv_pedidos add column if not exists carrito text not null default ''`);
+    await q(`create table if not exists tdv_carritos (
+      id text primary key, creado timestamptz not null default now(), actualizado timestamptz not null default now(),
+      nombre text not null default '', tel text not null default '', items jsonb not null default '[]', total numeric,
+      estado text not null default 'abierto'
+    )`);
+    await q(`create table if not exists tdv_limites (id bigserial primary key, clave text not null, creado timestamptz not null default now())`);
+    await q(`create index if not exists tdv_limites_clave on tdv_limites (clave, creado)`);
+    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
-      await fetch(`${SUPA_URL}/storage/v1/bucket`, {
-        method: "POST", headers: supaHeaders({ "content-type": "application/json" }),
-        body: JSON.stringify({ id: "productos", name: "productos", public: true }),
-      }).catch(() => {});
+      for (const [id, pub] of [["productos", true], ["comprobantes", false]]) {
+        await fetch(`${SUPA_URL}/storage/v1/bucket`, {
+          method: "POST", headers: supaHeaders({ "content-type": "application/json" }),
+          body: JSON.stringify({ id, name: id, public: pub }),
+        }).catch(() => {});
+      }
     }
   })().catch((e) => { ready = null; throw e; });
   return ready;
@@ -163,6 +176,30 @@ export async function subirFoto(path, buffer, type) {
   return `${SUPA_URL}/storage/v1/object/public/productos/${path}`;
 }
 
+// Comprobantes de pago: bucket privado, solo se ven desde el panel.
+export async function subirPrivado(path, buffer, type) {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/comprobantes/${path}`, {
+    method: "POST", headers: supaHeaders({ "content-type": type, "x-upsert": "true" }), body: buffer,
+  });
+  if (!r.ok) throw new Error("No se pudo guardar el comprobante (" + r.status + ")");
+}
+export async function bajarPrivado(path) {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/comprobantes/${path}`, { headers: supaHeaders() });
+  if (!r.ok) return null;
+  return { type: r.headers.get("content-type") || "image/jpeg", buffer: Buffer.from(await r.arrayBuffer()) };
+}
+
+// ---------- Freno a bots: cuántas veces por hora puede hacer algo cada conexión ----------
+const ipDe = (req) => String(req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "").split(",")[0].trim() || "sin-ip";
+export async function permitido(req, tipo, max, minutos = 60) {
+  const clave = tipo + ":" + crypto.createHash("sha256").update("tdv:" + ipDe(req)).digest("hex").slice(0, 20);
+  const { rows } = await q(`select count(*)::int as n from tdv_limites where clave = $1 and creado > now() - make_interval(mins => $2)`, [clave, minutos]);
+  if (rows[0].n >= max) return false;
+  await q("insert into tdv_limites (clave) values ($1)", [clave]);
+  if (Math.random() < 0.02) q("delete from tdv_limites where creado < now() - interval '2 days'").catch(() => {});
+  return true;
+}
+
 // ---------- Acceso al panel ----------
 const COOKIE = "tdv_panel";
 const firma = (exp) => crypto.createHmac("sha256", "tdv-panel:" + CLAVE).update(String(exp)).digest("hex");
@@ -214,7 +251,17 @@ export function nivel(compras) { return compras >= 4 ? "Comandante" : compras >=
 export function pedidoAdmin(r) {
   return { num: r.num, token: r.token, creado: r.creado, estado: r.estado, tel: r.cliente_tel, cliente: r.cliente, items: r.items,
     totalArs: num(r.total_ars), usdSub: num(r.usd_sub), cobradoArs: num(r.cobrado_ars), cobradoUsd: num(r.cobrado_usd), pagadoEn: r.pagado_en,
-    envioEmpresa: r.envio_empresa, envioCodigo: r.envio_codigo, enviadoEn: r.enviado_en, notas: r.notas, stockDescontado: r.stock_descontado, historial: r.historial };
+    envioEmpresa: r.envio_empresa, envioCodigo: r.envio_codigo, enviadoEn: r.enviado_en, notas: r.notas, stockDescontado: r.stock_descontado, historial: r.historial,
+    comprobantes: r.comprobantes || [], nps: r.nps, npsComent: r.nps_coment || "" };
+}
+
+// Datos de pago que se muestran al cliente (los cargás en el panel → Ajustes).
+export const CAMPOS_PAGO = ["titular", "banco", "alias", "cbu", "cuit", "usdtTrc20", "usdtBep20"];
+export async function pagoPublico() {
+  const v = await ajuste("pago", {});
+  const o = {};
+  for (const k of CAMPOS_PAGO) if (v[k] !== undefined && v[k] !== null && String(v[k]).trim() !== "") o[k] = String(v[k]).trim().slice(0, 120);
+  return o;
 }
 
 export const body = (req) => (typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {});

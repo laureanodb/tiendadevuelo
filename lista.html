@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lista de deseos · Tienda de Vuelo</title>
+  <meta name="description" content="Una lista de deseos de Tienda de Vuelo: regalos para pilotos.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="Lista de deseos · Tienda de Vuelo">
+  <meta property="og:description" content="Una lista de deseos de Tienda de Vuelo: regalos para pilotos.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="lista" data-wa="¡Hola! Quiero regalar algo de una lista de deseos.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Lista de deseos</span>
+      <h1 id="lsTitle">Lista de deseos</h1>
+      <p id="lsSub">Las cosas que le gustaría tener a un piloto.</p>
+    </div></section>
+    <section class="section wrap" id="lsBox"><p class="muted">Cargando…</p></section>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { esc, byId, card, deB64 } = window.TDV;
+      const box = document.getElementById("lsBox");
+      let d = null;
+      try { d = deB64(location.hash.slice(1)); } catch {}
+      const ps = d && Array.isArray(d.i) ? d.i.map((id) => byId[id]).filter((p) => p && !p.agotado) : [];
+      if (!ps.length) { box.innerHTML = '<p>Esta lista está vacía o el link no está completo. <a href="/#catalogo">Mirá el catálogo</a>.</p>'; return; }
+      const nombre = String(d.n || "").slice(0, 40).trim();
+      document.getElementById("lsTitle").textContent = nombre ? `La lista de deseos de ${nombre}` : "Lista de deseos";
+      document.getElementById("lsSub").textContent = nombre ? `${ps.length === 1 ? "Esto es lo que le gustaría" : "Estas son las cosas que le gustaría"} tener a ${nombre}. Elegí una y sorprendelo.` : "Elegí un regalo y sorprendé a tu piloto.";
+      document.title = (nombre ? `Lista de ${nombre}` : "Lista de deseos") + " · Tienda de Vuelo";
+      box.innerHTML = `<div class="grid">${ps.map(card).join("")}</div>
+        <div class="notice-inline ls-tip"><b>¿Vas a regalarle algo?</b> Agregalo al carrito y en <i>Notas</i> poné “Regalo para ${esc(nombre || "la lista")}”: lo envolvemos y no decimos el precio. Si querés, avisanos por WhatsApp así nadie lo repite.</div>
+        <p><a class="btn btn-ghost" href="/#catalogo">Armá tu propia lista</a></p>`;
+      try { sessionStorage.setItem("tdv-regalo-para", nombre || "la lista"); } catch {}
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

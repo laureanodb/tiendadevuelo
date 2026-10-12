@@ -11,6 +11,8 @@ const RUTAS = {
   resenas: () => import("../_panel/resenas.js"),
   preguntas: () => import("../_panel/preguntas.js"),
   ajustes: () => import("../_panel/ajustes.js"),
+  comprobante: () => import("../_panel/comprobante.js"),
+  carritos: () => import("../_panel/carritos.js"),
 };
 
 export default async function handler(req, res) {

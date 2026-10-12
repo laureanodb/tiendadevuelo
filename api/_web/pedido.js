@@ -1,5 +1,5 @@
 // La web guarda cada pedido al mandarlo por WhatsApp, para verlo en el panel y que el cliente lo siga.
-import { DB_URL, body, ensureSchema, q, send, telWa } from "../_lib.js";
+import { DB_URL, body, ensureSchema, permitido, q, send, telWa } from "../_lib.js";
 
 const s = (v, n = 200) => String(v ?? "").trim().slice(0, n);
 const n = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Math.max(0, Number(v)));
@@ -21,10 +21,13 @@ export default async function handler(req, res) {
     }));
     if (!items.length) return send(res, 400, { error: "datos" });
     await ensureSchema();
+    if (!(await permitido(req, "pedido", 12))) return send(res, 429, { guardado: false });
     const tel = telWa(cliente.tel);
-    await q(`insert into tdv_pedidos (num, token, cliente_tel, cliente, items, total_ars, usd_sub, historial)
-             values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (num) do nothing`,
-      [num, token, tel, cliente, JSON.stringify(items), n(b.totalArs), n(b.usdSub), JSON.stringify([{ estado: "nuevo", at: new Date().toISOString() }])]);
+    const carrito = /^[a-z0-9]{8,24}$/.test(s(b.carrito, 24)) ? s(b.carrito, 24) : "";
+    await q(`insert into tdv_pedidos (num, token, cliente_tel, cliente, items, total_ars, usd_sub, historial, carrito)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (num) do nothing`,
+      [num, token, tel, cliente, JSON.stringify(items), n(b.totalArs), n(b.usdSub), JSON.stringify([{ estado: "nuevo", at: new Date().toISOString() }]), carrito]);
+    if (carrito) await q("update tdv_carritos set estado = 'convertido', actualizado = now() where id = $1", [carrito]);
     if (tel) {
       await q(`insert into tdv_clientes (tel, nombre, dni) values ($1, $2, $3)
                on conflict (tel) do update set nombre = excluded.nombre, dni = coalesce(nullif(excluded.dni, ''), tdv_clientes.dni)`, [tel, cliente.nombre, cliente.dni]);

@@ -126,3 +126,10 @@ body.panel { background: var(--bg-2); }
 .p-stars { color: var(--sun); letter-spacing: 2px; }
 .p-pl { gap: 10px; }
 .p-pl-t { font-weight: 700 !important; }
+.e-comp { background: #e3f6ee; color: #0b6b49; }
+.p-nps summary { cursor: pointer; }
+.p-nps p { margin: 0; }
+.p-carritos { margin-top: 18px; }
+.p-cart-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.p-cart-row:last-child { border-bottom: 0; }
+.p-cart-row > div:first-child { min-width: 0; flex: 1 1 240px; }

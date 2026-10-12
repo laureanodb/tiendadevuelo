@@ -1,5 +1,5 @@
 // Reseñas verificadas: solo puede opinar quien compró (con el link de su pedido). Se publican cuando las aprobás.
-import { DB_URL, VENDIDOS, body, ensureSchema, q, send } from "../_lib.js";
+import { DB_URL, VENDIDOS, body, ensureSchema, permitido, q, send } from "../_lib.js";
 
 const corto = (n) => { const [a, b] = String(n || "").trim().split(/\s+/); return a ? a + (b ? " " + b[0].toUpperCase() + "." : "") : "Cliente"; };
 
@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return send(res, 405, { error: "metodo" });
     res.setHeader("Cache-Control", "no-store");
     const b = body(req);
+    if (!(await permitido(req, "resena", 10))) return send(res, 429, { mensaje: "Probá de nuevo en un rato." });
     const { rows } = await q("select * from tdv_pedidos where num = $1 and token = $2", [String(b.num || ""), String(b.token || "")]);
     if (!rows.length) return send(res, 404, { mensaje: "No encontramos ese pedido." });
     const p = rows[0];

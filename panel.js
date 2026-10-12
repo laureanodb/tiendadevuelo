@@ -85,7 +85,7 @@
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"]];
+  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
   const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
@@ -94,6 +94,7 @@
     if (tab === "actividad") return verActividad();
     if (tab === "opiniones") return verOpiniones();
     if (tab === "respuestas") return verRespuestas();
+    if (tab === "ajustes") return verAjustes();
     lista();
   }
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
@@ -228,7 +229,7 @@
           </div>
           <label>Categoría<select id="cat">${CATEGORIES.map((c) => `<option${c === p.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
           <label>Descripción corta<textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
-          <label><span>Características <span class="muted">(una por renglón)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
+          <label><span>Características <span class="muted">(una por renglón; para la ficha técnica usá “Atenuación: 24 dB”)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
         </section>
@@ -430,10 +431,11 @@
   const sitio = CONFIG.sitio;
   let filtroPed = "Activos", buscaPed = "";
 
+  const sinVer = (p) => (p.comprobantes || []).some((c) => !c.visto);
   async function cargarPedidos() {
     const d = await api("pedidos");
     pedidosCache = d;
-    pendientes = d.pedidos.filter((p) => p.estado === "nuevo").length;
+    pendientes = d.pedidos.filter((p) => p.estado === "nuevo" || sinVer(p)).length;
     return d;
   }
   async function verPedidos() {
@@ -454,6 +456,11 @@
         <div class="p-stat"><span>Mes anterior</span><b>${monto(r.anterior)}</b><small>&nbsp;</small></div>
       </div>
       <p class="muted small">Las ventas cuentan lo que anotás como cobrado en pedidos pagados, enviados o entregados. Pesos y dólares por separado.</p>
+      ${(() => { const v = d.pedidos.filter((p) => p.nps !== null && p.nps !== undefined); if (!v.length) return "";
+        const prom = v.filter((p) => p.nps >= 9).length, det = v.filter((p) => p.nps <= 6).length, nps = Math.round(((prom - det) / v.length) * 100);
+        const coments = v.filter((p) => p.npsComent).slice(0, 5);
+        return `<details class="p-card p-nps"><summary><b>¿Nos recomendarían?</b> Puntaje ${nps > 0 ? "+" : ""}${nps} <span class="muted small">(${v.length} ${v.length === 1 ? "respuesta" : "respuestas"}: ${prom} recomiendan, ${det} no)</span></summary>
+          <p class="muted small">Va de −100 a +100. Más de +50 es excelente.</p>${coments.map((p) => `<p class="small"><b>${p.nps}</b> · ${esc(p.cliente.nombre || "")}: “${esc(p.npsComent)}”</p>`).join("")}</details>`; })()}
       <div class="p-tools">
         <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
           <input id="buscaPed" type="search" placeholder="Buscar por número, nombre o teléfono" value="${esc(buscaPed)}"></label>
@@ -463,12 +470,31 @@
         <button class="p-row p-order" data-ped="${esc(p.num)}">
           <span class="p-row-info"><b>${esc(p.cliente.nombre || "Sin nombre")}</b><span class="muted small">${esc(p.num)} · ${fechaCorta(p.creado)}</span>
             <span class="muted small">${esc(p.items.map((i) => `${i.qty}× ${i.name}`).join(", "))}</span></span>
-          <span class="p-row-num"><i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i><b>${p.cobradoArs || p.cobradoUsd ? [p.cobradoArs ? ars(p.cobradoArs) : "", p.cobradoUsd ? usd(p.cobradoUsd) : ""].filter(Boolean).join(" + ") : p.totalArs ? "≈ " + ars(p.totalArs) : ""}</b></span>
-        </button>`).join("") || '<p class="empty">No hay pedidos con ese filtro.</p>'}</div>`;
+          <span class="p-row-num">${sinVer(p) ? '<i class="p-estado e-comp">💳 Comprobante</i>' : ""}<i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i><b>${p.cobradoArs || p.cobradoUsd ? [p.cobradoArs ? ars(p.cobradoArs) : "", p.cobradoUsd ? usd(p.cobradoUsd) : ""].filter(Boolean).join(" + ") : p.totalArs ? "≈ " + ars(p.totalArs) : ""}</b></span>
+        </button>`).join("") || '<p class="empty">No hay pedidos con ese filtro.</p>'}</div>
+      <section class="p-card p-carritos" id="carritos"><h2>Carritos sin terminar</h2><p class="muted small">Dejaron nombre y teléfono pero no mandaron el pedido. Un mensaje a tiempo suele cerrar la venta.</p><p class="p-loading">Cargando…</p></section>`;
+    verCarritos();
     app.querySelectorAll("[data-fp]").forEach((b) => (b.onclick = () => { filtroPed = b.dataset.fp; verPedidos(); }));
     app.querySelectorAll("[data-ped]").forEach((b) => (b.onclick = () => verPedido(d.pedidos.find((p) => p.num === b.dataset.ped))));
     const bp = document.getElementById("buscaPed");
     bp.oninput = () => { buscaPed = bp.value; clearTimeout(bp._t); bp._t = setTimeout(() => { const pos = bp.selectionStart; verPedidos().then(() => { const n = document.getElementById("buscaPed"); n.focus(); n.setSelectionRange(pos, pos); }); }, 250); };
+  }
+
+  async function verCarritos() {
+    const box = document.getElementById("carritos");
+    if (!box) return;
+    let d;
+    try { d = await api("carritos"); } catch { box.querySelector(".p-loading").textContent = "No se pudieron cargar."; return; }
+    const lista = d.carritos;
+    box.querySelector(".p-loading").outerHTML = lista.length ? `<div class="p-list">${lista.map((c) => `
+      <div class="p-cart-row" data-cid="${esc(c.id)}"><div><b>${esc(c.nombre)}</b> <span class="muted small">${fechaCorta(c.fecha)}${c.total ? " · ≈ " + ars(c.total) : ""}</span><br>
+        <span class="muted small">${esc(c.items.map((i) => `${i.qty}× ${i.name}${i.sub ? " (" + i.sub + ")" : ""}`).join(", "))}</span></div>
+        <div class="p-head-btns"><a class="btn btn-wa btn-sm" target="_blank" rel="noopener" data-cok="contactado" href="${waCliente(c.tel, `¡Hola ${c.nombre.split(" ")[0]}! Te escribo de Tienda de Vuelo ✈ Vi que estabas por pedir ${c.items.length === 1 ? c.items[0].name : "algunos productos"}. ¿Te puedo ayudar con alguna duda, el envío o la forma de pago?`)}">Escribirle</a>
+        <button class="btn btn-ghost btn-sm" data-cok="descartado">Descartar</button></div></div>`).join("")}</div>` : '<p class="muted">No hay carritos sin terminar. 👌</p>';
+    box.querySelectorAll("[data-cok]").forEach((b) => b.addEventListener("click", () => {
+      const row = b.closest("[data-cid]");
+      api("carritos", { method: "POST", body: { id: row.dataset.cid, estado: b.dataset.cok } }).then(() => row.remove()).catch((x) => toast(x.message));
+    }));
   }
 
   function mensajeCliente(p) {
@@ -510,6 +536,8 @@
             ${p.totalArs ? `<tr><td>Total aproximado al pedir</td><td class="num"><b>${ars(p.totalArs)}</b>${p.usdSub ? `<br><small class="muted">incluye ${usd(p.usdSub)}</small>` : ""}</td></tr>` : ""}</tbody></table></div>
           ${p.stockDescontado ? '<p class="muted small">✓ Ya se descontó del stock.</p>' : '<button type="button" class="btn btn-ghost" id="descontar">Descontar del stock</button>'}
         </section>
+        ${p.comprobantes?.length ? `<section class="p-card"><h2>Comprobantes que subió el cliente</h2><div class="p-acciones">${p.comprobantes.map((c, i) => `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="/api/panel/comprobante?num=${encodeURIComponent(p.num)}&i=${i}">${c.tipo === "application/pdf" ? "📄" : "🖼"} ${fechaCorta(c.at)}${c.visto ? "" : " · nuevo"}</a>`).join("")}</div></section>` : ""}
+        ${p.nps !== null && p.nps !== undefined ? `<section class="p-card"><h2>Encuesta</h2><p>¿Nos recomendaría? <b>${p.nps}/10</b>${p.npsComent ? `<br><i>“${esc(p.npsComent)}”</i>` : ""}</p></section>` : ""}
         <section class="p-card">
           <h2>Cobro</h2>
           <div class="p-grid2">
@@ -703,6 +731,27 @@
     };
     lista = lista.map((x) => ({ ...x }));
     pintar();
+  }
+
+  // ---------- Ajustes: datos de pago que ve el cliente ----------
+  async function verAjustes() {
+    app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
+    let v = {};
+    try { v = (await api("ajustes?clave=pago")).valor || {}; } catch {}
+    const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
+    app.innerHTML = tabsHTML("ajustes") + `
+      <div class="p-head"><div><h1>Ajustes</h1><p class="muted">Lo que cargues acá aparece al cliente cuando hace un pedido y en la página de seguimiento, con botón para copiar.</p></div></div>
+      <form class="p-card p-form" id="pagoForm"><h2>Datos de pago</h2>
+        <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
+        <p class="muted small">Dejá vacío lo que no uses. Revisá bien el CBU y las direcciones cripto: un error hace que el dinero vaya a otra cuenta.</p>
+        <button class="btn btn-primary" type="submit">Guardar datos de pago</button></form>`;
+    document.getElementById("pagoForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const valor = Object.fromEntries(C.map(([k]) => [k, document.getElementById("pg_" + k).value.trim()]));
+      if (valor.cbu && !/^\d{22}$/.test(valor.cbu.replace(/\s/g, ""))) return toast("El CBU o CVU tiene que tener 22 números.");
+      valor.cbu = valor.cbu.replace(/\s/g, "");
+      try { await api("ajustes", { method: "POST", body: { clave: "pago", valor } }); toast("Datos de pago guardados. Ya se ven en la web."); } catch (x) { toast(x.message); }
+    };
   }
 
   // ---------- Actividad ----------

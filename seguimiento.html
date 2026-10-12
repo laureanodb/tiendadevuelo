@@ -50,16 +50,62 @@
           box.innerHTML = p.estado === "cancelado"
             ? `<div class="notice-inline">Este pedido fue cancelado. Si tenés dudas, escribinos.</div>`
             : `<ol class="steps">${PASOS.map(([k, t, d], i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><b>${t}</b><span>${i === idx ? d : ""}${cuando(k) ? ` <small>${fecha(cuando(k).at)}</small>` : ""}</span></li>`).join("")}</ol>`;
+          if (p.pago && Object.keys(p.pago).length) { CONFIG.pago = p.pago; box.innerHTML += window.TDV.pagoHTML(p.totalArs); }
+          if (["nuevo", "señado"].includes(p.estado)) box.innerHTML += `<div class="up-box no-print"><h3>¿Ya pagaste?</h3>
+            <p class="small">Subí la captura o el PDF de la transferencia y lo verificamos. ${p.comprobantes ? `<b>Ya recibimos ${p.comprobantes === 1 ? "1 comprobante" : p.comprobantes + " comprobantes"}.</b>` : ""}</p>
+            <label class="btn btn-ghost up-btn">📎 Subir comprobante<input type="file" id="upFile" accept="image/*,application/pdf"></label><p class="small" id="upMsg" role="status"></p></div>`;
+          if (["enviado", "entregado"].includes(p.estado) && !p.nps) box.innerHTML += `<form class="nps-box no-print" id="npsForm"><h3>¿Nos recomendarías a otro piloto?</h3>
+            <div class="nps-scale" role="radiogroup" aria-label="Del 0 (nada probable) al 10 (muy probable)">${[...Array(11).keys()].map((n) => `<input type="radio" name="nps" id="nps${n}" value="${n}"><label for="nps${n}">${n}</label>`).join("")}</div>
+            <div class="nps-ends muted small"><span>Nada probable</span><span>Muy probable</span></div>
+            <div id="npsMas" hidden><label>¿Qué podríamos mejorar? <span class="muted">(opcional)</span><textarea id="npsTxt" rows="2" maxlength="600"></textarea></label><button class="btn btn-primary btn-sm">Enviar</button></div>
+            <p class="small" id="npsMsg" role="status"></p></form>`;
           if (p.envioCodigo) box.innerHTML += `<div class="contact-item track"><span class="muted small">Envío${p.envioEmpresa ? " por " + esc(p.envioEmpresa) : ""}</span><b>${esc(p.envioCodigo)}</b><button class="link-btn" id="copiar">Copiar código</button></div>`;
           box.innerHTML += `<h2>Detalle</h2><div class="table-wrap"><table><tbody>${p.items.map((i) => `<tr><td>${i.qty} × ${esc(i.name)}${i.sub ? `<br><small class="muted">${esc(i.sub)}</small>` : ""}</td><td class="num">${esc(i.label || "")}</td></tr>`).join("")}
             ${p.totalArs ? `<tr><td><b>Total aproximado</b> <small class="muted">(sin envío)</small></td><td class="num"><b>${ars(p.totalArs)}</b></td></tr>` : ""}</tbody></table></div>
             <p class="muted small">Entrega: ${esc(p.entrega || "")}${p.franja && p.entrega && p.entrega.includes("día") ? " · " + esc(p.franja) : ""}</p>
             <div class="cta-row no-print">${["pagado", "enviado", "entregado"].includes(p.estado) ? `<a class="btn btn-primary" href="/resena#${p.num}.${token}">⭐ Dejá tu opinión</a>` : ""}<button class="btn btn-ghost" onclick="window.print()">Guardar comprobante (PDF)</button><a class="btn btn-wa" href="${waLink(`¡Hola! Quería consultar por mi pedido ${p.num}.`)}" target="_blank" rel="noopener">Consultar por WhatsApp</a></div>`;
+          const up = document.getElementById("upFile");
+          if (up) up.onchange = async () => {
+            const f = up.files[0], msg = document.getElementById("upMsg");
+            if (!f) return;
+            msg.textContent = "Subiendo…";
+            try {
+              const pdf = f.type === "application/pdf";
+              if (pdf && f.size > 3e6) throw new Error("El PDF es muy grande. Mandá una captura de pantalla.");
+              const archivo = pdf ? await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = mal; r.readAsDataURL(f); }) : await achicar(f);
+              const r = await fetch("/api/comprobante", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ num, token, tipo: pdf ? "application/pdf" : "image/jpeg", archivo }) });
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(d.mensaje || "No se pudo subir.");
+              msg.innerHTML = "✓ ¡Recibido! Lo verificamos y te confirmamos por WhatsApp.";
+            } catch (x) { msg.textContent = x.message || "No se pudo subir. Mandalo por WhatsApp."; }
+            up.value = "";
+          };
+          const nf = document.getElementById("npsForm");
+          if (nf) {
+            nf.addEventListener("change", () => { document.getElementById("npsMas").hidden = false; });
+            nf.onsubmit = async (e) => {
+              e.preventDefault();
+              const nota = nf.querySelector('input[name="nps"]:checked')?.value;
+              if (nota === undefined) return;
+              const r = await fetch("/api/nps", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ num, token, nota, comentario: document.getElementById("npsTxt").value }) }).catch(() => null);
+              nf.innerHTML = r && r.ok ? `<h3>¡Gracias por tu respuesta!</h3><p class="small">${nota >= 9 ? "Nos alegra mucho. Si querés, contale a un amigo piloto." : "La vamos a tener en cuenta para mejorar."}</p>` : '<p class="small">No se pudo enviar. Probá de nuevo más tarde.</p>';
+            };
+          }
           const c = document.getElementById("copiar");
           if (c) c.onclick = async () => { try { await navigator.clipboard.writeText(p.envioCodigo); c.textContent = "Copiado ✓"; } catch {} };
         } catch {
           box.innerHTML = `<p>No encontramos ese pedido. Revisá el link o escribinos por WhatsApp con tu número de pedido.</p>`;
         }
+      }
+      // Achica la foto antes de subirla (máx. 1600 px, JPG)
+      function achicar(file) {
+        return new Promise((ok, mal) => {
+          const img = new Image();
+          img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+            const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(img.src); ok(c.toDataURL("image/jpeg", 0.82).split(",")[1]); };
+          img.onerror = () => mal(new Error("No se pudo leer la imagen. Probá con una captura."));
+          img.src = URL.createObjectURL(file);
+        });
       }
       function lista() {
         let ped = [];

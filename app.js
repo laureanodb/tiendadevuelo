@@ -71,6 +71,19 @@
     $("#grid").classList.toggle("as-list", state.vista === "list");
     $("#vGrid").setAttribute("aria-pressed", state.vista === "grid"); $("#vList").setAttribute("aria-pressed", state.vista === "list");
     $("#empty").hidden = list.length > 0;
+    const fs = $("#favShare");
+    fs.hidden = !(state.f === "Favoritos" && list.length);
+    if (!fs.hidden && !fs.dataset.listo) {
+      fs.dataset.listo = "1";
+      fs.innerHTML = `<div><b>Compartí tu lista de deseos</b><span class="muted small">Ideal para que tu familia sepa qué regalarte.</span></div>
+        <form id="favForm"><input id="favNom" maxlength="40" placeholder="Tu nombre" aria-label="Tu nombre" required value="${esc(TDV.store.get("tdv-datos", {}).nombre?.split(" ")[0] || "")}"><button class="btn btn-primary btn-sm">Compartir</button></form>`;
+      $("#favForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const url = `${CONFIG.sitio}/lista#${TDV.b64({ n: $("#favNom").value.trim(), i: TDV.favs.filter((id) => byId[id]) })}`, texto = "Esta es mi lista de deseos de Tienda de Vuelo ✈";
+        if (navigator.share) { try { await navigator.share({ title: "Mi lista de deseos", text: texto, url }); return; } catch (x) { if (x.name === "AbortError") return; } }
+        try { await navigator.clipboard.writeText(url); toast("Link copiado. Mandáselo a quien quieras."); } catch { window.open(`https://wa.me/?text=${encodeURIComponent(texto + " " + url)}`, "_blank", "noopener"); }
+      };
+    }
     $("#empty").innerHTML = state.f === "Favoritos" && !state.q
       ? "Todavía no guardaste favoritos. Tocá el ♡ de cualquier producto."
       : `No encontramos nada con esa búsqueda. <a href="/contacto#pedido">Pedinos el producto</a> y lo conseguimos.`;
@@ -174,7 +187,10 @@
       enOferta(p) && `<span class="tag tag-sale">Oferta${p.ofertaHasta ? " hasta el " + p.ofertaHasta.split("-").reverse().slice(0, 2).join("/") : ""}</span>`,
     ].filter(Boolean).join("");
     $("#pvDesc").textContent = p.desc;
-    $("#pvSpecs").innerHTML = p.specs.map((s) => `<li>${esc(s)}</li>`).join("");
+    // "Atenuación: 24 dB" va a la tabla técnica; lo demás, a la lista
+    const { tabla, sueltas } = TDV.fichaTecnica(p);
+    $("#pvSpecs").innerHTML = (tabla.length ? `<table class="spec-table"><tbody>${tabla.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</tbody></table>` : "") +
+      (sueltas.length ? `<ul class="specs">${sueltas.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
     $("#pvEtapas").innerHTML = p.etapas?.length ? `<span class="muted small">Ideal para:</span> ${p.etapas.map((e) => `<span class="tag">${ETAPAS[e]}</span>`).join("")}` : "";
     $("#pvVariantWrap").hidden = !p.variantes;
     const ops = opciones(p);
