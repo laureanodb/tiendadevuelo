@@ -10,6 +10,9 @@ const RUTAS = {
   carrito: () => import("./_web/carrito.js"),
   comprobante: () => import("./_web/comprobante.js"),
   nps: () => import("./_web/nps.js"),
+  catalogo: () => import("./_web/catalogo.js"),
+  envios: () => import("./_web/envios.js"),
+  salud: () => import("./_web/salud.js"),
 };
 
 export default async function handler(req, res) {

@@ -261,7 +261,7 @@
         </div>
         <div>
           <h4>Tienda</h4>
-          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a><a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h4>Contacto</h4>
@@ -418,6 +418,7 @@
   }
 
   const datos = store.get("tdv-datos", {});
+  const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
   const regaloPara = () => { try { const n = sessionStorage.getItem("tdv-regalo-para"); return n ? `Regalo para ${n} (de su lista de deseos)` : ""; } catch { return ""; } };
   const carritoId = () => { let id = store.get("tdv-cid", ""); if (!id) { id = azar(); store.set("tdv-cid", id); } return id; };
   function renderCart() {
@@ -491,13 +492,14 @@
           <label>Horario<select id="fHora"><option>10 a 13 h</option><option>14 a 17 h</option><option>17 a 20 h</option></select></label>
         </div>
         <label id="fFranjaWrap">Franja horaria<select id="fFranja"><option>Mañana (9 a 13 h)</option><option>Tarde (14 a 19 h)</option></select></label>
+        <label id="fProvWrap">Provincia<select id="fProv"><option value="">Elegí la provincia</option>${PROVINCIAS.map((x) => `<option${x === datos.provincia ? " selected" : ""}>${x}</option>`).join("")}</select></label>
         <label id="fDirWrap">Dirección, ciudad y código postal<input id="fDir" autocomplete="street-address" value="${esc(datos.dir || "")}"></label>
         <label><span>DNI o CUIT <span class="muted">(opcional, si necesitás factura)</span></span><input id="fDni" inputmode="numeric" value="${esc(datos.dni || "")}"></label>
         <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2">${esc(regaloPara())}</textarea></label>
         <p class="muted small">Usamos tus datos solo para tu pedido. Si no llegás a terminarlo, puede que te escribamos para ayudarte.</p>
       </form>`;
     foot.innerHTML = totalBlock + `<div class="foot-btns"><button class="btn btn-ghost" id="toItems">← Volver</button><button class="btn btn-primary" id="send" form="orderForm" type="submit">Enviar pedido por WhatsApp</button></div>`;
-    const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA"; };
+    const syncDir = () => { const v = document.querySelector('input[name="entrega"]:checked').value; $("#fDirWrap").hidden = v === "Retiro en CABA"; $("#fDir").required = v !== "Retiro en CABA"; $("#fProvWrap").hidden = v !== "Envío a domicilio"; $("#fProv").required = v === "Envío a domicilio"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA"; };
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
@@ -515,8 +517,9 @@
       nombre: $("#fNombre").value.trim(), tel: $("#fTel").value.trim(), dni: $("#fDni").value.trim(),
       entrega: document.querySelector('input[name="entrega"]:checked').value, dir: $("#fDir").value.trim(), notas: $("#fNotas").value.trim(),
     };
+    d.provincia = d.entrega === "Envío a domicilio" ? $("#fProv").value : "CABA";
     d.franja = d.entrega === "Envío en el día (CABA)" ? $("#fFranja").value : d.entrega === "Retiro en CABA" ? `${$("#fDia").value}, ${$("#fHora").value}` : "";
-    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir });
+    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir, provincia: d.entrega === "Envío a domicilio" ? d.provincia : datos.provincia });
     store.set("tdv-datos", datos);
     const now = new Date();
     const num = `TDV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
@@ -528,7 +531,7 @@
       return `• ${l.qty} x ${i.name}${i.sub ? ` (${i.sub})` : ""} — ${l.kit ? ars(i.unit * l.qty) : i.label}${link}`;
     });
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())} + envío\n\n` +
-      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}` : "") +
+      `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.entrega !== "Retiro en CABA" ? `\nDirección: ${d.dir}${d.entrega === "Envío a domicilio" ? ", " + d.provincia : ""}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {

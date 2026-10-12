@@ -85,7 +85,7 @@
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
+  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
   const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
@@ -95,6 +95,7 @@
     if (tab === "opiniones") return verOpiniones();
     if (tab === "respuestas") return verRespuestas();
     if (tab === "ajustes") return verAjustes();
+    if (tab === "ventas") return verVentas();
     lista();
   }
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
@@ -527,7 +528,7 @@
           <h2>Cliente</h2>
           <p class="p-cli"><b>${esc(c.nombre)}</b><br>
             <a href="https://wa.me/${esc(p.tel)}" target="_blank" rel="noopener">${esc(c.tel)}</a>${c.dni ? ` · DNI/CUIT ${esc(c.dni)}` : ""}<br>
-            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.dir ? "<br>" + esc(c.dir) : ""}
+            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}
             ${c.notas ? `<br><i>“${esc(c.notas)}”</i>` : ""}</p>
         </section>
         <section class="p-card">
@@ -733,6 +734,95 @@
     pintar();
   }
 
+  // ---------- Ventas: gráficos y descarga para Excel ----------
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  async function verVentas() {
+    app.innerHTML = tabsHTML("ventas") + '<p class="p-loading">Cargando ventas…</p>';
+    let d;
+    try { d = await api("ventas"); } catch (x) { app.innerHTML = tabsHTML("ventas") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    const porId = Object.fromEntries(productos.map((p) => [p.id, p]));
+    const monto = (v) => (v.ars || v.usd ? (v.ars || 0) + (v.usd || 0) * dolar : v.total || 0);
+    const clave = (f) => { const x = new Date(f); return x.getFullYear() * 12 + x.getMonth(); };
+    const hoy = new Date(), ahora = hoy.getFullYear() * 12 + hoy.getMonth();
+    const porMes = {}, ganMes = {}, cubierto = {};
+    const cats = {}, marcas = {};
+    for (const v of d.ventas) {
+      const k = clave(v.fecha);
+      porMes[k] = (porMes[k] || 0) + monto(v);
+      if (k <= ahora - 12) continue;
+      for (const i of v.items) {
+        const p = porId[i.id], sub = (i.unitArs || 0) * i.qty;
+        const cat = p ? p.cat : i.kit ? "Kits" : "Otros", marca = p?.brand || (i.kit ? "Kits" : "Sin marca");
+        cats[cat] = (cats[cat] || 0) + sub; marcas[marca] = (marcas[marca] || 0) + sub;
+        if (p && p.costo !== null && p.costo !== undefined) {
+          const costo = (p.costoMoneda === "USD" ? p.costo * dolar : p.costo) * i.qty;
+          ganMes[k] = (ganMes[k] || 0) + sub - costo; cubierto[k] = (cubierto[k] || 0) + sub;
+        }
+      }
+    }
+    const meses = [...Array(12).keys()].map((n) => ahora - 11 + n);
+    const max = Math.max(1, ...meses.map((k) => Math.max(porMes[k] || 0, porMes[k - 12] || 0)));
+    const W = 900, H = 240, pad = 64, bw = (W - pad) / 12;
+    const nombreMes = (k) => MESES[k % 12] + (k % 12 === 0 ? " " + String(Math.floor(k / 12)).slice(2) : "");
+    const corto = (n) => (n >= 1e6 ? (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " mil" : Math.round(n));
+    const yTicks = [0, 0.5, 1].map((t) => t * max);
+    const svg = `<svg class="p-chart" viewBox="0 0 ${W} ${H + 24}" role="img" aria-label="Ventas por mes de los últimos 12 meses">
+      ${yTicks.map((t) => { const y = H - (t / max) * (H - 16); return `<line x1="${pad}" x2="${W}" y1="${y}" y2="${y}" class="grid"/><text x="${pad - 6}" y="${y + 4}" text-anchor="end" class="ax">${t ? corto(t) : 0}</text>`; }).join("")}
+      ${meses.map((k, i) => { const v = porMes[k] || 0, a = porMes[k - 12] || 0, h = (v / max) * (H - 16), x = pad + i * bw + bw * 0.18, w = bw * 0.64, ya = H - (a / max) * (H - 16);
+        return `<g class="bar"><title>${nombreMes(k)}: ${ars(v)}${a ? ` · un año antes: ${ars(a)}` : ""}</title><rect x="${pad + i * bw}" y="0" width="${bw}" height="${H}" class="hit"/>
+          ${v ? `<path d="M${x},${H} v${-Math.max(h - 4, 0)} q0,-4 4,-4 h${w - 8} q4,0 4,4 v${Math.max(h - 4, 0)} z" class="col"/>` : ""}
+          ${a ? `<line x1="${x - 3}" x2="${x + w + 3}" y1="${ya}" y2="${ya}" class="prev"/>` : ""}
+          <text x="${x + w / 2}" y="${H + 16}" text-anchor="middle" class="ax">${nombreMes(k)}</text></g>`; }).join("")}
+      <line x1="${pad}" x2="${W}" y1="${H}" y2="${H}" class="base"/></svg>`;
+    const barras = (o) => { const e = Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 8), m = Math.max(1, ...e.map((x) => x[1]));
+      return e.length ? `<div class="p-hbars">${e.map(([k, v]) => `<div class="p-hbar"><span>${esc(k)}</span><div><i style="width:${Math.max(2, (v / m) * 100)}%"></i></div><b>${ars(v)}</b></div>`).join("")}</div>` : '<p class="muted">Todavía no hay ventas.</p>'; };
+    const esteMes = porMes[ahora] || 0, anioAntes = porMes[ahora - 12] || 0;
+    const gan = ganMes[ahora] || 0, cub = cubierto[ahora] || 0;
+    app.innerHTML = tabsHTML("ventas") + `
+      <div class="p-head"><div><h1>Ventas</h1><p class="muted">Pesos y dólares sumados al dólar oficial de hoy (${ars(dolar)}).</p></div>
+        <div class="p-head-btns"><button class="btn btn-ghost" data-csv="pedidos">⬇ Pedidos</button><button class="btn btn-ghost" data-csv="productos">⬇ Productos y stock</button><button class="btn btn-ghost" data-csv="clientes">⬇ Clientes</button></div></div>
+      <div class="p-stats">
+        <div class="p-stat"><span>Este mes</span><b>${ars(esteMes)}</b><small>${anioAntes ? `${esteMes >= anioAntes ? "▲" : "▼"} ${Math.abs(Math.round((esteMes / anioAntes - 1) * 100))}% vs. hace un año` : "&nbsp;"}</small></div>
+        <div class="p-stat"><span>Ganancia estimada del mes</span><b>${cub ? ars(gan) : "—"}</b><small>${cub ? `Margen ${Math.round((gan / cub) * 100)}% · ${Math.round((cub / Math.max(esteMes, cub)) * 100)}% con costo cargado` : "Cargá el costo de los productos"}</small></div>
+        <div class="p-stat"><span>Últimos 12 meses</span><b>${ars(meses.reduce((s, k) => s + (porMes[k] || 0), 0))}</b><small>${d.ventas.filter((v) => clave(v.fecha) > ahora - 12).length} ventas</small></div>
+      </div>
+      <section class="p-card"><h2>Ventas por mes</h2><div class="p-legend"><span><i class="lg-col"></i>Este período</span><span><i class="lg-prev"></i>Mismo mes, un año antes</span></div><div class="p-chart-wrap">${svg}</div>
+        <details><summary class="small">Ver como tabla</summary><div class="table-wrap"><table><thead><tr><th>Mes</th><th class="num">Ventas</th><th class="num">Un año antes</th><th class="num">Ganancia estimada</th></tr></thead><tbody>${meses.slice().reverse().map((k) => `<tr><td>${nombreMes(k)}</td><td class="num">${ars(porMes[k] || 0)}</td><td class="num">${porMes[k - 12] ? ars(porMes[k - 12]) : "—"}</td><td class="num">${cubierto[k] ? ars(ganMes[k]) : "—"}</td></tr>`).join("")}</tbody></table></div></details></section>
+      <div class="p-grid2 p-act">
+        <section class="p-card"><h2>Por categoría</h2><p class="muted small">Últimos 12 meses, al precio de cada pedido.</p>${barras(cats)}</section>
+        <section class="p-card"><h2>Por marca</h2><p class="muted small">Las 8 que más venden.</p>${barras(marcas)}</section>
+      </div>`;
+    app.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => exportar(b.dataset.csv).catch((x) => toast(x.message))));
+  }
+
+  // Archivos para Excel (separados por punto y coma, como lo abre Excel en castellano)
+  async function exportar(que) {
+    const num = (v) => (v === null || v === undefined || v === "" ? "" : String(v).replace(".", ","));
+    const cel = (v) => { const s = String(v ?? ""); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const fecha = (f) => (f ? new Date(f).toLocaleDateString("es-AR") : "");
+    let filas = [];
+    if (que === "pedidos") {
+      const d = pedidosCache || (await cargarPedidos());
+      filas = [["Número", "Fecha", "Estado", "Cliente", "Teléfono", "DNI/CUIT", "Entrega", "Productos", "Total aprox. ($)", "Cobrado ($)", "Cobrado (US$)", "Fecha de pago", "Envío", "Código de seguimiento"],
+        ...d.pedidos.map((p) => [p.num, fecha(p.creado), estadoTxt(p.estado), p.cliente.nombre, p.cliente.tel, p.cliente.dni, p.cliente.entrega, p.items.map((i) => `${i.qty} x ${i.name}${i.sub ? " (" + i.sub + ")" : ""}`).join(" | "),
+          num(p.totalArs), num(p.cobradoArs), num(p.cobradoUsd), fecha(p.pagadoEn), p.envioEmpresa, p.envioCodigo])];
+    } else if (que === "productos") {
+      filas = [["Código", "Nombre", "Marca", "Modelo", "Categoría", "Precio US$", "Precio $", "Costo", "Moneda del costo", "Stock", "Stock mínimo", "Proveedor", "Visible"],
+        ...productos.map((p) => [p.id, p.name, p.brand, p.model, p.cat, num(p.usd), num(p.ars), num(p.costo), p.costoMoneda, num(p.stock), num(p.stockMin), p.proveedor, p.visible ? "Sí" : "No"])];
+    } else {
+      const d = await api("clientes");
+      filas = [["Nombre", "Teléfono", "DNI/CUIT", "Cumpleaños", "Escuela", "Nivel", "Compras", "Total $", "Total US$", "Último pedido", "Notas"],
+        ...d.clientes.map((c) => [c.nombre, c.tel, c.dni, c.cumple ? c.cumple.split("-").reverse().join("/") : "", c.escuela, c.nivel, c.compras, num(c.totalArs), num(c.totalUsd), fecha(c.ultimo), c.notas])];
+    }
+    const csv = "\ufeff" + filas.map((f) => f.map(cel).join(";")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `tiendadevuelo-${que}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast("Descargado. Abrilo con Excel o Google Sheets.");
+  }
+
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
@@ -744,7 +834,16 @@
       <form class="p-card p-form" id="pagoForm"><h2>Datos de pago</h2>
         <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
         <p class="muted small">Dejá vacío lo que no uses. Revisá bien el CBU y las direcciones cripto: un error hace que el dinero vaya a otra cuenta.</p>
-        <button class="btn btn-primary" type="submit">Guardar datos de pago</button></form>`;
+        <button class="btn btn-primary" type="submit">Guardar datos de pago</button></form>
+      <section class="p-card p-form"><h2>Catálogo para Instagram, Facebook y WhatsApp</h2>
+        <p>Esta dirección tiene todos tus productos con foto y precio, y se actualiza sola:</p>
+        <div class="p-doc"><input readonly value="${sitio}/catalogo.csv" id="feedUrl" aria-label="Dirección del catálogo"><button type="button" class="btn btn-ghost btn-sm" id="feedCopy">Copiar</button></div>
+        <ol class="small"><li>Entrá a <b>business.facebook.com/commerce</b> → <b>Catálogo</b> → <b>Orígenes de datos</b> → <b>Agregar artículos</b> → <b>Feed de datos</b>.</li>
+          <li>Elegí <b>Programar feed</b>, pegá la dirección y poné que se actualice <b>todos los días</b>.</li>
+          <li>Moneda: <b>ARS</b>. Listo: vas a poder etiquetar productos en Instagram y Facebook.</li>
+          <li>Para WhatsApp: en la app de WhatsApp Business → <b>Herramientas para la empresa</b> → <b>Catálogo</b> → conectá el mismo catálogo de Meta.</li></ol>
+        <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al oficial del día.</p></section>`;
+    document.getElementById("feedCopy").onclick = async () => { try { await navigator.clipboard.writeText(document.getElementById("feedUrl").value); toast("Copiado."); } catch { document.getElementById("feedUrl").select(); } };
     document.getElementById("pagoForm").onsubmit = async (e) => {
       e.preventDefault();
       const valor = Object.fromEntries(C.map(([k]) => [k, document.getElementById("pg_" + k).value.trim()]));
@@ -766,7 +865,25 @@
           ${d.busquedas.length ? `<ol class="p-rank">${d.busquedas.map((b) => `<li><span>${esc(b.dato)}</span><b>${b.n}</b></li>`).join("")}</ol>` : '<p class="muted">Todavía nada. Aparece cuando alguien busca algo que no está cargado.</p>'}</section>
         <section class="p-card"><h2>Productos más consultados</h2><p class="muted small">Toques en “Lo quiero”, “Consultar” y “Hacer una pregunta”.</p>
           ${d.consultas.length ? `<ol class="p-rank">${d.consultas.map((c) => `<li><span>${esc(c.name)}</span><b>${c.n}</b>${c.quiero ? `<small>${c.quiero} “Lo quiero”</small>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía nada.</p>'}</section>
-      </div>`;
+      </div>
+      <section class="p-card p-hist" id="historial"><h2>Historial de cambios</h2><p class="muted small">Precios, stock, productos y pedidos. Si te equivocaste, tocá “Deshacer”.</p><p class="p-loading">Cargando…</p></section>`;
+    verHistorial();
+  }
+  async function verHistorial() {
+    const box = document.getElementById("historial");
+    if (!box) return;
+    let d;
+    try { d = await api("cambios"); } catch { box.querySelector(".p-loading").textContent = "No se pudo cargar."; return; }
+    const ICO = { producto: "✏️", borrado: "🗑", precios: "💲", pedido: "📦" };
+    box.querySelector(".p-loading").outerHTML = d.cambios.length ? `<ol class="p-hist-list">${d.cambios.map((c) => `
+      <li class="${c.deshecho ? "deshecho" : ""}"><span aria-hidden="true">${ICO[c.tipo] || "•"}</span><div><b>${esc(c.nombre || c.ref)}</b> <span class="muted small">${fechaCorta(c.creado)}</span><br><span class="small">${esc(c.resumen)}${c.deshecho ? " · deshecho" : ""}</span></div>
+        ${c.deshacer ? `<button class="btn btn-ghost btn-sm" data-undo="${c.id}">Deshacer</button>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía no hay cambios anotados.</p>';
+    box.querySelectorAll("[data-undo]").forEach((b) => (b.onclick = async () => {
+      if (b.dataset.ok !== "1") { b.dataset.ok = "1"; b.textContent = "¿Seguro? Tocá de nuevo"; return; }
+      b.disabled = true;
+      try { await api("cambios", { method: "POST", body: { id: b.dataset.undo } }); toast("Listo, se deshizo el cambio."); productos = (await api("productos")).productos; verActividad(); }
+      catch (x) { toast(x.message); b.disabled = false; }
+    }));
   }
 
   // Achica la foto en el celular antes de subirla (máx. 1600 px, JPG).

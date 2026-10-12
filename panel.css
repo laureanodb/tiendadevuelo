@@ -133,3 +133,29 @@ body.panel { background: var(--bg-2); }
 .p-cart-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .p-cart-row:last-child { border-bottom: 0; }
 .p-cart-row > div:first-child { min-width: 0; flex: 1 1 240px; }
+.p-hist-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.p-hist-list li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.p-hist-list li:last-child { border-bottom: 0; }
+.p-hist-list li.deshecho { opacity: .55; }
+.p-hist { margin-top: 16px; }
+.p-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.p-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg-col { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
+.lg-prev { width: 14px; height: 0; border-top: 2px solid var(--text); }
+.p-chart-wrap { overflow-x: auto; }
+.p-chart { width: 100%; min-width: 560px; height: auto; display: block; }
+.p-chart .grid { stroke: var(--line); stroke-width: 1; }
+.p-chart .base { stroke: #b8c6d6; stroke-width: 1; }
+.p-chart .ax { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.p-chart .col { fill: var(--accent); }
+.p-chart .prev { stroke: var(--text); stroke-width: 2; stroke-linecap: round; }
+.p-chart .hit { fill: transparent; }
+.p-chart .bar:hover .hit { fill: var(--bg-2); }
+.p-chart .bar:hover .col { fill: var(--accent-2); }
+.p-hbars { display: grid; gap: 8px; }
+.p-hbar { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+.p-hbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-hbar div { height: 12px; }
+.p-hbar i { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.p-hbar b { font-variant-numeric: tabular-nums; font-size: 13px; }
+details summary { cursor: pointer; }

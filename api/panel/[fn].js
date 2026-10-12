@@ -13,6 +13,8 @@ const RUTAS = {
   ajustes: () => import("../_panel/ajustes.js"),
   comprobante: () => import("../_panel/comprobante.js"),
   carritos: () => import("../_panel/carritos.js"),
+  cambios: () => import("../_panel/cambios.js"),
+  ventas: () => import("../_panel/ventas.js"),
 };
 
 export default async function handler(req, res) {

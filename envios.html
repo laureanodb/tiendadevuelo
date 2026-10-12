@@ -57,6 +57,8 @@
       <h2>Si algo llega mal</h2>
       <p>Si el paquete llega dañado, escribinos dentro de las 48 h de recibirlo con fotos del paquete y del producto, y lo resolvemos.</p>
 
+      <div id="mapaBox" hidden><h2>A dónde ya enviamos</h2><p id="mapaTxt"></p><div class="mapa-wrap"><svg id="mapa" role="img" aria-labelledby="mapaTxt"></svg><ol class="mapa-lista" id="mapaLista"></ol></div></div>
+
       <h2>Envíos al exterior</h2>
       <p>Por ahora enviamos solo dentro de Argentina. Si estás en otro país, escribinos y vemos cómo hacerlo.</p>
     </section>
@@ -64,6 +66,23 @@
   <div id="siteFooter"></div>
   <script src="/products.js"></script>
   <script src="/catalogo.js" data-load="/site.js"></script>
+  <script src="/mapa-ar.js"></script>
+  <script>
+    // Mapa de envíos: un punto por provincia, más grande cuantos más pedidos. Aparece cuando hay datos suficientes.
+    fetch("/api/envios").then((r) => r.json()).then(({ provincias }) => {
+      const M = window.MAPA_AR, e = Object.entries(provincias || {}).filter(([k]) => M.provincias[k]).sort((a, b) => b[1] - a[1]);
+      const total = e.reduce((s, x) => s + x[1], 0);
+      if (e.length < 3 || total < 10) return;
+      const max = e[0][1], r = (n) => 4 + Math.sqrt(n / max) * 14;
+      const svg = document.getElementById("mapa");
+      svg.setAttribute("viewBox", `-12 -12 ${M.ancho + 24} ${M.alto + 24}`);
+      svg.innerHTML = `<path d="${M.contorno}" class="mapa-pais"/>` + e.slice().reverse().map(([k, n]) => { const [x, y] = M.provincias[k];
+        return `<g class="mapa-punto"><title>${k}: ${n} ${n === 1 ? "pedido" : "pedidos"}</title><circle cx="${x}" cy="${y}" r="${r(n) + 6}" class="hit"/><circle cx="${x}" cy="${y}" r="${r(n)}"/></g>`; }).join("");
+      document.getElementById("mapaTxt").textContent = `Pilotos de ${e.length} provincias ya recibieron su pedido. Los puntos más grandes son donde más enviamos.`;
+      document.getElementById("mapaLista").innerHTML = e.slice(0, 8).map(([k, n]) => `<li><span>${k}</span><b>${n}</b></li>`).join("");
+      document.getElementById("mapaBox").hidden = false;
+    }).catch(() => {});
+  </script>
   
   <script defer src="/_vercel/insights/script.js"></script>
 </body>

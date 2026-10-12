@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pilot shop en Buenos Aires: retiro en CABA y envío en el día · Tienda de Vuelo</title>
+  <meta name="description" content="Pilot shop en Buenos Aires: auriculares, GPS, kneeboards y accesorios para pilotos. Retiro en CABA, envío en el día en la Ciudad y a todo el país en 48 h.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/pilot-shop-buenos-aires">
+  <meta property="og:title" content="Pilot shop en Buenos Aires: retiro en CABA y envío en el día · Tienda de Vuelo">
+  <meta property="og:description" content="Pilot shop en Buenos Aires: auriculares, GPS, kneeboards y accesorios para pilotos. Retiro en CABA, envío en el día en la Ciudad y a todo el país en 48 h.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "¿Dónde queda Tienda de Vuelo?", "acceptedAnswer": {"@type": "Answer", "text": "Estamos en la Ciudad de Buenos Aires. Coordinamos el retiro por WhatsApp, con día y horario."}}, {"@type": "Question", "name": "¿Hacen envíos en el día en CABA?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Si el pedido se confirma temprano, en CABA puede llegar el mismo día. Al resto del país despachamos en 48 horas hábiles."}}, {"@type": "Question", "name": "¿Cómo se paga?", "acceptedAnswer": {"@type": "Answer", "text": "Transferencia, efectivo al retirar, dólares o cripto. No trabajamos con cuotas."}}]}</script>
+</head>
+<body data-page="buenos-aires" data-wa="¡Hola! Quería hacerles una consulta.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Buenos Aires</span>
+      <h1>Pilot shop en Buenos Aires</h1>
+      <p>Auriculares, navegación, aviónica y accesorios para pilotos y tripulantes, con retiro en CABA, envío en el día dentro de la Ciudad y despacho a todo el país en 48 horas hábiles.</p>
+      <div class="cta-row"><a class="btn btn-primary" href="/#catalogo">Ver el catálogo</a><a class="btn btn-wa" href="https://wa.me/5491133586360?text=%C2%A1Hola!%20Quiero%20coordinar%20un%20retiro%20en%20CABA." target="_blank" rel="noopener">Coordinar un retiro</a></div>
+    </div></section>
+    <article class="wrap narrow prose guide">
+      <h2>Cómo comprar</h2>
+      <ul class="check">
+        <li><b>Elegí en la web</b> y mandá el pedido por WhatsApp: te confirmamos stock, envío y forma de pago.</li>
+        <li><b>Retiro en CABA</b> con día y horario que elegís al hacer el pedido.</li>
+        <li><b>Envío en el día</b> dentro de la Ciudad, en franja de mañana o de tarde.</li>
+        <li><b>Todo el país:</b> despacho en 48 horas hábiles con seguimiento.</li>
+      </ul>
+      <h2>Por qué comprarnos</h2>
+      <ul>
+        <li>Más de 2.500 ventas a pilotos, alumnos y tripulantes.</li>
+        <li>Garantía oficial del fabricante y ayuda real para elegir.</li>
+        <li>Precios en dólares y en pesos al dólar oficial del día.</li>
+      </ul>
+    </article>
+    <section class="section wrap" data-sec><div class="row-head"><h2>Lo más elegido</h2><a class="more" href="/#catalogo">Ver todo →</a></div><div class="grid" data-grid="top" data-max="8"></div></section>
+    <article class="wrap narrow prose guide">
+      <h2>Preguntas frecuentes</h2>
+      <div class="faq"><details><summary>¿Dónde queda Tienda de Vuelo?</summary><p>Estamos en la Ciudad de Buenos Aires. Coordinamos el retiro por WhatsApp, con día y horario.</p></details><details><summary>¿Hacen envíos en el día en CABA?</summary><p>Sí. Si el pedido se confirma temprano, en CABA puede llegar el mismo día. Al resto del país despachamos en 48 horas hábiles.</p></details><details><summary>¿Cómo se paga?</summary><p>Transferencia, efectivo al retirar, dólares o cripto. No trabajamos con cuotas.</p></details></div>
+    </article>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const FILTROS = { top: (p) => p.top || p.destacado };
+      const { card, pesos } = window.TDV;
+      const vis = PRODUCTS.filter((p) => !p.agotado);
+      document.querySelectorAll("[data-grid]").forEach((g) => {
+        const f = FILTROS[g.dataset.grid];
+        const ps = vis.filter(f).slice(0, Number(g.dataset.max) || 8);
+        g.innerHTML = ps.map(card).join("");
+        const sec = g.closest("[data-sec]"); if (sec && !ps.length) sec.hidden = true;
+      });
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

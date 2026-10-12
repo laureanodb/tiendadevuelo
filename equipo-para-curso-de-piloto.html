@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equipo para el curso de piloto privado · Tienda de Vuelo</title>
+  <meta name="description" content="Qué necesitás para el curso de piloto privado en Argentina: auricular, kneeboard, E6B, plotter, cartas y libro de vuelo. Lista por etapa y kits con descuento.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/equipo-para-curso-de-piloto">
+  <meta property="og:title" content="Equipo para el curso de piloto privado · Tienda de Vuelo">
+  <meta property="og:description" content="Qué necesitás para el curso de piloto privado en Argentina: auricular, kneeboard, E6B, plotter, cartas y libro de vuelo. Lista por etapa y kits con descuento.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "¿Qué necesito para empezar el curso de piloto privado?", "acceptedAnswer": {"@type": "Answer", "text": "Para las primeras clases: auricular (si la escuela no presta), kneeboard, libro de vuelo y lápices. Cuando empezás a navegar se suman la computadora E6B, el plotter y las cartas."}}, {"@type": "Question", "name": "¿Es obligatorio tener auricular propio?", "acceptedAnswer": {"@type": "Answer", "text": "No siempre: muchas escuelas prestan. Igual conviene tener uno: se ajusta a tu cabeza, es más higiénico y te acostumbrás a la radio con el mismo equipo."}}, {"@type": "Question", "name": "¿Conviene una E6B de aluminio o una electrónica?", "acceptedAnswer": {"@type": "Answer", "text": "La de aluminio es la que se usa en los exámenes y no necesita pilas. La electrónica es más rápida, pero conviene aprender primero con la manual."}}, {"@type": "Question", "name": "¿Tienen un kit armado?", "acceptedAnswer": {"@type": "Answer", "text": "Sí: el kit del alumno junta lo básico con descuento."}}]}</script>
+</head>
+<body data-page="curso" data-wa="¡Hola! Estoy por empezar el curso de piloto y quiero armar mi equipo.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Curso de piloto</span>
+      <h1>Equipo para el curso de piloto privado</h1>
+      <p>Qué comprar en cada etapa del curso, qué puede esperar y qué conviene tener desde el primer día. Revisalo con tu instructor: cada escuela tiene sus reglas.</p>
+      <div class="cta-row"><a class="btn btn-primary" href="/#kits">Ver kits con descuento</a><a class="btn btn-ghost" href="/guia-primer-vuelo">Qué llevar a tu primer vuelo</a></div>
+    </div></section>
+    <article class="wrap narrow prose guide">
+      <h2>Desde la primera clase</h2>
+      <ul class="check">
+        <li><b>Libro de vuelo:</b> registrá todo desde la primera hora.</li>
+        <li><b>Kneeboard:</b> para el checklist, las frecuencias y anotar autorizaciones.</li>
+        <li><b>Auricular:</b> un pasivo alcanza para empezar.</li>
+      </ul>
+      <h2>Cuando empezás a navegar</h2>
+      <ul class="check">
+        <li><b>Computadora de vuelo E6B:</b> viento, rumbo, tiempo y combustible.</li>
+        <li><b>Plotter:</b> para trazar las rutas en la carta.</li>
+        <li><b>Cartas aeronáuticas</b> vigentes de tu zona.</li>
+      </ul>
+      <h2>Para estudiar</h2>
+      <ul class="check"><li><b>Manual del piloto privado</b> y preguntas de práctica para el examen teórico.</li></ul>
+    </article>
+    <section class="section wrap" data-sec><div class="row-head"><h2>Lo que usan los alumnos</h2><a class="more" href="/#catalogo">Ver todo →</a></div><div class="grid" data-grid="alumno" data-max="8"></div></section>
+    <article class="wrap narrow prose guide">
+      <h2>Preguntas frecuentes</h2>
+      <div class="faq"><details><summary>¿Qué necesito para empezar el curso de piloto privado?</summary><p>Para las primeras clases: auricular (si la escuela no presta), kneeboard, libro de vuelo y lápices. Cuando empezás a navegar se suman la computadora E6B, el plotter y las cartas.</p></details><details><summary>¿Es obligatorio tener auricular propio?</summary><p>No siempre: muchas escuelas prestan. Igual conviene tener uno: se ajusta a tu cabeza, es más higiénico y te acostumbrás a la radio con el mismo equipo.</p></details><details><summary>¿Conviene una E6B de aluminio o una electrónica?</summary><p>La de aluminio es la que se usa en los exámenes y no necesita pilas. La electrónica es más rápida, pero conviene aprender primero con la manual.</p></details><details><summary>¿Tienen un kit armado?</summary><p>Sí: el kit del alumno junta lo básico con descuento.</p></details></div>
+    </article>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const FILTROS = { alumno: (p) => (p.etapas || []).includes("alumno") };
+      const { card, pesos } = window.TDV;
+      const vis = PRODUCTS.filter((p) => !p.agotado);
+      document.querySelectorAll("[data-grid]").forEach((g) => {
+        const f = FILTROS[g.dataset.grid];
+        const ps = vis.filter(f).slice(0, Number(g.dataset.max) || 8);
+        g.innerHTML = ps.map(card).join("");
+        const sec = g.closest("[data-sec]"); if (sec && !ps.length) sec.hidden = true;
+      });
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

@@ -655,3 +655,13 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
 .quote-foot { border-top: 1px solid var(--line); padding-top: 10px; color: var(--muted); font-size: 12px; text-align: center; }
 @media (max-width: 560px) { .ps-form { grid-template-columns: 1fr; } .quote { padding: 16px; } .quote-num { text-align: left; } }
 @media print { .quote { border: 0; padding: 0; } .table-wrap { border: 0; } body[data-page="presupuesto"] .page-hero { display: none; } }
+/* Mapa de envíos */
+.mapa-wrap { display: grid; grid-template-columns: minmax(0, 260px) 1fr; gap: 24px; align-items: start; margin: 8px 0 24px; }
+#mapa { width: 100%; height: auto; }
+.mapa-pais { fill: var(--bg-2); stroke: #9ccbf0; stroke-width: 1.2; stroke-linejoin: round; }
+.mapa-punto circle { fill: var(--accent); fill-opacity: .85; stroke: #fff; stroke-width: 2; }
+.mapa-punto circle.hit { fill: transparent; stroke: none; }
+.mapa-punto:hover circle:not(.hit) { fill: var(--accent-2); fill-opacity: 1; }
+.mapa-lista { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.mapa-lista li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .mapa-wrap { grid-template-columns: 1fr; } #mapa { max-width: 240px; margin: 0 auto; } }

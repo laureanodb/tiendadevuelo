@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Regalos para pilotos: ideas por presupuesto · Tienda de Vuelo</title>
+  <meta name="description" content="Ideas de regalos para pilotos, alumnos y tripulantes en Argentina, ordenadas por presupuesto y ocasión. Envío a todo el país.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/regalos-para-pilotos">
+  <meta property="og:title" content="Regalos para pilotos: ideas por presupuesto · Tienda de Vuelo">
+  <meta property="og:description" content="Ideas de regalos para pilotos, alumnos y tripulantes en Argentina, ordenadas por presupuesto y ocasión. Envío a todo el país.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "¿Qué le regalo a un alumno piloto?", "acceptedAnswer": {"@type": "Answer", "text": "Algo que va a usar en cada clase: un kneeboard, una computadora E6B, un libro de vuelo o, si todavía no tiene, un auricular. Si no sabés qué tiene, pedile su lista de deseos."}}, {"@type": "Question", "name": "¿Qué regalar para el primer vuelo solo o la licencia?", "acceptedAnswer": {"@type": "Answer", "text": "Las alas de piloto, un llavero Remove Before Flight o un libro de vuelo nuevo son clásicos. Si querés algo grande, un auricular con cancelación de ruido."}}, {"@type": "Question", "name": "¿Pueden enviarlo directamente a la persona?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Lo mandamos a todo el país y en CABA puede llegar en el día. Avisanos que es un regalo y no ponemos el precio."}}, {"@type": "Question", "name": "¿Y si no sé qué tiene?", "acceptedAnswer": {"@type": "Answer", "text": "Mandale un regalo con link desde cualquier producto, o pedile que te comparta su lista de deseos de la tienda."}}]}</script>
+</head>
+<body data-page="regalos" data-wa="¡Hola! Quiero regalarle algo a un piloto.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Regalos</span>
+      <h1>Regalos para pilotos</h1>
+      <p>Ideas por presupuesto y por ocasión: primer vuelo solo, licencia, cumpleaños o el día del egreso. Envío a todo el país y en el día en CABA.</p>
+    </div></section>
+    <section class="section wrap" data-sec><div class="row-head"><h2>Hasta $50.000</h2></div><div class="grid" data-grid="r1"></div></section>
+    <section class="section wrap" data-sec><div class="row-head"><h2>De $50.000 a $150.000</h2></div><div class="grid" data-grid="r2"></div></section>
+    <section class="section wrap" data-sec><div class="row-head"><h2>Para un regalo grande</h2></div><div class="grid" data-grid="r3" data-max="4"></div></section>
+    <article class="wrap narrow prose guide">
+      <h2>Ideas por ocasión</h2>
+      <ul class="check">
+        <li><b>Empieza el curso:</b> kneeboard, libro de vuelo y E6B. Son las tres cosas que va a usar desde la primera semana.</li>
+        <li><b>Primer vuelo solo:</b> un llavero Remove Before Flight o unas alas. Es una fecha que no se olvida.</li>
+        <li><b>Licencia de piloto privado:</b> un auricular mejor, una flight bag o un GPS para sus primeras travesías.</li>
+        <li><b>Tripulante de cabina:</b> alas plateadas, linterna o un set de viaje.</li>
+      </ul>
+      <h2>Para acertar sin preguntar</h2>
+      <ul>
+        <li>Pedile que te mande su <b>lista de deseos</b>: en la tienda, cada piloto puede guardar favoritos y compartirlos.</li>
+        <li>O mandale un <b>regalo con link</b>: elegís el producto, escribís un mensaje y le llega como sorpresa.</li>
+      </ul>
+      <h2>Preguntas frecuentes</h2>
+      <div class="faq"><details><summary>¿Qué le regalo a un alumno piloto?</summary><p>Algo que va a usar en cada clase: un kneeboard, una computadora E6B, un libro de vuelo o, si todavía no tiene, un auricular. Si no sabés qué tiene, pedile su lista de deseos.</p></details><details><summary>¿Qué regalar para el primer vuelo solo o la licencia?</summary><p>Las alas de piloto, un llavero Remove Before Flight o un libro de vuelo nuevo son clásicos. Si querés algo grande, un auricular con cancelación de ruido.</p></details><details><summary>¿Pueden enviarlo directamente a la persona?</summary><p>Sí. Lo mandamos a todo el país y en CABA puede llegar en el día. Avisanos que es un regalo y no ponemos el precio.</p></details><details><summary>¿Y si no sé qué tiene?</summary><p>Mandale un regalo con link desde cualquier producto, o pedile que te comparta su lista de deseos de la tienda.</p></details></div>
+    </article>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const FILTROS = { r1: (p) => pesos(p) !== null && pesos(p) <= 50000, r2: (p) => pesos(p) > 50000 && pesos(p) <= 150000, r3: (p) => pesos(p) > 150000 };
+      const { card, pesos } = window.TDV;
+      const vis = PRODUCTS.filter((p) => !p.agotado);
+      document.querySelectorAll("[data-grid]").forEach((g) => {
+        const f = FILTROS[g.dataset.grid];
+        const ps = vis.filter(f).sort((a, b) => (b.regalo ? 1 : 0) - (a.regalo ? 1 : 0) || pesos(a) - pesos(b)).slice(0, Number(g.dataset.max) || 8);
+        g.innerHTML = ps.map(card).join("");
+        const sec = g.closest("[data-sec]"); if (sec && !ps.length) sec.hidden = true;
+      });
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

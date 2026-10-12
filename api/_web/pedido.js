@@ -1,6 +1,7 @@
 // La web guarda cada pedido al mandarlo por WhatsApp, para verlo en el panel y que el cliente lo siga.
 import { DB_URL, body, ensureSchema, permitido, q, send, telWa } from "../_lib.js";
 
+const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
 const s = (v, n = 200) => String(v ?? "").trim().slice(0, n);
 const n = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Math.max(0, Number(v)));
 
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
     const num = s(b.num, 24), token = s(b.token, 24);
     if (!/^TDV-\d{6}-\d{3,5}$/.test(num) || !/^[a-z0-9]{8,24}$/.test(token)) return send(res, 400, { error: "datos" });
     const c = b.cliente || {};
-    const cliente = { nombre: s(c.nombre, 80), tel: s(c.tel, 30), dni: s(c.dni, 20), entrega: s(c.entrega, 40), franja: s(c.franja, 40), dir: s(c.dir, 200), notas: s(c.notas, 500) };
+    const cliente = { nombre: s(c.nombre, 80), tel: s(c.tel, 30), dni: s(c.dni, 20), entrega: s(c.entrega, 40), franja: s(c.franja, 40), dir: s(c.dir, 200), notas: s(c.notas, 500), provincia: PROVINCIAS.includes(c.provincia) ? c.provincia : "" };
     if (!cliente.nombre || !cliente.tel) return send(res, 400, { error: "datos" });
     const items = (Array.isArray(b.items) ? b.items : []).slice(0, 40).map((i) => ({
       id: s(i.id, 80), kit: s(i.kit, 80), name: s(i.name, 120), sub: s(i.sub, 300), qty: Math.min(99, Math.max(1, parseInt(i.qty) || 1)),

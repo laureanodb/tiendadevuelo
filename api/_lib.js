@@ -99,9 +99,13 @@ export function ensureSchema() {
       nombre text not null default '', tel text not null default '', items jsonb not null default '[]', total numeric,
       estado text not null default 'abierto'
     )`);
+    await q(`create table if not exists tdv_cambios (
+      id bigserial primary key, creado timestamptz not null default now(), tipo text not null, ref text not null default '',
+      nombre text not null default '', resumen text not null default '', antes jsonb, deshecho boolean not null default false
+    )`);
     await q(`create table if not exists tdv_limites (id bigserial primary key, clave text not null, creado timestamptz not null default now())`);
     await q(`create index if not exists tdv_limites_clave on tdv_limites (clave, creado)`);
-    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites"]) await q(`alter table ${t} enable row level security`).catch(() => {});
+    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       for (const [id, pub] of [["productos", true], ["comprobantes", false]]) {
         await fetch(`${SUPA_URL}/storage/v1/bucket`, {
@@ -232,6 +236,20 @@ export async function ajuste(clave, def = {}) {
 }
 export async function guardarAjuste(clave, valor) {
   await q("insert into tdv_ajustes (clave, valor) values ($1, $2) on conflict (clave) do update set valor = excluded.valor", [clave, JSON.stringify(valor)]);
+}
+
+// ---------- Historial de cambios (con opción de deshacer) ----------
+export async function anotar(tipo, ref, nombre, resumen, antes = null) {
+  await q("insert into tdv_cambios (tipo, ref, nombre, resumen, antes) values ($1, $2, $3, $4, $5)",
+    [tipo, String(ref).slice(0, 120), String(nombre).slice(0, 160), String(resumen).slice(0, 400), antes === null ? null : JSON.stringify(antes)]);
+  if (Math.random() < 0.05) q("delete from tdv_cambios where creado < now() - interval '180 days'").catch(() => {});
+}
+// Vuelve a guardar un producto tal como estaba (fila completa guardada en el historial)
+export async function restaurarProducto(r) {
+  const cols = Object.keys(r).filter((k) => k !== "id");
+  const val = (c) => (c === "docs" ? JSON.stringify(r[c] ?? []) : r[c]);
+  await q(`insert into tdv_productos (id, ${cols.join(", ")}) values ($1, ${cols.map((_, i) => "$" + (i + 2)).join(", ")})
+    on conflict (id) do update set ${cols.map((c) => `${c} = excluded.${c}`).join(", ")}`, [r.id, ...cols.map(val)]);
 }
 
 // ---------- Pedidos y clientes ----------

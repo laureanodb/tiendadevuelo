@@ -29,6 +29,10 @@
     {
       "source": "/carrito",
       "destination": "/"
+    },
+    {
+      "source": "/catalogo.csv",
+      "destination": "/api/catalogo"
     }
   ],
   "redirects": [
