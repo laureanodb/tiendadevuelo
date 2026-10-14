@@ -100,12 +100,31 @@
     "api/[fn].js": {
       "includeFiles": "products.js",
       "maxDuration": 60
+    },
+    "api/panel/[fn].js": {
+      "includeFiles": "products.js",
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/resumen",
       "schedule": "0 23 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw-panel.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/panel"
+        }
+      ]
     }
   ]
 }

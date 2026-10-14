@@ -7,6 +7,10 @@
   <title>Panel · Tienda de Vuelo</title>
   <meta name="theme-color" content="#0c2340">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/panel.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Panel TDV">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -31,5 +35,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/products.js"></script>
   <script src="/panel.js"></script>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw-panel.js", { scope: "/panel" }).catch(() => {});</script>
 </body>
 </html>

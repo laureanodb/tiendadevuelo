@@ -1,0 +1,16 @@
+{
+  "name": "Panel · Tienda de Vuelo",
+  "short_name": "Panel TDV",
+  "description": "Pedidos, productos y ventas de Tienda de Vuelo.",
+  "start_url": "/panel",
+  "scope": "/panel",
+  "display": "standalone",
+  "background_color": "#f2f8fe",
+  "theme_color": "#0c2340",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "/icons/panel-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/panel-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/panel-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

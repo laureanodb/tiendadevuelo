@@ -163,3 +163,11 @@ details summary { cursor: pointer; }
 .p-gasto { display: grid; grid-template-columns: 140px 1fr 140px 120px 76px auto; gap: 8px; margin: 12px 0; }
 .p-gasto input, .p-gasto select { min-width: 0; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--line); font: inherit; background: #fff; }
 @media (max-width: 760px) { .p-gasto { grid-template-columns: 1fr 1fr; } .p-gasto #gConcepto { grid-column: 1 / -1; } }
+.p-scan { position: fixed; inset: 0; z-index: 80; background: rgba(12, 35, 64, .85); display: grid; place-items: center; padding: 16px; }
+.p-scan-box { position: relative; width: min(420px, 100%); background: #fff; border-radius: 18px; padding: 14px; display: grid; gap: 10px; text-align: center; }
+.p-scan-box video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: #0c2340; }
+.p-scan-line { position: absolute; left: 24px; right: 24px; top: calc(14px + (100% - 28px) * 0); height: 0; }
+.p-scan-box p { margin: 0; color: var(--muted); font-size: 14px; }
+.p-scan-man { display: flex; gap: 8px; }
+.p-scan-man input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--line); font: inherit; }
+.p-switch.small { font-size: 14px !important; }

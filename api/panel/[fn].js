@@ -16,6 +16,8 @@ const RUTAS = {
   cambios: () => import("../_panel/cambios.js"),
   ventas: () => import("../_panel/ventas.js"),
   gastos: () => import("../_panel/gastos.js"),
+  usuarios: () => import("../_panel/usuarios.js"),
+  ia: () => import("../_panel/ia.js"),
 };
 
 export default async function handler(req, res) {

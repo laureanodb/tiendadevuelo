@@ -51,6 +51,7 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists oficial boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
+    await q(`alter table tdv_productos add column if not exists codigo text not null default ''`);
     await q(`alter table tdv_productos add column if not exists liquidacion boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists alquiler_moneda text not null default 'ARS'`);
     await q(`create table if not exists tdv_resenas (
@@ -147,7 +148,7 @@ export function fromRow(r, admin = false) {
     return p;
   }
   return { ...p, llega: r.llega ? new Date(r.llega).toISOString().slice(0, 10) : null, antes: num(r.antes), ofertaHasta: r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
-    visible: r.visible, proveedor: r.proveedor, notas: r.notas, orden: r.orden, actualizado: r.actualizado };
+    visible: r.visible, proveedor: r.proveedor, notas: r.notas, codigo: r.codigo || "", orden: r.orden, actualizado: r.actualizado };
 }
 
 const str = (v, max = 300) => String(v ?? "").trim().slice(0, max);
@@ -169,7 +170,7 @@ export function toRow(p) {
     llega: /^\d{4}-\d{2}-\d{2}$/.test(String(p.llega || "")) ? p.llega : null,
     oficial: !!p.oficial, alquiler: money(p.alquiler), alquiler_moneda: p.alquilerMoneda === "USD" ? "USD" : "ARS",
     docs: JSON.stringify((Array.isArray(p.docs) ? p.docs : []).filter((d) => d && /^https:\/\//.test(String(d.url)) || /^http:\/\/localhost[:/]/.test(String(d && d.url))).slice(0, 6).map((d) => ({ nombre: str(d.nombre, 80) || "Documento", url: str(d.url, 400) }))),
-    visible: p.visible !== false, proveedor: str(p.proveedor, 120), notas: str(p.notas, 1000), orden: int(p.orden) ?? 0,
+    visible: p.visible !== false, codigo: str(p.codigo, 40).replace(/[^\w-]/g, ""), proveedor: str(p.proveedor, 120), notas: str(p.notas, 1000), orden: int(p.orden) ?? 0,
   };
 }
 
@@ -212,26 +213,51 @@ export async function permitido(req, tipo, max, minutos = 60) {
 
 // ---------- Acceso al panel ----------
 const COOKIE = "tdv_panel";
-const firma = (exp) => crypto.createHmac("sha256", "tdv-panel:" + CLAVE).update(String(exp)).digest("hex");
+const firma = (datos) => crypto.createHmac("sha256", "tdv-panel:" + CLAVE).update(String(datos)).digest("hex");
 export const claveLista = () => CLAVE.length >= 6;
 export function claveCorrecta(intento) {
   const a = crypto.createHash("sha256").update(String(intento ?? "")).digest();
   const b = crypto.createHash("sha256").update(CLAVE).digest();
   return claveLista() && crypto.timingSafeEqual(a, b);
 }
-export function abrirSesion(res) {
+// Sesión: "vencimiento.usuario.firma". usuario "dueno" es quien tiene PANEL_CLAVE; el resto son ayudantes.
+export function abrirSesion(res, usuario = "dueno") {
   const exp = Date.now() + 30 * 24 * 3600 * 1000;
-  res.setHeader("Set-Cookie", `${COOKIE}=${exp}.${firma(exp)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${30 * 24 * 3600}`);
+  const u = String(usuario).replace(/[^a-z0-9]/g, "");
+  res.setHeader("Set-Cookie", `${COOKIE}=${exp}.${u}.${firma(exp + "." + u)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${30 * 24 * 3600}`);
 }
 export function cerrarSesion(res) { res.setHeader("Set-Cookie", `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`); }
-export function conSesion(req) {
-  if (!claveLista()) return false;
+function leerCookie(req) {
+  if (!claveLista()) return null;
   const c = String(req.headers.cookie || "").split(/;\s*/).find((x) => x.startsWith(COOKIE + "="));
-  if (!c) return false;
-  const [exp, sig] = c.slice(COOKIE.length + 1).split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const ok = firma(exp);
-  return sig.length === ok.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(ok));
+  if (!c) return null;
+  const partes = c.slice(COOKIE.length + 1).split(".");
+  // Formato viejo (vencimiento.firma) = dueño
+  const [exp, u, sig] = partes.length === 2 ? [partes[0], null, partes[1]] : partes;
+  if (!exp || !sig || Number(exp) < Date.now()) return null;
+  const ok = firma(u === null ? exp : exp + "." + u);
+  if (sig.length !== ok.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(ok))) return null;
+  return u === null ? "dueno" : u;
+}
+export const conSesion = (req) => !!leerCookie(req);
+// Quién entró: { id, nombre, dueno }. Los ayudantes tienen que seguir existiendo (si los borrás, pierden el acceso).
+export async function quien(req) {
+  const u = leerCookie(req);
+  if (!u) return null;
+  if (u === "dueno") return { id: "dueno", nombre: "Dueño", dueno: true };
+  const lista = await ajuste("usuarios", []);
+  const x = (Array.isArray(lista) ? lista : []).find((y) => y.id === u);
+  return x ? { id: x.id, nombre: x.nombre, dueno: false } : null;
+}
+export const hashClave = (clave, sal = crypto.randomBytes(16).toString("hex")) => sal + ":" + crypto.scryptSync(String(clave), sal, 32).toString("hex");
+export function claveDeUsuario(clave, lista) {
+  for (const u of Array.isArray(lista) ? lista : []) {
+    const [sal, h] = String(u.hash || "").split(":");
+    if (!sal || !h) continue;
+    const a = Buffer.from(hashClave(clave, sal).split(":")[1], "hex"), b = Buffer.from(h, "hex");
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return u;
+  }
+  return null;
 }
 
 // ---------- Utilidades de respuesta ----------
@@ -257,9 +283,9 @@ export async function avisar(texto) {
 }
 
 // ---------- Historial de cambios (con opción de deshacer) ----------
-export async function anotar(tipo, ref, nombre, resumen, antes = null) {
+export async function anotar(tipo, ref, nombre, resumen, antes = null, quien = null) {
   await q("insert into tdv_cambios (tipo, ref, nombre, resumen, antes) values ($1, $2, $3, $4, $5)",
-    [tipo, String(ref).slice(0, 120), String(nombre).slice(0, 160), String(resumen).slice(0, 400), antes === null ? null : JSON.stringify(antes)]);
+    [tipo, String(ref).slice(0, 120), String(nombre).slice(0, 160), (quien && !quien.dueno ? `[${quien.nombre}] ` : "") + String(resumen).slice(0, 400), antes === null ? null : JSON.stringify(antes)]);
   if (Math.random() < 0.05) q("delete from tdv_cambios where creado < now() - interval '180 days'").catch(() => {});
 }
 // Vuelve a guardar un producto tal como estaba (fila completa guardada en el historial)
@@ -323,8 +349,8 @@ export function send(res, code, data) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.status(code).send(JSON.stringify(data));
 }
-// Envuelve una función del panel: exige configuración, sesión y JSON.
-export function panel(fn) {
+// Envuelve una función del panel: exige configuración, sesión y JSON. soloDueno = los ayudantes no entran.
+export function panel(fn, { soloDueno = false } = {}) {
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Robots-Tag", "noindex");
@@ -332,7 +358,13 @@ export function panel(fn) {
     if (!claveLista()) return send(res, 503, { error: "falta_clave", mensaje: "Falta crear la clave del panel (PANEL_CLAVE) en Vercel." });
     if (!conSesion(req)) return send(res, 401, { error: "sin_sesion", mensaje: "Ingresá con tu clave." });
     if (req.method !== "GET" && !String(req.headers["content-type"] || "").includes("application/json")) return send(res, 415, { error: "formato" });
-    try { await ensureSchema(); await fn(req, res); }
+    try {
+      await ensureSchema();
+      req.usuario = await quien(req);
+      if (!req.usuario) return send(res, 401, { error: "sin_sesion", mensaje: "Ingresá con tu clave." });
+      if (soloDueno && !req.usuario.dueno) return send(res, 403, { error: "permiso", mensaje: "Esto lo puede ver solo el dueño de la tienda." });
+      await fn(req, res);
+    }
     catch (e) { console.error(e); send(res, 500, { error: "interno", mensaje: e.message || "Error inesperado" }); }
   };
 }

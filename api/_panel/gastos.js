@@ -19,4 +19,4 @@ export default panel(async (req, res) => {
   await q("insert into tdv_gastos (fecha, concepto, categoria, monto, moneda) values ($1, $2, $3, $4, $5)",
     [fecha, concepto, CATEGORIAS.includes(b.categoria) ? b.categoria : "Otros", monto, b.moneda === "USD" ? "USD" : "ARS"]);
   send(res, 200, { ok: true });
-});
+}, { soloDueno: true });

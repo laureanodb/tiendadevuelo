@@ -5,6 +5,7 @@
   const ars = (n) => "$" + Math.round(n).toLocaleString("es-AR");
   const usd = (n) => "US$ " + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 });
   let productos = [], estado = {}, filtro = "Todos", busca = "", dolar = 1500;
+  const esDueno = () => !estado.usuario || estado.usuario.dueno;
 
   // El mismo dólar que usa la web (se elige en Ajustes)
   async function cargarDolar() {
@@ -40,6 +41,7 @@
     if (!estado.base || !estado.clave) return configurar();
     if (!estado.sesion) return login();
     document.getElementById("salir").hidden = false;
+    if (estado.usuario && !estado.usuario.dueno) document.getElementById("salir").textContent = `Salir (${estado.usuario.nombre})`;
     await cargar();
   }
 
@@ -73,8 +75,10 @@
       const err = document.getElementById("loginError");
       err.hidden = true;
       try {
-        await api("sesion", { method: "POST", body: { clave: document.getElementById("clave").value } });
+        const s = await api("sesion", { method: "POST", body: { clave: document.getElementById("clave").value } });
+        estado = { ...estado, ...s };
         document.getElementById("salir").hidden = false;
+        document.getElementById("salir").textContent = estado.usuario && !estado.usuario.dueno ? `Salir (${estado.usuario.nombre})` : "Salir";
         await cargar();
       } catch (x) { err.textContent = x.message; err.hidden = false; }
     };
@@ -93,7 +97,7 @@
 
   // ---------- Pestañas ----------
   const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
-  const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
+  const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.filter(([k]) => esDueno() || !["ventas", "ajustes"].includes(k)).map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
     if (tab === "pedidos") return verPedidos();
@@ -101,8 +105,8 @@
     if (tab === "actividad") return verActividad();
     if (tab === "opiniones") return verOpiniones();
     if (tab === "respuestas") return verRespuestas();
-    if (tab === "ajustes") return verAjustes();
-    if (tab === "ventas") return verVentas();
+    if (tab === "ajustes" && esDueno()) return verAjustes();
+    if (tab === "ventas" && esDueno()) return verVentas();
     lista();
   }
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
@@ -122,14 +126,15 @@
     const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     const pasa = { "Todos": () => true, "En la web": (p) => p.visible, "Ocultos": (p) => !p.visible, "Stock bajo": stockBajo };
     const vis = productos.filter((p) => (pasa[filtro] ? pasa[filtro](p) : p.cat === filtro) &&
-      (!busca || norm([p.name, p.brand, p.model, p.proveedor].join(" ")).includes(norm(busca))));
+      (!busca || norm([p.name, p.brand, p.model, p.proveedor, p.codigo].join(" ")).includes(norm(busca))));
 
     app.innerHTML = tabsHTML("productos") + `
       <div class="p-head">
         <div><h1>Productos</h1>
           <p class="muted">${productos.length} cargados · ${productos.length - ocultos} en la web${ocultos ? ` · ${ocultos} ocultos` : ""}</p></div>
         <div class="p-head-btns">
-          <button class="btn btn-ghost" id="bloque">Cambiar precios</button>
+          <button class="btn btn-ghost" id="escanear">📷 Escanear</button>
+          ${esDueno() ? '<button class="btn btn-ghost" id="bloque">Cambiar precios</button>' : ""}
           <button class="btn btn-primary" id="nuevo">＋ Nuevo producto</button>
         </div>
       </div>
@@ -165,7 +170,14 @@
       try { const d = await api("importar", { method: "POST", body: { productos: PRODUCTS } }); toast(`Listo: ${d.importados} productos cargados`); await cargar(); }
       catch (x) { toast(x.message); $("importar").disabled = false; }
     };
-    $("bloque").onclick = bloque;
+    if ($("bloque")) $("bloque").onclick = bloque;
+    $("escanear").onclick = async () => {
+      const cod = await escanear();
+      if (!cod) return;
+      const p = productos.find((x) => x.codigo === cod);
+      if (p) { toast(`Encontrado: ${p.name}`); editar(p); }
+      else { toast("Ese código no está cargado. Lo cargamos como producto nuevo."); editar(null, { codigo: cod }); }
+    };
     if ($("busca")) $("busca").oninput = (e) => { busca = e.target.value; const pos = e.target.selectionStart; lista(); const b = $("busca"); b.focus(); b.setSelectionRange(pos, pos); };
     app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filtro = b.dataset.f; lista(); }));
     app.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => editar(productos.find((p) => p.id === b.dataset.edit))));
@@ -205,10 +217,10 @@
   }
 
   // ---------- Formulario de producto ----------
-  function editar(p) {
+  function editar(p, extra = {}) {
     const nuevo = !p;
     p = p ? structuredClone(p) : { name: "", brand: "", model: "", cat: CATEGORIES[0], icon: "tag", usd: null, ars: null, costo: null, costoMoneda: "USD",
-      stock: null, stockMin: null, etapas: [], variantes: [], specs: [], desc: "", fotos: [], visible: true, proveedor: "", notas: "" };
+      stock: null, stockMin: null, etapas: [], variantes: [], specs: [], desc: "", fotos: [], visible: true, proveedor: "", notas: "", codigo: "", ...extra };
     const moneda = p.usd !== null ? "USD" : p.ars !== null ? "ARS" : "consultar";
     const precio = p.usd ?? p.ars ?? "";
     let fotos = [...(p.fotos || [])];
@@ -222,8 +234,10 @@
         <section class="p-card">
           <h2>Fotos</h2>
           <div class="p-fotos" id="fotos"></div>
-          ${estado.fotos ? `<label class="btn btn-ghost p-upload">📷 Agregar fotos<input type="file" id="fotoIn" accept="image/*" multiple hidden></label>
-            <p class="muted small">Hasta 8. La primera es la principal. Se achican solas antes de subir.</p>`
+          ${estado.fotos ? `<div class="p-head-btns">${estado.ia ? `<label class="btn btn-primary p-upload">✨ Sacar foto y completar con IA<input type="file" id="iaIn" accept="image/*" capture="environment" hidden></label>` : ""}
+            <label class="btn btn-ghost p-upload">📷 Agregar fotos<input type="file" id="fotoIn" accept="image/*" multiple hidden></label></div>
+            <label class="p-switch small"><input type="checkbox" id="fondoBlanco"${guardado("tdv-fondo") ? " checked" : ""}> Poner fondo blanco a las fotos nuevas (tarda unos segundos)</label>
+            <p class="muted small">Hasta 8. La primera es la principal. Se achican solas antes de subir.${estado.ia ? " Con la IA, sacale una foto al producto y te completa nombre, marca, categoría, descripción y características: revisalos antes de guardar." : ""}</p>`
             : `<p class="muted small">Para subir fotos falta conectar Supabase en Vercel (Storage). Mientras tanto se usa el dibujo.</p>`}
           <label>Dibujo (si no hay fotos)<select id="icon">${Object.keys(ICONS).map((k) => `<option value="${k}"${k === p.icon ? " selected" : ""}>${k}</option>`).join("")}</select></label>
         </section>
@@ -235,8 +249,9 @@
             <label>Marca<input id="brand" maxlength="60" value="${esc(p.brand)}"></label>
             <label>Modelo<input id="model" maxlength="60" value="${esc(p.model)}"></label>
           </div>
+          <label><span>Código de barras <span class="muted">(opcional)</span></span><span class="p-doc"><input id="codigo" maxlength="40" inputmode="numeric" value="${esc(p.codigo || "")}"><button type="button" class="btn btn-ghost btn-sm" id="codScan">📷 Escanear</button></span></label>
           <label>Categoría<select id="cat">${CATEGORIES.map((c) => `<option${c === p.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
-          <label>Descripción corta<textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
+          <label><span>Descripción corta ${estado.ia ? '<button type="button" class="link-btn" id="iaDesc">✨ Redactar con IA</button>' : ""}</span><textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
           <label><span>Características <span class="muted">(una por renglón; para la ficha técnica usá “Atenuación: 24 dB”)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
@@ -253,7 +268,7 @@
             <label><span>Oferta hasta <span class="muted">(vacío = sin fecha)</span></span><input id="ofertaHasta" type="date" value="${esc(p.ofertaHasta || "")}"></label>
           </div>
           <p class="muted small" id="ofertaInfo"></p>
-          <div class="p-grid2">
+          <div class="p-grid2"${esDueno() ? "" : " hidden"}>
             <label><span>Costo <span class="muted">(no se muestra)</span></span><input id="costo" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(p.costo ?? "")}"></label>
             <label>Moneda del costo<select id="costoMoneda"><option value="USD"${p.costoMoneda === "USD" ? " selected" : ""}>Dólares</option><option value="ARS"${p.costoMoneda === "ARS" ? " selected" : ""}>Pesos</option></select></label>
           </div>
@@ -353,13 +368,46 @@
       e.target.value = "";
       for (const [i, f] of files.entries()) {
         toast(`Subiendo foto ${i + 1} de ${files.length}…`);
-        try {
-          const [data, mini] = await Promise.all([achicar(f), achicar(f, 600, 0.8)]);
-          const d = await api("foto", { method: "POST", body: { data, mini, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
-          fotos.push(d.url); renderFotos();
-        } catch (x) { toast(x.message); }
+        try { await subirFoto(f); } catch (x) { toast(x.message); }
       }
       toast("Fotos listas. Acordate de guardar.");
+    };
+    async function subirFoto(f) {
+      let img = f;
+      if ($("fondoBlanco")?.checked) { toast("Poniendo fondo blanco…"); img = await fondoBlanco(f).catch((x) => { toast(x.message); return f; }); }
+      const [data, mini] = await Promise.all([achicar(img), achicar(img, 600, 0.8)]);
+      const d = await api("foto", { method: "POST", body: { data, mini, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
+      fotos.push(d.url); renderFotos(); dirty = true;
+      return data;
+    }
+    if ($("fondoBlanco")) $("fondoBlanco").onchange = (e) => guardar("tdv-fondo", e.target.checked);
+    $("codScan").onclick = async () => { const c = await escanear(); if (c) { $("codigo").value = c; dirty = true; } };
+    if ($("iaDesc")) $("iaDesc").onclick = async () => {
+      const b = $("iaDesc"); b.disabled = true; b.textContent = "Escribiendo…";
+      try {
+        const d = await api("ia", { method: "POST", body: { modo: "texto", producto: { name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, specs: $("specs").value, desc: val("desc") } } });
+        $("desc").value = d.datos.desc.slice(0, 600); dirty = true; toast("Listo. Revisala y ajustala si hace falta.");
+      } catch (x) { toast(x.message); }
+      b.disabled = false; b.textContent = "✨ Redactar con IA";
+    };
+    if ($("iaIn")) $("iaIn").onchange = async (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      toast("Subiendo la foto…");
+      try {
+        const imagen = await subirFoto(f);
+        toast("La IA está mirando la foto…");
+        const { datos: x } = await api("ia", { method: "POST", body: { modo: "foto", imagen, categorias: CATEGORIES } });
+        const poner = (id, v) => { if (v && !val(id)) $(id).value = v; };
+        poner("name", x.name); poner("brand", x.brand); poner("model", x.model); poner("desc", x.desc);
+        if (x.specs?.length && !val("specs")) $("specs").value = x.specs.join("\n");
+        if (nuevo && CATEGORIES.includes(x.cat)) $("cat").value = x.cat;
+        if (nuevo && ICONS[x.icon]) $("icon").value = x.icon;
+        if (nuevo) document.querySelectorAll("[data-etapa]").forEach((c) => (c.checked = (x.etapas || []).includes(c.dataset.etapa)));
+        dirty = true;
+        toast("Listo. Revisá los datos, poné el precio y guardá.");
+        $("name").scrollIntoView({ block: "center" });
+      } catch (x) { toast(x.message); }
     };
 
     const ofertaInfo = () => {
@@ -415,7 +463,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
@@ -890,6 +938,11 @@
         <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
         <p class="muted small">Dejá vacío lo que no uses. Revisá bien el CBU y las direcciones cripto: un error hace que el dinero vaya a otra cuenta.</p>
         <button class="btn btn-primary" type="submit">Guardar datos de pago</button></form>
+      <section class="p-card p-form" id="usuariosBox"><h2>Ayudantes</h2>
+        <p class="muted small">Personas que pueden entrar al panel con su propia clave. Ven productos, pedidos y clientes, pero no costos, ganancias, ventas ni ajustes. Lo que cambian queda anotado con su nombre en el historial.</p>
+        <div id="usuariosLista"><p class="p-loading">Cargando…</p></div>
+        <form class="p-grid2" id="usuarioForm"><label>Nombre<input id="uNom" maxlength="40" required></label><label>Clave <span class="muted">(mínimo 8)</span><input id="uClave" type="password" minlength="8" required autocomplete="new-password"></label>
+          <button class="btn btn-primary" type="submit">Agregar ayudante</button></form></section>
       <section class="p-card p-form"><h2>Catálogo para Instagram, Facebook y WhatsApp</h2>
         <p>Esta dirección tiene todos tus productos con foto y precio, y se actualiza sola:</p>
         <div class="p-doc"><input readonly value="${sitio}/catalogo.csv" id="feedUrl" aria-label="Dirección del catálogo"><button type="button" class="btn btn-ghost btn-sm" id="feedCopy">Copiar</button></div>
@@ -898,6 +951,22 @@
           <li>Moneda: <b>ARS</b>. Listo: vas a poder etiquetar productos en Instagram y Facebook.</li>
           <li>Para WhatsApp: en la app de WhatsApp Business → <b>Herramientas para la empresa</b> → <b>Catálogo</b> → conectá el mismo catálogo de Meta.</li></ol>
         <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al dólar del día.</p></section>`;
+    const pintarUsuarios = async () => {
+      try {
+        const { usuarios } = await api("usuarios");
+        document.getElementById("usuariosLista").innerHTML = usuarios.length ? usuarios.map((u) => `<div class="p-cart-row"><div><b>${esc(u.nombre)}</b> <span class="muted small">desde ${new Date(u.creado).toLocaleDateString("es-AR")}</span></div><button class="btn btn-ghost btn-sm" data-udel="${esc(u.id)}">Quitar acceso</button></div>`).join("") : '<p class="muted">Todavía no agregaste ayudantes.</p>';
+        document.querySelectorAll("[data-udel]").forEach((b) => (b.onclick = async () => {
+          if (b.dataset.ok !== "1") { b.dataset.ok = "1"; b.textContent = "¿Seguro?"; return; }
+          try { await api("usuarios?id=" + b.dataset.udel, { method: "DELETE" }); toast("Listo, ya no puede entrar."); pintarUsuarios(); } catch (x) { toast(x.message); }
+        }));
+      } catch (x) { document.getElementById("usuariosLista").textContent = x.message; }
+    };
+    pintarUsuarios();
+    document.getElementById("usuarioForm").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("usuarios", { method: "POST", body: { nombre: document.getElementById("uNom").value, clave: document.getElementById("uClave").value } }); toast("Ayudante agregado. Pasale la clave en persona."); e.target.reset(); pintarUsuarios(); }
+      catch (x) { toast(x.message); }
+    };
     document.getElementById("feedCopy").onclick = async () => { try { await navigator.clipboard.writeText(document.getElementById("feedUrl").value); toast("Copiado."); } catch { document.getElementById("feedUrl").select(); } };
     const syncDl = () => { document.getElementById("dlManWrap").hidden = document.getElementById("dlTipo").value !== "manual"; };
     document.getElementById("dlTipo").onchange = syncDl; syncDl();
@@ -946,6 +1015,58 @@
       try { await api("cambios", { method: "POST", body: { id: b.dataset.undo } }); toast("Listo, se deshizo el cambio."); productos = (await api("productos")).productos; verActividad(); }
       catch (x) { toast(x.message); b.disabled = false; }
     }));
+  }
+
+  const guardado = (k) => { try { return localStorage.getItem(k) === "1"; } catch { return false; } };
+  const guardar = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch {} };
+  const cargarScript = (src) => new Promise((ok, mal) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => mal(new Error("No se pudo cargar. Revisá la conexión.")); document.head.appendChild(s); });
+
+  // Lee un código de barras con la cámara del celular. Devuelve el código o null.
+  async function escanear() {
+    const m = document.createElement("div");
+    m.className = "p-scan"; m.setAttribute("role", "dialog"); m.setAttribute("aria-label", "Escanear código de barras");
+    m.innerHTML = `<div class="p-scan-box"><video playsinline muted></video><i class="p-scan-line"></i><p>Apuntá al código de barras</p>
+      <div class="p-scan-man"><input placeholder="…o escribilo" inputmode="numeric" aria-label="Código"><button class="btn btn-primary btn-sm">Usar</button></div>
+      <button class="btn btn-ghost btn-sm" data-cerrar>Cancelar</button></div>`;
+    document.body.appendChild(m);
+    const video = m.querySelector("video");
+    let stream = null, fin, lector = null, vivo = true;
+    const resultado = new Promise((ok) => (fin = ok));
+    const cerrar = (cod) => { vivo = false; stream?.getTracks().forEach((t) => t.stop()); lector?.reset?.(); m.remove(); fin(cod ? String(cod).trim() : null); };
+    m.querySelector("[data-cerrar]").onclick = () => cerrar(null);
+    m.querySelector(".p-scan-man button").onclick = () => cerrar(m.querySelector(".p-scan-man input").value || null);
+    try {
+      if ("BarcodeDetector" in window) {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream; await video.play();
+        const det = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code"] });
+        (async function mirar() {
+          if (!vivo) return;
+          try { const r = await det.detect(video); if (r.length) { navigator.vibrate?.(80); return cerrar(r[0].rawValue); } } catch {}
+          setTimeout(mirar, 250);
+        })();
+      } else {
+        if (!window.ZXing) await cargarScript("https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js");
+        lector = new ZXing.BrowserMultiFormatReader();
+        await lector.decodeFromVideoDevice(null, video, (r) => { if (r && vivo) { navigator.vibrate?.(80); cerrar(r.getText()); } });
+      }
+    } catch { m.querySelector("p").textContent = "No se pudo abrir la cámara. Escribí el código abajo."; }
+    return resultado;
+  }
+
+  // Fondo blanco: recorta el producto con un modelo que corre en el celular y lo pone sobre blanco.
+  let quitaFondo = null;
+  async function fondoBlanco(file) {
+    quitaFondo ??= import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm").catch(() => { quitaFondo = null; throw new Error("No se pudo cargar el quitafondos. Se sube la foto como está."); });
+    const { removeBackground } = await quitaFondo;
+    const recorte = await removeBackground(file, { output: { format: "image/png" } });
+    const img = await createImageBitmap(recorte);
+    const pad = Math.round(Math.max(img.width, img.height) * 0.06);
+    const c = document.createElement("canvas");
+    c.width = img.width + pad * 2; c.height = img.height + pad * 2;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, pad, pad);
+    return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.92));
   }
 
   // Achica la foto en el celular antes de subirla (máx. 1600 px, JPG).

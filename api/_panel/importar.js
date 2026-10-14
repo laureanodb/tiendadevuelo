@@ -16,4 +16,4 @@ export default panel(async (req, res) => {
     n++;
   }
   send(res, 200, { ok: true, importados: n });
-});
+}, { soloDueno: true });

@@ -13,6 +13,6 @@ export default panel(async (req, res) => {
   let n = 0;
   if (moneda !== "ARS") n += (await q(`update tdv_productos set usd = round(usd * $1, 2), actualizado = now() where usd is not null${filtroCat}`, params)).rowCount;
   if (moneda !== "USD") n += (await q(`update tdv_productos set ars = round(ars * $1 / 100) * 100, actualizado = now() where ars is not null${filtroCat}`, params)).rowCount;
-  await anotar("precios", cat || "", cat || "Todas las categorías", `Precios ${pct > 0 ? "+" : ""}${pct}% (${moneda === "USD" ? "solo dólares" : moneda === "ARS" ? "solo pesos" : "dólares y pesos"})`, antes);
+  await anotar("precios", cat || "", cat || "Todas las categorías", `Precios ${pct > 0 ? "+" : ""}${pct}% (${moneda === "USD" ? "solo dólares" : moneda === "ARS" ? "solo pesos" : "dólares y pesos"})`, antes, req.usuario);
   send(res, 200, { ok: true, cambiados: n });
-});
+}, { soloDueno: true });

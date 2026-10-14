@@ -56,6 +56,6 @@ export default panel(async (req, res) => {
       notas = $8, historial = $9 where num = $1 returning *`,
     [p.num, estado, n(b.cobradoArs), n(b.cobradoUsd), vendido, String(b.envioEmpresa ?? p.envio_empresa).slice(0, 60), String(b.envioCodigo ?? p.envio_codigo).slice(0, 80),
       String(b.notas ?? p.notas).slice(0, 1000), JSON.stringify(historial)]);
-  if (estado !== p.estado) await anotar("pedido", p.num, p.cliente.nombre || p.num, `Estado: ${p.estado} → ${estado}`);
+  if (estado !== p.estado) await anotar("pedido", p.num, p.cliente.nombre || p.num, `Estado: ${p.estado} → ${estado}`, null, req.usuario);
   send(res, 200, { pedido: pedidoAdmin(u[0]) });
 });
