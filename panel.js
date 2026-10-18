@@ -257,6 +257,9 @@
           <label><span>Características <span class="muted">(una por renglón; para la ficha técnica usá “Atenuación: 24 dB”)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Preguntas frecuentes <span class="muted">(una por renglón: «¿Pregunta? | Respuesta»)</span></span><textarea id="faqs" rows="3">${esc((p.faqs || []).map((f) => f[0] + " | " + f[1]).join("\n"))}</textarea></label>
+          <fieldset class="p-compl"><legend>Sugerir en el carrito junto a este producto <span class="muted">(hasta 6)</span></legend>
+            <div class="p-compl-lista">${productos.filter((o) => o.id !== p.id).map((o) => `<label class="p-chk"><input type="checkbox" name="compl" value="${esc(o.id)}"${(p.complementos || []).includes(o.id) ? " checked" : ""}> ${esc(o.name)}</label>`).join("")}</div>
+          </fieldset>
           <label id="descargaWrap"${p.digital ? "" : " hidden"}><span>Link de descarga <span class="muted">(producto digital: solo lo ve quien pagó, en la página de su pedido)</span></span><input id="descarga" type="url" inputmode="url" placeholder="https://drive.google.com/…" value="${esc(p.descarga || "")}"></label>
           <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
         </section>
@@ -468,7 +471,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, complementos: [...document.querySelectorAll('input[name="compl"]:checked')].map((x) => x.value).slice(0, 6), descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
@@ -607,7 +610,7 @@
           <h2>Cliente</h2>
           <p class="p-cli"><b>${esc(c.nombre)}</b><br>
             <a href="https://wa.me/${esc(p.tel)}" target="_blank" rel="noopener">${esc(c.tel)}</a>${c.dni ? ` · DNI/CUIT ${esc(c.dni)}` : ""}<br>
-            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.aerodromo ? " · " + esc(c.aerodromo) : ""}${c.empresa ? `<br>Correo: ${esc(c.empresa)} · ${esc(c.modo || "")}` : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}${c.escuela ? "<br>Escuela: " + esc(c.escuela) : ""}
+            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.aerodromo ? " · " + esc(c.aerodromo) : ""}${c.empresa ? `<br>Correo: ${esc(c.empresa)} · ${esc(c.modo || "")}` : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}${c.escuela ? "<br>Escuela: " + esc(c.escuela) : ""}${c.ref ? `<br>🤝 Recomendado con el código <b>${esc(c.ref)}</b>` : ""}
             ${c.notas ? `<br><i>“${esc(c.notas)}”</i>` : ""}</p>
         </section>
         <section class="p-card">
@@ -698,25 +701,53 @@
     const norm = (x) => String(x).toLowerCase();
     const vis = d.clientes.filter((c) => !buscaCli || norm(c.nombre + " " + c.tel + " " + c.escuela).includes(norm(buscaCli)));
     const niveles = ["Comandante", "Piloto", "Alumno"].map((n) => [n, d.clientes.filter((c) => c.nivel === n).length]);
+    const recompra = paraEscribir(d.clientes);
     app.innerHTML = tabsHTML("clientes") + `
       <div class="p-head"><div><h1>Clientes</h1><p class="muted">${d.clientes.length} clientes · ${niveles.map(([n, k]) => `${k} ${n.toLowerCase()}`).join(" · ")}</p></div></div>
       <p class="muted small">Se arman solos con cada pedido. Niveles: Alumno (1 compra), Piloto (2 o 3), Comandante (4 o más).</p>
       ${cumples.length ? `<section class="p-card p-cumples"><h2>🎂 Cumpleaños de esta semana</h2>${cumples.map((c) => `
         <div class="p-cumple"><span><b>${esc(c.nombre)}</b> · ${c.en === 0 ? "¡hoy!" : c.en === 1 ? "mañana" : `en ${c.en} días`}</span>
         <a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(c.tel, `¡Feliz cumpleaños, ${c.nombre.split(" ")[0]}! 🎂✈ Te deseamos un gran año y muchas horas de vuelo. — Tienda de Vuelo`)}">Saludar</a></div>`).join("")}</section>` : ""}
+      ${recompra.length ? `<section class="p-card p-cumples"><h2>📣 Para escribirles</h2><p class="muted small">Clientes a los que les puede servir algo nuevo. Cuando les escribas, tocá «Listo» y no aparecen por 3 meses.</p>${recompra.map((r) => `
+        <div class="p-cumple p-recompra"><span><b>${esc(r.c.nombre || r.c.tel)}</b><br><span class="small">${esc(r.motivo)}</span></span>
+        <span class="p-head-btns"><a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(r.c.tel, r.msg)}">Escribir</a><button class="btn btn-ghost btn-sm" data-record="${esc(r.c.tel)}">Listo</button></span></div>`).join("")}</section>` : ""}
       <div class="p-tools"><label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
         <input id="buscaCli" type="search" placeholder="Buscar por nombre, teléfono o escuela" value="${esc(buscaCli)}"></label></div>
       <div class="p-list">${vis.map((c) => `
         <button class="p-row p-order" data-cli="${esc(c.tel)}">
           <span class="p-row-info"><b>${esc(c.nombre || c.tel)}</b><span class="muted small">${esc(c.tel)}${c.escuela ? " · " + esc(c.escuela) : ""}${c.cumple ? " · 🎂 " + c.cumple.slice(8) + "/" + c.cumple.slice(5, 7) : ""}</span>
-            <span class="muted small">${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.ultimo ? " · último pedido " + new Date(c.ultimo).toLocaleDateString("es-AR") : ""}</span></span>
+            <span class="muted small">${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.ultimo ? " · último pedido " + new Date(c.ultimo).toLocaleDateString("es-AR") : ""}${c.codigo ? " · código " + esc(c.codigo) : ""}${c.recomendados ? ` · 🤝 trajo ${c.recomendados} ${c.recomendados === 1 ? "venta" : "ventas"}` : ""}</span></span>
           <span class="p-row-num"><i class="p-nivel n-${c.nivel.toLowerCase()}">${c.nivel}</i><b>${[c.totalArs ? ars(c.totalArs) : "", c.totalUsd ? usd(c.totalUsd) : ""].filter(Boolean).join(" + ")}</b></span>
         </button>`).join("") || '<p class="empty">Todavía no hay clientes. Aparecen solos cuando entra el primer pedido.</p>'}</div>`;
     app.querySelectorAll("[data-cli]").forEach((b) => (b.onclick = () => verCliente(d.clientes.find((c) => c.tel === b.dataset.cli))));
+    app.querySelectorAll("[data-record]").forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try { await api("clientes", { method: "POST", body: { tel: b.dataset.record, recordado: true } }); b.closest(".p-recompra").remove(); toast("Anotado. Vuelve a aparecer en 3 meses si corresponde."); } catch (x) { toast(x.message); b.disabled = false; }
+    }));
     const bc = document.getElementById("buscaCli");
     bc.oninput = () => { buscaCli = bc.value; clearTimeout(bc._t); bc._t = setTimeout(() => { const pos = bc.selectionStart; verClientes().then(() => { const n = document.getElementById("buscaCli"); n.focus(); n.setSelectionRange(pos, pos); }); }, 250); };
   }
 
+  // A quién escribirle: según lo que compró y hace cuánto (sin repetir por 3 meses después de «Listo»)
+  function paraEscribir(clientes) {
+    const porId = Object.fromEntries(productos.map((p) => [p.id, p])), dias = (f) => Math.floor((Date.now() - new Date(f)) / 864e5);
+    const out = [];
+    for (const c of clientes) {
+      if (!c.historial?.length || (c.recordado && dias(c.recordado) < 90)) continue;
+      const nom = (c.nombre || "").split(" ")[0] || "¿cómo estás?";
+      const compras = c.historial.flatMap((h) => h.items.map((i) => ({ ...i, p: porId[i.id], dias: dias(h.fecha) })));
+      const ultima = Math.min(...c.historial.map((h) => dias(h.fecha)));
+      const de = (icon) => compras.filter((i) => i.p && i.p.icon === icon).sort((a, b) => a.dias - b.dias)[0];
+      const auri = de("headset"), radio = de("radio"), nav = compras.find((i) => i.p && ["Navegación"].includes(i.p.cat) && i.dias >= 120 && i.dias <= 400);
+      let r = null;
+      if (auri && auri.dias >= 330) r = { motivo: `Compró ${auri.name} hace ${Math.round(auri.dias / 30)} meses: ofrecerle almohadillas nuevas o una revisión.`, msg: `¡Hola ${nom}! Te escribimos de Tienda de Vuelo. Ya pasó más de un año desde que te llevaste tu ${auri.name}: si querés renovar las almohadillas o que lo revisemos, avisanos. ¡Buenos vuelos!` };
+      else if (radio && radio.dias >= 540) r = { motivo: `Compró ${radio.name} hace ${Math.round(radio.dias / 30)} meses: ofrecerle una batería de repuesto.`, msg: `¡Hola ${nom}! Te escribimos de Tienda de Vuelo. Las baterías de las radios rinden menos después de un par de años: si querés una de repuesto para tu ${radio.name}, te la conseguimos.` };
+      else if (nav && !auri) r = { motivo: `Compró ${nav.name} hace ${Math.round(nav.dias / 30)} meses y no tiene auricular: puede estar avanzando en el curso.`, msg: `¡Hola ${nom}! ¿Cómo va el curso? Si ya estás volando seguido y querés tu propio auricular o una radio portátil, te asesoramos para elegir según el avión de tu escuela.` };
+      else if (ultima >= 270) r = { motivo: `Hace ${Math.round(ultima / 30)} meses que no compra.`, msg: `¡Hola ${nom}! Te escribimos de Tienda de Vuelo para contarte que tenemos novedades en la tienda: ${CONFIG.sitio}. Si necesitás algo para tus vuelos, escribinos.` };
+      if (r) out.push({ c, ...r });
+    }
+    return out.slice(0, 12);
+  }
   async function verCliente(c) {
     window.scrollTo(0, 0);
     if (!pedidosCache) { try { await cargarPedidos(); } catch {} }
@@ -725,7 +756,7 @@
       <button class="back-btn" id="volverCli">← Clientes</button>
       <form class="p-form" id="cliForm">
         <h1>${esc(c.nombre || c.tel)}</h1>
-        <p><i class="p-nivel n-${c.nivel.toLowerCase()}">${c.nivel}</i> · ${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.totalArs || c.totalUsd ? " · " + [c.totalArs ? ars(c.totalArs) : "", c.totalUsd ? usd(c.totalUsd) : ""].filter(Boolean).join(" + ") : ""}</p>
+        <p><i class="p-nivel n-${c.nivel.toLowerCase()}">${c.nivel}</i>${c.codigo ? ` · Código para recomendar: <b>${esc(c.codigo)}</b>${c.recomendados ? ` (trajo ${c.recomendados} ${c.recomendados === 1 ? "venta" : "ventas"}: le corresponde su descuento)` : ""}` : ""} · ${c.compras} ${c.compras === 1 ? "compra" : "compras"}${c.totalArs || c.totalUsd ? " · " + [c.totalArs ? ars(c.totalArs) : "", c.totalUsd ? usd(c.totalUsd) : ""].filter(Boolean).join(" + ") : ""}</p>
         <section class="p-card">
           <label>Nombre<input id="cNom" value="${esc(c.nombre)}"></label>
           <div class="p-grid2">
@@ -1033,8 +1064,8 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {}, vp = {}, vb = {}, caps = [], vm = {};
-    try { [v, vp, vb, caps, vm] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing")])).map((x) => x.valor || {}); } catch {}
+    let v = {}, vp = {}, vb = {}, caps = [], vm = {}, vr = {}, vg = {};
+    try { [v, vp, vb, caps, vm, vr, vg] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing"), api("ajustes?clave=referidos"), api("ajustes?clave=google")])).map((x) => x.valor || {}); } catch {}
     if (!Array.isArray(caps)) caps = [];
     const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
     app.innerHTML = tabsHTML("ajustes") + `
@@ -1081,13 +1112,59 @@
       <form class="p-card p-form" id="mktForm"><h2>Píxel de Meta (medir la publicidad)</h2>
         <p class="muted small">Con el píxel, Instagram y Facebook saben qué anuncio trajo a cada persona que mira un producto, pide precio o manda un pedido. Lo encontrás en <b>business.facebook.com/events_manager</b> → <b>Conectar orígenes de datos</b> → <b>Web</b>: es un número de 15 o 16 cifras.</p>
         <label>Identificador del píxel<input id="pixelId" inputmode="numeric" maxlength="20" value="${esc(vm.metaPixel || "")}" placeholder="Ej.: 123456789012345"></label>
-        <button class="btn btn-primary" type="submit">Guardar</button></form>`;
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
+      <section class="p-card" id="respaldos"><h2>Copias de seguridad</h2>
+        <p class="muted small">Todos los domingos a la noche se guarda una copia de tus productos, pedidos, clientes y ajustes (se conservan las últimas 8). Si algo se borra por error, con la copia se recupera.</p>
+        <p><a class="btn btn-primary btn-sm" href="/api/panel/respaldo?descargar=ahora" download>Descargar una copia ahora</a></p>
+        <div id="respLista"><p class="muted small">Cargando copias guardadas…</p></div></section>
+      <form class="p-card p-form" id="refForm"><h2>Recomendaciones entre clientes</h2>
+        <p class="muted small">Cada cliente recibe su código al hacer un pedido (por ejemplo, JUAN-482). Quien compra con el código de otro tiene este descuento, y vos le das el mismo descuento a quien lo recomendó en su próxima compra (lo ves en Clientes). Poné 0 para apagarlo.</p>
+        <label>Descuento (%)<input id="refPct" type="number" min="0" max="30" step="1" value="${esc(vr.pct ?? 0)}"></label>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
+      <form class="p-card p-form" id="gForm"><h2>Tus reseñas de Google</h2>
+        <p class="muted small">Se muestran en la portada y en cada producto, con link a tu ficha de Google. Copiá el promedio y la cantidad tal como aparecen en Google Maps y actualizalos cuando cambien.</p>
+        <label>Link a tus reseñas<input id="gLink" type="url" value="${esc(vg.link || "")}" placeholder="https://g.page/r/…  o el link de Google Maps"></label>
+        <div class="p-grid2"><label>Promedio<input id="gProm" type="number" min="1" max="5" step="0.1" value="${esc(vg.promedio ?? "")}" placeholder="4,9"></label><label>Cantidad de reseñas<input id="gCant" type="number" min="1" step="1" value="${esc(vg.cantidad ?? "")}" placeholder="120"></label></div>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
+      <section class="p-card"><h2>Ficha de Google Maps</h2>
+        <p class="muted small">Es lo primero que ve quien busca «pilot shop» o «auriculares de aviación» en Google. Podés tenerla sin mostrar tu dirección.</p>
+        <ol class="small"><li>Entrá a <b>business.google.com</b> y tocá <b>Administrar ahora</b>. Nombre: <b>Tienda de Vuelo</b>.</li>
+          <li>Categoría principal: <b>Tienda de artículos de aviación</b>. Agregá <b>Tienda de electrónica</b> como secundaria.</li>
+          <li>Cuando te pregunte si los clientes te visitan, elegí <b>No</b> y cargá como zona de servicio <b>CABA y Gran Buenos Aires</b> y <b>Argentina</b>: así no se muestra tu dirección.</li>
+          <li>Sitio web: <b>https://www.tiendadevuelo.com.ar</b>. Teléfono: <b>${esc(CONFIG.whatsappVisible)}</b>. Horario: el mismo que atendés por WhatsApp.</li>
+          <li>Subí al menos 10 fotos: productos, paquetes listos para enviar, entregas en aeródromo. Cargá los productos en la sección <b>Productos</b>.</li>
+          <li>Verificá la ficha (Google te pide un video corto o una llamada) y pediles a tus clientes la reseña con el link que te da Google en <b>Pedir reseñas</b>.</li>
+          <li>Después pegá ese link en el formulario de arriba para que las estrellas salgan en la web.</li></ol></section>
+      <section class="p-card"><h2>Catálogo en WhatsApp Business</h2>
+        <p class="muted small">Tus productos aparecen dentro de tu perfil de WhatsApp, con foto y precio. Se toma del mismo catálogo automático que usa Instagram, así que se actualiza solo.</p>
+        <ol class="small"><li>Primero armá el catálogo de Meta con la dirección de «Catálogo para Instagram y Facebook» que está más arriba (si ya lo hiciste, saltá este paso).</li>
+          <li>En el celular, abrí <b>WhatsApp Business → Herramientas para la empresa → Catálogo</b>.</li>
+          <li>Tocá <b>⋮ → Conectar con Facebook</b> (o <b>Administrar catálogo en Commerce Manager</b>) y elegí el catálogo de Tienda de Vuelo.</li>
+          <li>Esperá unos minutos: los productos aparecen solos. En cada chat podés mandar un producto con el botón 📎 → <b>Catálogo</b>.</li></ol>
+        <p class="muted small">Solo se muestran los productos con foto y precio. Si el número de WhatsApp de la tienda no es WhatsApp Business, pasalo desde la app: se conservan los chats.</p></section>`;
     document.querySelectorAll("[data-copy-url]").forEach((b) => (b.onclick = async () => { const i = document.getElementById(b.dataset.copyUrl); try { await navigator.clipboard.writeText(i.value); toast("Copiado."); } catch { i.select(); } }));
     document.getElementById("mktForm").onsubmit = async (e) => {
       e.preventDefault();
       const id = document.getElementById("pixelId").value.replace(/\D/g, "");
       if (id && !/^\d{12,20}$/.test(id)) return toast("El identificador del píxel son solo números (15 o 16 cifras).");
       try { await api("ajustes", { method: "POST", body: { clave: "marketing", valor: { metaPixel: id } } }); toast(id ? "Píxel guardado. Ya mide la web." : "Píxel quitado."); } catch (x) { toast(x.message); }
+    };
+    api("respaldo").then((r) => {
+      const el = document.getElementById("respLista"); if (!el) return;
+      el.innerHTML = !r.almacenamiento ? '<p class="muted small">Para guardar copias automáticas falta conectar el almacenamiento de fotos (Supabase).</p>'
+        : r.guardadas.length ? `<ul class="small">${r.guardadas.map((g) => `<li><a href="/api/panel/respaldo?descargar=${encodeURIComponent(g.nombre)}" download>${esc(g.nombre.replace(".json", "").split("-").reverse().join("/"))}</a> · ${Math.max(1, Math.round(g.bytes / 1024))} KB</li>`).join("")}</ul>`
+        : '<p class="muted small">La primera copia automática se guarda este domingo.</p>';
+    }).catch(() => {});
+    document.getElementById("refForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const pct = Math.min(30, Math.max(0, Math.round(+document.getElementById("refPct").value || 0)));
+      try { await api("ajustes", { method: "POST", body: { clave: "referidos", valor: { pct } } }); toast(pct ? `Listo: ${pct}% para quien compra con un código.` : "Recomendaciones apagadas."); } catch (x) { toast(x.message); }
+    };
+    document.getElementById("gForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const link = document.getElementById("gLink").value.trim(), promedio = +document.getElementById("gProm").value || null, cantidad = Math.round(+document.getElementById("gCant").value) || null;
+      if (link && !/^https:\/\//.test(link)) return toast("El link tiene que empezar con https://");
+      try { await api("ajustes", { method: "POST", body: { clave: "google", valor: { link, promedio, cantidad } } }); toast(link && promedio ? "Listo: las estrellas ya se ven en la web." : "Guardado."); } catch (x) { toast(x.message); }
     };
     const guardarCaps = () => api("ajustes", { method: "POST", body: { clave: "testimonios", valor: caps } });
     const pintarCaps = () => {
@@ -1157,9 +1234,32 @@
         <section class="p-card"><h2>Productos más consultados</h2><p class="muted small">Toques en “Lo quiero”, “Consultar” y “Hacer una pregunta”.</p>
           ${d.consultas.length ? `<ol class="p-rank">${d.consultas.map((c) => `<li><span>${esc(c.name)}</span><b>${c.n}</b>${c.quiero ? `<small>${c.quiero} “Lo quiero”</small>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía nada.</p>'}</section>
       </div>
+      <section class="p-card" id="gsc"><h2>Cómo te encuentran en Google</h2><p class="p-loading">Cargando…</p></section>
       <section class="p-card" id="calidad"><h2>Control de calidad</h2><p class="muted small">Lo que le falta a cada producto para vender mejor y salir bien en Google. Se revisa cada vez que entrás.</p><p class="p-loading">Revisando…</p></section>
       <section class="p-card p-hist" id="historial"><h2>Historial de cambios</h2><p class="muted small">Precios, stock, productos y pedidos. Si te equivocaste, tocá “Deshacer”.</p><p class="p-loading">Cargando…</p></section>`;
-    verHistorial(); verCalidad();
+    verHistorial(); verCalidad(); verBusquedas();
+  }
+  async function verBusquedas() {
+    const box = document.getElementById("gsc");
+    if (!box) return;
+    let d;
+    try { d = await api("busquedas"); } catch (x) { box.querySelector(".p-loading").textContent = x.message; return; }
+    const num = (n) => Math.round(n).toLocaleString("es-AR");
+    if (!d.configurado) {
+      box.querySelector(".p-loading").outerHTML = `<p class="muted small">Muestra qué escribe la gente en Google antes de entrar a tu web, cuántas veces apareciste y en qué puesto. Se configura una sola vez:</p>
+        <ol class="small"><li>Entrá a <b>search.google.com/search-console</b>, agregá la propiedad de dominio <b>tiendadevuelo.com.ar</b> y verificála (Google te da un registro para cargar donde compraste el dominio).</li>
+          <li>Entrá a <b>console.cloud.google.com</b>, creá un proyecto, activá la <b>Google Search Console API</b> y en <b>IAM → Cuentas de servicio</b> creá una cuenta. En <b>Claves → Agregar clave → JSON</b>, descargá el archivo.</li>
+          <li>En Search Console → <b>Configuración → Usuarios y permisos</b>, agregá el mail de esa cuenta de servicio con permiso <b>Restringido</b>.</li>
+          <li>En Vercel → Settings → Environment Variables, cargá <b>GSC_EMAIL</b> (el mail de la cuenta) y <b>GSC_KEY</b> (el texto de «private_key» del archivo). Volvé a publicar y listo.</li></ol>
+        <p class="muted small">Google tarda 2 o 3 días en mostrar los primeros datos.</p>`;
+      return;
+    }
+    if (d.error) { box.querySelector(".p-loading").outerHTML = `<p class="p-error">${esc(d.error)}</p>`; return; }
+    const tabla = (filas, titulo, fmt) => filas.length ? `<h3>${titulo}</h3><div class="p-tabla-wrap"><table class="p-tabla"><thead><tr><th>${titulo === "Páginas" ? "Página" : "Búsqueda"}</th><th>Clics</th><th>Veces que apareciste</th><th>Puesto</th></tr></thead><tbody>${filas.map((f) => `<tr><td>${esc(fmt(f.clave))}</td><td>${num(f.clics)}</td><td>${num(f.vistas)}</td><td>${String(f.puesto).replace(".", ",")}</td></tr>`).join("")}</tbody></table></div>` : "";
+    box.querySelector(".p-loading").outerHTML = `<p class="muted small">Del ${d.desde.split("-").reverse().join("/")} al ${d.hasta.split("-").reverse().join("/")}. Puesto 1 es el primer resultado; del 11 en adelante ya es la segunda página.</p>
+      <div class="p-kpis"><div><b>${num(d.total.clics)}</b><span>clics desde Google</span></div><div><b>${num(d.total.vistas)}</b><span>veces que apareciste</span></div><div><b>${String(d.total.puesto).replace(".", ",")}</b><span>puesto promedio</span></div></div>
+      ${tabla(d.busquedas, "Búsquedas", (x) => x)}${tabla(d.paginas, "Páginas", (x) => x.replace(/^https?:\/\/[^/]+/, "") || "/")}
+      ${!d.busquedas.length ? '<p class="muted">Todavía no hay datos. Google tarda unos días en empezar a mostrarlos.</p>' : ""}`;
   }
   // Revisa los productos visibles: precio, fotos (que abran y que no pesen de más), descripción, ficha técnica y preguntas.
   async function verCalidad() {

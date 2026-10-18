@@ -52,6 +52,7 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
     await q(`alter table tdv_productos add column if not exists faqs jsonb not null default '[]'`);
+    await q(`alter table tdv_productos add column if not exists complementos text[] not null default '{}'`);
     await q(`alter table tdv_productos add column if not exists descarga text not null default ''`);
     await q(`alter table tdv_productos add column if not exists nota text not null default ''`);
     await q(`alter table tdv_productos add column if not exists digital boolean not null default false`);
@@ -100,6 +101,10 @@ export function ensureSchema() {
     await q(`alter table tdv_pedidos add column if not exists nps integer`);
     await q(`alter table tdv_pedidos add column if not exists nps_coment text not null default ''`);
     await q(`alter table tdv_pedidos add column if not exists carrito text not null default ''`);
+    await q(`alter table tdv_pedidos add column if not exists ref text not null default ''`);
+    await q(`alter table tdv_clientes add column if not exists codigo text`);
+    await q(`alter table tdv_clientes add column if not exists recordado timestamptz`);
+    await q(`create unique index if not exists tdv_clientes_codigo on tdv_clientes (codigo)`);
     await q(`create table if not exists tdv_carritos (
       id text primary key, creado timestamptz not null default now(), actualizado timestamptz not null default now(),
       nombre text not null default '', tel text not null default '', items jsonb not null default '[]', total numeric,
@@ -139,7 +144,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], complementos: r.complementos || [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -172,6 +177,7 @@ export function toRow(p) {
     stock: int(p.stock), stock_min: int(p.stockMin),
     encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion, digital: !!p.digital, nota: str(p.nota, 60),
     faqs: JSON.stringify((Array.isArray(p.faqs) ? p.faqs : String(p.faqs || "").split("\n").map((l) => l.split("|"))).map((x) => [str(x[0], 200), str(x[1], 600)]).filter((x) => x[0] && x[1]).slice(0, 10)),
+    complementos: list(p.complementos, 6).map((x) => x.replace(/[^\w-]/g, "")).filter(Boolean),
     descarga: /^https:\/\//.test(str(p.descarga, 400)) ? str(p.descarga, 400) : "",
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
@@ -208,6 +214,29 @@ export async function bajarPrivado(path) {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/comprobantes/${path}`, { headers: supaHeaders() });
   if (!r.ok) return null;
   return { type: r.headers.get("content-type") || "image/jpeg", buffer: Buffer.from(await r.arrayBuffer()) };
+}
+
+// ---------- Copias de seguridad ----------
+const TABLAS_RESPALDO = ["tdv_productos", "tdv_pedidos", "tdv_clientes", "tdv_gastos", "tdv_resenas", "tdv_preguntas", "tdv_suscriptores", "tdv_consultas", "tdv_ajustes"];
+export async function armarRespaldo() {
+  const datos = { creado: new Date().toISOString(), sitio: "tiendadevuelo.com.ar", tablas: {} };
+  for (const t of TABLAS_RESPALDO) {
+    // Las claves de los ayudantes no se copian
+    const { rows } = await q(t === "tdv_ajustes" ? `select * from ${t} where clave <> 'usuarios'` : `select * from ${t}`);
+    datos.tablas[t] = rows;
+  }
+  return datos;
+}
+export async function listarPrivado(prefix) {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/list/comprobantes`, {
+    method: "POST", headers: supaHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ prefix, limit: 100, sortBy: { column: "name", order: "desc" } }),
+  });
+  const lista = r.ok ? await r.json().catch(() => []) : [];
+  return (Array.isArray(lista) ? lista : []).filter((x) => x.name && x.id).map((x) => ({ nombre: x.name, bytes: x.metadata?.size || 0, creado: x.created_at }));
+}
+export async function borrarPrivado(paths) {
+  await fetch(`${SUPA_URL}/storage/v1/object/comprobantes`, { method: "DELETE", headers: supaHeaders({ "content-type": "application/json" }), body: JSON.stringify({ prefixes: paths }) }).catch(() => {});
 }
 
 // ---------- Freno a bots: cuántas veces por hora puede hacer algo cada conexión ----------
@@ -352,12 +381,31 @@ export async function extrasPublicos() {
   const t = await ajuste("testimonios", []);
   const b = await ajuste("beneficio", {});
   const m = await ajuste("marketing", {});
+  const rf = await ajuste("referidos", {});
+  const g = await ajuste("google", {});
+  const gProm = Math.round(Number(g && g.promedio) * 10) / 10, gCant = Math.round(Number(g && g.cantidad));
   const px = String((m && m.metaPixel) || "").replace(/\D/g, "").slice(0, 20);
   return {
     metaPixel: px.length >= 10 ? px : "",
+    referidos: pctReferidos(rf),
+    google: g && /^https:\/\//.test(String(g.link)) && gProm >= 1 && gProm <= 5 && gCant > 0 ? { link: String(g.link).slice(0, 300), promedio: gProm, cantidad: gCant } : null,
     testimonios: (Array.isArray(t) ? t : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), nombre: String(x.nombre || "").slice(0, 40) })),
     beneficio: b && String(b.texto || "").trim() ? String(b.texto).trim().slice(0, 300) : "",
   };
+}
+// Recomendaciones: % de descuento para quien compra con el código de otro cliente (0 = apagado).
+export const pctReferidos = (v) => Math.min(30, Math.max(0, Math.round(Number(v && v.pct) || 0)));
+export async function codigoCliente(tel, nombre) {
+  const { rows: [c] } = await q("select codigo from tdv_clientes where tel = $1", [tel]);
+  if (!c) return "";
+  if (c.codigo) return c.codigo;
+  const base = (String(nombre || "").normalize("NFD").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 6) || "PILOTO");
+  for (let i = 0; i < 8; i++) {
+    const cod = `${base}-${100 + Math.floor(Math.random() * 900)}`;
+    const { rowCount } = await q("update tdv_clientes set codigo = $2 where tel = $1 and codigo is null and not exists (select 1 from tdv_clientes where codigo = $2)", [tel, cod]);
+    if (rowCount) return cod;
+  }
+  return "";
 }
 export async function pagoPublico() {
   const v = await ajuste("pago", {});

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Icom IC-A16 o Yaesu FTA-250L · Tienda de Vuelo</title>
+  <meta name="description" content="Icom IC-A16 o Yaesu FTA-250L: comparación técnica lado a lado y cuál conviene según cómo volás. Dos radios portátiles de banda aeronáutica, solo comunicaciones, con separación de 8,33 y 25 kHz.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/comparar/icom-a16-vs-yaesu-fta-250l">
+  <meta property="og:title" content="Icom IC-A16 o Yaesu FTA-250L · Tienda de Vuelo">
+  <meta property="og:description" content="Icom IC-A16 o Yaesu FTA-250L: comparación técnica lado a lado y cuál conviene según cómo volás. Dos radios portátiles de banda aeronáutica, solo comunicaciones, con separación de 8,33 y 25 kHz.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Inicio","item":"https://www.tiendadevuelo.com.ar/"},{"@type":"ListItem","position":2,"name":"Comparativas","item":"https://www.tiendadevuelo.com.ar/comparativas"},{"@type":"ListItem","position":3,"name":"Icom IC-A16 o Yaesu FTA-250L","item":"https://www.tiendadevuelo.com.ar/comparar/icom-a16-vs-yaesu-fta-250l"}]}]}</script>
+</head>
+<body data-page="comparar" data-wa="¡Hola! Estoy dudando entre Icom IC-A16 y Yaesu FTA-250L.">
+  <div id="siteHeader"></div>
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <nav class="small" aria-label="Ubicación"><a href="/comparativas">Comparativas</a> › Icom IC-A16 o Yaesu FTA-250L</nav>
+      <span class="kicker">Comparativa</span>
+      <h1>Icom IC-A16 o Yaesu FTA-250L</h1>
+      <p>Dos radios portátiles de banda aeronáutica, solo comunicaciones, con separación de 8,33 y 25 kHz.</p>
+    </div></section>
+    <section class="wrap prose">
+      <div class="cmp-tabla-wrap"><table class="cmp-tabla" id="cmpTabla"><caption class="small muted">Datos del fabricante</caption></table></div>
+      <h2>¿Cuál te conviene?</h2>
+      <div class="cmp-veredicto"><div><h3>Elegí la Icom IC-A16 si…</h3><p>querés más potencia (6 W), audio más fuerte para ambientes ruidosos, más autonomía y protección IP67 contra agua y polvo.</p></div><div><h3>Elegí la Yaesu FTA-250L si…</h3><p>priorizás el tamaño y el peso: es muy compacta y entra en cualquier bolsillo del flight bag.</p></div></div>
+      <p>¿Seguís con dudas? Escribinos por WhatsApp y te asesoramos según el avión y las horas que volás.</p>
+      <p><a href="/comparativas">Ver otras comparativas</a></p>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { esc, byId, priceHTML, $ } = window.TDV;
+      const ps = [byId["icom-ic-a16"], byId["yaesu-fta-250l"]].filter(Boolean);
+      if (ps.length < 2) return;
+      const datos = ps.map((p) => Object.fromEntries((p.specs || []).map((s) => { const i = s.indexOf(":"); return i > 0 ? [s.slice(0, i).trim(), s.slice(i + 1).trim()] : [s, "Sí"]; })));
+      const claves = [...new Set(datos.flatMap(Object.keys))];
+      $("#cmpTabla").insertAdjacentHTML("beforeend", `<thead><tr><th scope="col"><span class="sr-only">Dato</span></th>${ps.map((p) => `<th scope="col"><a href="/producto/${p.id}">${p.fotos ? `<img src="${esc(p.fotos[0].replace(/\.jpg$/, "-t.webp"))}" alt="" width="120" height="120" loading="lazy">` : ""}<span>${esc(p.name)}</span></a></th>`).join("")}</tr></thead>
+        <tbody>${claves.map((k) => `<tr><th scope="row">${esc(k)}</th>${datos.map((d) => `<td>${esc(d[k] || "—")}</td>`).join("")}</tr>`).join("")}
+        <tr><th scope="row">Precio</th>${ps.map((p) => `<td>${priceHTML(p)}</td>`).join("")}</tr></tbody>`);
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

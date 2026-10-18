@@ -95,7 +95,7 @@ const PRODUCTS = [
   { id: "icom-ic-a16", faqs: [["¿Qué incluye?", "Batería, cargador, antena y clip para el cinturón."], ["¿Sirve para canales de 8,33 kHz?", "Sí, trabaja con separación de 8,33 y 25 kHz."]], name: "Transceptor portátil Icom IC-A16", brand: "Icom", model: "IC-A16", cat: "Comunicaciones", icon: "radio", destacado: 4,
     etapas: ["privado", "comercial"],
     desc: "Radio VHF de banda aeronáutica, compacta y resistente al agua, con 6 W de potencia y audio fuerte para escucharse bien en ambientes ruidosos.",
-    specs: ["Potencia: 6 W (PEP)", "Audio: 1500 mW", "Canales: 200 memorias, separación 8,33 / 25 kHz", "Batería: Litio 2400 mAh, aprox. 17 h", "Protección: IP67", "Incluye: Batería, cargador, antena y clip"],
+    specs: ["Potencia: 6 W (PEP)", "Audio: 1500 mW", "Canales: 200 memorias", "Separación: 8,33 / 25 kHz", "Batería: Litio 2400 mAh, aprox. 17 h", "Protección: IP67", "Incluye: Batería, cargador, antena y clip"],
     fotos: ["/img/productos/icom-a16-1.jpg", "/img/productos/icom-a16-2.jpg"] },
   { id: "jeppesen-cr-3", faqs: [["¿Viene con instrucciones?", "Sí, trae manual de instrucciones y funda."]], name: "Computadora de vuelo Jeppesen CR-3", brand: "Jeppesen", model: "CR-3", cat: "Navegación", icon: "calc", top: true,
     etapas: ["alumno", "privado"],

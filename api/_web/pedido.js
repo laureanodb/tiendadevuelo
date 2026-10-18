@@ -1,5 +1,5 @@
 // La web guarda cada pedido al mandarlo por WhatsApp, para verlo en el panel y que el cliente lo siga.
-import { DB_URL, avisar, body, ensureSchema, permitido, q, send, telWa } from "../_lib.js";
+import { DB_URL, ajuste, avisar, body, codigoCliente, ensureSchema, permitido, pctReferidos, q, send, telWa } from "../_lib.js";
 
 const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
 const s = (v, n = 200) => String(v ?? "").trim().slice(0, n);
@@ -27,17 +27,27 @@ export default async function handler(req, res) {
     if (!(await permitido(req, "pedido", 12))) return send(res, 429, { guardado: false });
     const tel = telWa(cliente.tel);
     const carrito = /^[a-z0-9]{8,24}$/.test(s(b.carrito, 24)) ? s(b.carrito, 24) : "";
+    // Código de recomendación: tiene que existir, no ser el propio y estar activado en Ajustes
+    let ref = "";
+    const pedido = s(c.ref, 20).toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    if (pedido && pctReferidos(await ajuste("referidos", {})) > 0) {
+      const { rows: [r] } = await q("select tel from tdv_clientes where codigo = $1", [pedido]);
+      if (r && r.tel !== tel) ref = pedido;
+    }
+    cliente.ref = ref;
     const { rowCount: nuevo } = await q(`insert into tdv_pedidos (num, token, cliente_tel, cliente, items, total_ars, usd_sub, historial, carrito)
              values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (num) do nothing`,
       [num, token, tel, cliente, JSON.stringify(items), n(b.totalArs), n(b.usdSub), JSON.stringify([{ estado: "nuevo", at: new Date().toISOString() }]), carrito]);
+    if (ref && nuevo) await q("update tdv_pedidos set ref = $2 where num = $1", [num, ref]);
     if (carrito) await q("update tdv_carritos set estado = 'convertido', actualizado = now() where id = $1", [carrito]);
     if (tel) {
       await q(`insert into tdv_clientes (tel, nombre, dni, cumple, escuela) values ($1, $2, $3, $4, $5)
                on conflict (tel) do update set nombre = excluded.nombre, dni = coalesce(nullif(excluded.dni, ''), tdv_clientes.dni),
                  cumple = coalesce(excluded.cumple, tdv_clientes.cumple), escuela = coalesce(nullif(excluded.escuela, ''), tdv_clientes.escuela)`, [tel, cliente.nombre, cliente.dni, cumple, cliente.escuela]);
     }
-    if (nuevo) await avisar(`✈ Pedido nuevo ${num}\n${cliente.nombre} · ${cliente.entrega}\n${items.map((i) => `${i.qty} x ${i.name}`).join("\n")}${n(b.totalArs) ? `\nTotal aprox.: $${Math.round(n(b.totalArs)).toLocaleString("es-AR")}` : ""}\nhttps://www.tiendadevuelo.com.ar/panel#pedidos`);
-    send(res, 200, { guardado: true });
+    const codigo = tel ? await codigoCliente(tel, cliente.nombre) : "";
+    if (nuevo) await avisar(`✈ Pedido nuevo ${num}\n${cliente.nombre} · ${cliente.entrega}${ref ? `\nRecomendado con el código ${ref}` : ""}\n${items.map((i) => `${i.qty} x ${i.name}`).join("\n")}${n(b.totalArs) ? `\nTotal aprox.: $${Math.round(n(b.totalArs)).toLocaleString("es-AR")}` : ""}\nhttps://www.tiendadevuelo.com.ar/panel#pedidos`);
+    send(res, 200, { guardado: true, codigo, ref: !!ref });
   } catch (e) {
     console.error(e);
     send(res, 200, { guardado: false });

@@ -305,11 +305,11 @@
           <a href="/" class="brand">${logoSVG()}<span class="brand-text"><b>Tienda de Vuelo</b><small>Pilot shop</small></span></a>
           <p class="muted">Equipamiento original para pilotos, alumnos y tripulantes.</p>
           <form class="news" id="newsForm"><label for="newsMail">Novedades y ofertas por mail</label><div><input id="newsMail" type="email" required placeholder="tu@mail.com" autocomplete="email"><input name="web" tabindex="-1" autocomplete="off" class="trampa" aria-hidden="true"><button class="btn btn-primary btn-sm">Sumarme</button></div><p class="small" id="newsMsg" role="status"></p></form>
-          <p class="made"><svg viewBox="0 0 9 6" width="22" height="15" aria-hidden="true"><rect width="9" height="6" fill="#74acdf"/><rect y="2" width="9" height="2" fill="#fff"/><circle cx="4.5" cy="3" r=".6" fill="#f6b40e"/></svg> Hecho en Argentina</p>
+          <p class="made"><svg viewBox="0 0 9 6" width="22" height="15" aria-hidden="true"><rect width="9" height="6" fill="#74acdf"/><rect y="2" width="9" height="2" fill="#fff"/><circle cx="4.5" cy="3" r=".6" fill="#f6b40e"/></svg> Hecho en Argentina</p><div data-google="pie" hidden></div>
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/aviones">¿Qué ficha usa tu avión?</a><a href="/comparativas">Comparativas</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h2 class="foot-h">Contacto</h2>
@@ -527,6 +527,7 @@
   const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
   const regaloPara = () => { try { const n = sessionStorage.getItem("tdv-regalo-para"); return n ? `Regalo para ${n} (de su lista de deseos)` : ""; } catch { return ""; } };
   const carritoId = () => { let id = store.get("tdv-cid", ""); if (!id) { id = azar(); store.set("tdv-cid", id); } return id; };
+  let refValido = {};
   function renderCart() {
     const count = cart.reduce((s, l) => s + l.qty, 0);
     $("#cartCount").textContent = count;
@@ -564,13 +565,21 @@
           <b class="line-total">${ars(info.unit * l.qty)}</b>
         </div>`;
       }).join("");
-      // Te puede servir también: accesorios que no están en el carrito, primero los de la misma etapa
+      // Antes de seguir: lo que completa la compra (primero lo que el dueño cargó como complemento, después por tipo de producto)
       const enCarrito = new Set(cart.flatMap((l) => (l.kit ? l.items : [l.id])));
-      const etapas = new Set(cart.flatMap((l) => (l.kit ? [] : byId[l.id].etapas || [])));
-      const extra = PRODUCTS.filter((p) => !enCarrito.has(p.id) && !p.agotado && (p.ars || p.usd) && (pesos(p) || 0) <= 60000)
-        .sort((a, b) => (b.etapas || []).filter((x) => etapas.has(x)).length - (a.etapas || []).filter((x) => etapas.has(x)).length || pesos(a) - pesos(b)).slice(0, 3);
-      if (extra.length) body.innerHTML += `<div class="upsell"><h4>Te puede servir también</h4>${extra.map((p) => `
-        <div class="upsell-item">${art(p)}<span><b>${esc(p.name)}</b>${priceHTML(p)}</span><button class="icon-btn" data-add="${p.id}" aria-label="Agregar ${esc(p.name)}">+</button></div>`).join("")}</div>`;
+      const deCarrito = cart.flatMap((l) => (l.kit ? l.items : [l.id])).map((id) => byId[id]).filter(Boolean);
+      const COMPLEMENTA = { headset: ["radio", "watch"], radio: ["headset", "watch"], plotter: ["calc", "plotter", "watch"], calc: ["plotter", "watch"], watch: ["calc", "plotter"], keychain: ["keychain"] };
+      const puntos = {};
+      for (const p of deCarrito) {
+        (p.complementos || []).forEach((id, i) => { puntos[id] = (puntos[id] || 0) + 10 - i; });
+        for (const q of PRODUCTS) if ((COMPLEMENTA[p.icon] || []).includes(q.icon)) puntos[q.id] = (puntos[q.id] || 0) + 3 - (COMPLEMENTA[p.icon].indexOf(q.icon));
+      }
+      const extra = PRODUCTS.filter((p) => !enCarrito.has(p.id) && !p.agotado && puntos[p.id] > 0)
+        .sort((a, b) => puntos[b.id] - puntos[a.id] || (pesos(a) ?? 1e12) - (pesos(b) ?? 1e12)).slice(0, 3);
+      if (extra.length) body.innerHTML += `<div class="upsell"><h4>Completá tu equipo</h4>${extra.map((p) => `
+        <div class="upsell-item">${art(p)}<span><b>${esc(p.name)}</b>${p.nota ? `<small class="muted">${esc(p.nota)}</small>` : ""}${priceHTML(p)}</span>${pesos(p) !== null && !p.variantes
+          ? `<button class="icon-btn" data-add="${p.id}" aria-label="Agregar ${esc(p.name)}">+</button>`
+          : `<a class="icon-btn" href="/producto/${p.id}" aria-label="Ver ${esc(p.name)}">›</a>`}</div>`).join("")}</div>`;
       foot.innerHTML = totalBlock + (despacho ? `<p class="small notice-inline">${esc(despacho)}</p>` : "") + `<button class="btn btn-primary btn-block" id="toDatos">Continuar</button>
         <div class="cart-extra"><button type="button" class="link-btn" id="shareCart">Compartir carrito</button><a class="link-btn" href="/presupuesto">Descargar presupuesto</a></div>`;
       $("#toDatos").onclick = () => { step = "datos"; renderCart(); };
@@ -608,6 +617,7 @@
           <label><span>Tu cumpleaños <span class="muted">(opcional)</span></span><input id="fCumple" type="date" value="${esc(datos.cumple || "")}"></label>
           <label><span>Escuela o aeroclub <span class="muted">(opcional)</span></span><input id="fEscuela" maxlength="80" value="${esc(datos.escuela || "")}"></label>
         </div>
+        ${CONFIG.referidos ? `<label><span>Código de recomendación <span class="muted">(opcional)</span></span><input id="fRef" maxlength="20" autocapitalize="characters" autocomplete="off" value="${esc(refValido.codigo || store.get("tdv-ref", ""))}"></label><p class="small" id="fRefTxt" role="status"></p>` : ""}
         <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2">${esc(regaloPara())}</textarea></label>
         <p class="muted small">Usamos tus datos solo para tu pedido. Si no llegás a terminarlo, puede que te escribamos para ayudarte.</p>
       </form>`;
@@ -622,6 +632,20 @@
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
+    if ($("#fRef")) {
+      const validar = async () => {
+        const c = $("#fRef").value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ""), t = $("#fRefTxt");
+        refValido = {};
+        if (!c) { t.textContent = ""; return; }
+        try {
+          const d = await (await fetch("/api/codigo?c=" + encodeURIComponent(c))).json();
+          if (d.valido) { refValido = d; t.textContent = `✔ Código de ${d.de || "un cliente"}: ${d.pct}% de descuento (−${ars(Math.round(total() * d.pct / 100))}).`; t.className = "small ok-txt"; }
+          else { t.textContent = d.mensaje || "Ese código no existe. Revisalo o dejalo vacío."; t.className = "small muted"; }
+        } catch { t.textContent = ""; }
+      };
+      $("#fRef").addEventListener("change", validar);
+      if ($("#fRef").value) validar();
+    }
     const borrador = () => {
       const nombre = $("#fNombre").value.trim(), tel = $("#fTel").value.trim();
       if (!nombre || tel.replace(/\D/g, "").length < 8) return;
@@ -653,22 +677,35 @@
       const link = l.kit ? "" : `\n  ${CONFIG.sitio}/producto/${l.id}`;
       return `• ${l.qty} x ${i.name}${i.sub ? ` (${i.sub})` : ""} — ${l.kit ? ars(i.unit * l.qty) : i.label}${link}`;
     });
-    const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())}${soloDigital() ? "" : " + envío"}\n\n` +
+    const descRef = refValido.valido ? Math.round(total() * refValido.pct / 100) : 0;
+    if (descRef) d.ref = refValido.codigo;
+    const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\n` +
+      (descRef ? `Descuento por recomendación (${refValido.codigo}, ${refValido.pct}%): −${ars(descRef)}\n` : "") +
+      `Total${hasUsd() ? " aprox." : ""}: ${ars(total() - descRef)}${soloDigital() ? "" : " + envío"}\n\n` +
       `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.aerodromo ? ` · ${d.aerodromo}` : "") +
       (correo ? `\nCorreo: ${d.empresa} · ${d.modo}` : "") + (!["Retiro en CABA", "Entrega en aeródromo", "Digital"].includes(d.entrega) ? `\nDirección: ${d.dir}${correo ? ", " + d.provincia : ""}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {
       fetch("/api/pedido", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({
-        num, token, carrito: carritoId(), totalArs: Math.round(total()), usdSub: cart.reduce((s, l) => s + (usdDe(l) || 0) * l.qty, 0) || null,
+        num, token, carrito: carritoId(), totalArs: Math.round(total() - descRef), usdSub: cart.reduce((s, l) => s + (usdDe(l) || 0) * l.qty, 0) || null,
         cliente: d, items: cart.map((l) => { const i = lineInfo(l); return { id: l.kit ? "" : l.id, kit: l.kit || "", name: i.name, sub: i.sub, qty: l.qty, label: i.label, unitArs: Math.round(i.unit), usd: usdDe(l) }; }),
-      }) }).catch(() => {});
+      }) }).then((r) => r.json()).then((x) => {
+        // Su propio código para recomendar
+        const box = $("#refBox");
+        if (!x.codigo || !CONFIG.referidos || !box) return;
+        store.set("tdv-micodigo", x.codigo);
+        const link = `${CONFIG.sitio}/?ref=${x.codigo}`;
+        box.innerHTML = `<div class="ref-box"><b>Tu código para recomendar: ${esc(x.codigo)}</b><p class="small">Si un compañero compra con tu código, tiene ${CONFIG.referidos}% de descuento y vos también en tu próxima compra.</p>
+          <a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`Comprá tu equipo de vuelo en Tienda de Vuelo con mi código ${x.codigo} y tenés ${CONFIG.referidos}% de descuento: ${link}`)}">Compartir por WhatsApp</a></div>`;
+      }).catch(() => {});
     } catch {}
+    refValido = {}; store.set("tdv-ref", "");
     const pedidos = store.get("tdv-pedidos", []);
     pedidos.unshift({ num, token, fecha: now.toISOString(), total: total(), items: cart.map((l) => ({ ...l })) });
     store.set("tdv-pedidos", pedidos.slice(0, 20));
     window.open(waLink(msg), "_blank", "noopener");
-    const montoPedido = Math.round(total());
+    const montoPedido = Math.round(total() - descRef);
     medir("InitiateCheckout", { value: montoPedido, currency: "ARS", num_items: cart.reduce((a, l) => a + l.qty, 0) });
     cart = []; save(); step = "listo"; store.set("tdv-cid", "");
     $("#cartCount").textContent = "0"; $("#cartCount").classList.remove("show");
@@ -677,6 +714,7 @@
       <p>Tu pedido <b>${num}</b> se abrió en WhatsApp. Enviá el mensaje y te confirmamos stock, envío y forma de pago.</p>
       ${pagoHTML(montoPedido)}
       <p><a class="btn btn-ghost" href="/seguimiento#${num}.${token}">Seguí tu pedido</a></p>
+      <div id="refBox"></div>
       ${avisoHorario() ? `<p class="small">${esc(avisoHorario())}.</p>` : ""}
       <p class="muted small">¿No se abrió WhatsApp? Escribinos al ${esc(CONFIG.whatsappVisible)} con el número de pedido.</p></div>`;
     $("#drawerFoot").innerHTML = `<button class="btn btn-primary btn-block" id="doneBtn">Seguir comprando</button>`;
@@ -755,12 +793,22 @@
   const medir = (ev, datos) => { try { if (window.fbq) window.fbq("track", ev, datos || {}); } catch {} };
   pixel();
   document.addEventListener("click", (e) => { if (e.target.closest("a[href*='wa.me/']")) medir("Contact"); });
+  // Link de recomendación (?ref=CODIGO): se guarda para precargarlo en el carrito
+  try { const r = new URLSearchParams(location.search).get("ref"); if (r) store.set("tdv-ref", r.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20)); } catch {}
+  // Reseñas de Google (cargadas en el panel): sello con estrellas y link a la ficha
+  const googleHTML = (clase = "") => {
+    const g = CONFIG.google;
+    if (!g) return "";
+    return `<a class="g-sello ${clase}" href="${esc(g.link)}" target="_blank" rel="noopener" aria-label="${String(g.promedio).replace(".", ",")} de 5 en Google, ${g.cantidad} reseñas"><b aria-hidden="true">G</b><span aria-hidden="true">${String(g.promedio.toFixed(1)).replace(".", ",")} ★★★★★</span><small aria-hidden="true">${g.cantidad} reseñas en Google</small></a>`;
+  };
+  const pintarGoogle = () => document.querySelectorAll("[data-google]").forEach((el) => { el.innerHTML = googleHTML(el.dataset.google); el.hidden = !CONFIG.google; });
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };
   pintarDolar(); document.addEventListener("tdv:precios", pintarDolar);
+  pintarGoogle();
   asistente();
   window.dispatchEvent(new Event("tdv:listo"));
 })();

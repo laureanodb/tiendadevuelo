@@ -18,6 +18,8 @@ const RUTAS = {
   gastos: () => import("../_panel/gastos.js"),
   usuarios: () => import("../_panel/usuarios.js"),
   consultas: () => import("../_panel/consultas.js"),
+  respaldo: () => import("../_panel/respaldo.js"),
+  busquedas: () => import("../_panel/busquedas.js"),
   ia: () => import("../_panel/ia.js"),
 };
 
