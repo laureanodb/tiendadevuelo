@@ -57,7 +57,9 @@ export default async function handler(req, res) {
       const pesos = p.usd ? redondear(p.usd * dolar) : p.ars;
       const precioTxt = p.usd ? `US$ ${p.usd} (≈ $${pesos.toLocaleString("es-AR")})` : p.ars ? `$${Number(p.ars).toLocaleString("es-AR")}` : "";
       const titulo = `${p.name}${precioTxt ? " · " + precioTxt : ""} · Tienda de Vuelo`;
-      const desc = `${p.desc || p.name}`.slice(0, 155) + (precioTxt ? "" : " Consultá el precio.") + " Envíos a todo el país.";
+      const base = String(p.desc || p.name).trim();
+      const corta = base.length <= 140 ? base : base.slice(0, 140).replace(/[\s,;:.]+\S*$/, "") + "…";
+      const desc = corta + (/[.…!?]$/.test(corta) ? "" : ".") + (precioTxt ? "" : " Consultá el precio.") + " Envíos a todo el país.";
       const fotos = (p.fotos || []).map(abs);
       const ld = {
         "@context": "https://schema.org", "@type": "Product", name: p.name, description: p.desc || p.name, sku: p.id,
