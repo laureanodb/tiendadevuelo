@@ -21,7 +21,8 @@
   // ---------- Banners que rotan ----------
   const BAN = BANNERS.filter((b) => KITS.length || !String(b.href).includes("#kits"));
   $("#banners").innerHTML = `<div class="banner-track" id="bannerTrack">${BAN.map((b, i) => `
-    <a class="banner b${i % 3}" href="${b.href}">
+    <a class="banner b${i % 3}${b.img ? " banner-con-foto" : ""}" href="${b.href}">
+      ${b.img ? `<img class="banner-img" src="${esc(b.img)}" alt="" loading="lazy">` : ""}
       <span class="kicker">${esc(b.kicker)}</span><h3>${esc(b.title)}</h3><p>${esc(b.text)}</p><span class="banner-cta">${esc(b.cta)} →</span>
     </a>`).join("")}</div>
     <div class="dots" role="tablist" aria-label="Banners">${BAN.map((_, i) => `<button role="tab" aria-label="Banner ${i + 1}" data-dot="${i}"></button>`).join("")}</div>`;

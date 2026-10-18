@@ -152,6 +152,7 @@
         <span class="card-cat">${esc(p.brand || p.cat)}</span>
         <h3><a href="/producto/${p.id}" data-view="${p.id}">${esc(p.name)}</a></h3>
         ${p.rating ? `<div class="stars-sm" aria-label="${p.rating} de 5 estrellas">${estrellas(p.rating)} <span>(${p.resenas})</span></div>` : ""}
+        ${p.nota ? `<div class="card-nota">${esc(p.nota)}</div>` : ""}
         ${priceHTML(p)}
         ${p.llega ? `<div class="note">Preventa · llega el ${fechaCorta(p.llega)}</div>` : p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
       </div>

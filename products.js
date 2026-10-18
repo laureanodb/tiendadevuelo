@@ -77,9 +77,10 @@ const CAT_COLORS = {
 const PRODUCTS = [
   { id: "bose-a30", name: "Auricular Bose A30", brand: "Bose", model: "A30", cat: "Comunicaciones", icon: "headset", top: true, destacado: 1, oficial: true,
     etapas: ["privado", "comercial"],
-    desc: "Auricular de aviación con cancelación activa de ruido de tres niveles, Bluetooth y control por toque para escuchar la cabina sin sacártelo. Muy liviano y con poca presión sobre la cabeza, pensado para vuelos largos.",
-    specs: ["Tipo: Cancelación activa de ruido (ANR), 3 niveles", "Bluetooth: Sí", "Peso: 404 g", "Pilas: 2 AA, más de 45 h de uso", "Certificación: FAA / EASA TSO-C139a", "Garantía: Oficial Bose"],
-    variantes: ["Fichas GA dual", "Ficha LEMO (alimentada por el panel)", "Ficha U-174 (helicóptero)"],
+    nota: "Con ficha Dual plug, LEMO o XLR",
+    desc: "Auricular de aviación con cancelación activa de ruido de tres niveles, Bluetooth y control por toque para escuchar la cabina sin sacártelo. Muy liviano y con poca presión sobre la cabeza, pensado para vuelos largos. Lo tenemos con ficha Dual plug, LEMO y XLR.",
+    specs: ["Fichas disponibles: Dual plug (GA), LEMO y XLR", "Tipo: Cancelación activa de ruido (ANR), 3 niveles", "Bluetooth: Sí", "Peso: 404 g", "Pilas: 2 AA, más de 45 h de uso", "Certificación: FAA / EASA TSO-C139a", "Garantía: Oficial Bose"],
+    variantes: ["Ficha Dual plug (GA)", "Ficha LEMO (alimentada por el panel)", "Ficha XLR (5 pines)"],
     fotos: ["/img/productos/bose-a30-1.jpg", "/img/productos/bose-a30-2.jpg", "/img/productos/bose-a30-3.jpg"] },
   { id: "david-clark-dc-pro-x2", name: "Auricular David Clark DC PRO-X2", brand: "David Clark", model: "DC PRO-X2", cat: "Comunicaciones", icon: "headset", destacado: 2,
     etapas: ["privado", "comercial"],
@@ -129,6 +130,7 @@ const KITS = [];
 
 // Banners de la portada (se rotan solos)
 const BANNERS = [
+  { kicker: "Distribuidor oficial Bose", title: "Bose A30", text: "Liviano y cómodo, con 3 niveles de cancelación de ruido y Bluetooth. Lo tenemos con ficha Dual plug, LEMO y XLR.", cta: "Ver Bose A30", href: "/producto/bose-a30", img: "/img/productos/bose-a30-1-t.webp" },
   { kicker: "Envíos", title: "Envío en el día en CABA", text: "Y despacho en 48 h hábiles a todo el país.", cta: "Ver envíos", href: "/envios" },
   { kicker: "Por encargo", title: "¿No está lo que buscás?", text: "Lo traemos en 15 a 30 días. Pedilo y te pasamos precio.", cta: "Pedir un producto", href: "/contacto#pedido" },
   { kicker: "Kits", title: "Armá tu kit con descuento", text: "Elegí qué llevar de cada kit y mantené el 10% off.", cta: "Ver kits", href: "/#kits" },

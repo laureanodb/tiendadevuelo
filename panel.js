@@ -246,6 +246,7 @@
         <section class="p-card">
           <h2>Datos</h2>
           <label>Nombre<input id="name" required maxlength="120" value="${esc(p.name)}" placeholder="Ej.: Auricular ANR"></label>
+          <label><span>Frase corta en la tarjeta <span class="muted">(opcional, ej.: “Con ficha Dual plug, LEMO o XLR”)</span></span><input id="nota" maxlength="60" value="${esc(p.nota || "")}"></label>
           <div class="p-grid2">
             <label>Marca<input id="brand" maxlength="60" value="${esc(p.brand)}"></label>
             <label>Modelo<input id="model" maxlength="60" value="${esc(p.model)}"></label>
@@ -464,7 +465,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        codigo: val("codigo"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), nota: val("nota"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
