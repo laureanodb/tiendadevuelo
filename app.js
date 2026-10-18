@@ -7,22 +7,27 @@
   // ---------- Destacados, tripulantes, regalos ----------
   const renderRows = () => {
     $("#destacados").innerHTML = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map(card).join("");
-    $("#tcpGrid").innerHTML = visibles.filter((p) => p.tcp).slice(0, 4).map(card).join("");
-    $("#regalosGrid").innerHTML = visibles.filter((p) => p.regalo).slice(0, 4).map(card).join("");
+    const tcp = visibles.filter((p) => p.tcp), regalos = visibles.filter((p) => p.regalo);
+    $("#tripulantes").hidden = !tcp.length; $("#regalos").hidden = !regalos.length;
+    $("#tcpGrid").innerHTML = tcp.slice(0, 4).map(card).join("");
+    $("#regalosGrid").innerHTML = regalos.slice(0, 4).map(card).join("");
+    $("#kits").hidden = !KITS.length;
+    document.querySelectorAll('a[href="#kits"]').forEach((a) => (a.hidden = !KITS.length));
     const usados = visibles.filter((p) => p.reacond);
     $("#usados").hidden = !usados.length;
     $("#usadosGrid").innerHTML = usados.slice(0, 4).map(card).join("");
   };
 
   // ---------- Banners que rotan ----------
-  $("#banners").innerHTML = `<div class="banner-track" id="bannerTrack">${BANNERS.map((b, i) => `
+  const BAN = BANNERS.filter((b) => KITS.length || !String(b.href).includes("#kits"));
+  $("#banners").innerHTML = `<div class="banner-track" id="bannerTrack">${BAN.map((b, i) => `
     <a class="banner b${i % 3}" href="${b.href}">
       <span class="kicker">${esc(b.kicker)}</span><h3>${esc(b.title)}</h3><p>${esc(b.text)}</p><span class="banner-cta">${esc(b.cta)} →</span>
     </a>`).join("")}</div>
-    <div class="dots" role="tablist" aria-label="Banners">${BANNERS.map((_, i) => `<button role="tab" aria-label="Banner ${i + 1}" data-dot="${i}"></button>`).join("")}</div>`;
+    <div class="dots" role="tablist" aria-label="Banners">${BAN.map((_, i) => `<button role="tab" aria-label="Banner ${i + 1}" data-dot="${i}"></button>`).join("")}</div>`;
   let bi = 0, bTimer;
   const showBanner = (i) => {
-    bi = (i + BANNERS.length) % BANNERS.length;
+    bi = (i + BAN.length) % BAN.length;
     $("#bannerTrack").style.transform = `translateX(-${bi * 100}%)`;
     document.querySelectorAll("[data-dot]").forEach((d, k) => d.setAttribute("aria-selected", k === bi));
   };
@@ -44,7 +49,7 @@
   try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
   const hace30 = Date.now() - 30 * 864e5;
   const esNovedad = (p) => p.nuevo || (p.creado && new Date(p.creado).getTime() > hace30);
-  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), "Por encargo", "Favoritos", ...CATEGORIES.filter((c) => visibles.some((p) => p.cat === c))];
+  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), ...(visibles.some(esNovedad) ? ["Novedades del mes"] : []), ...(visibles.some((p) => p.top) ? ["Más vendidos"] : []), ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), ...(visibles.some((p) => p.encargo) ? ["Por encargo"] : []), "Favoritos", ...CATEGORIES.filter((c) => visibles.some((p) => p.cat === c))];
   const marcasTodas = [...new Set(visibles.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   // Franja de marcas: primero las que somos distribuidor oficial
   const oficiales = new Set(visibles.filter((p) => p.oficial).map((p) => p.brand));

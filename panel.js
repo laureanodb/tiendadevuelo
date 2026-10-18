@@ -158,8 +158,8 @@
       </div>` : `
       <section class="p-card p-empty">
         <h2>Todavía no hay productos</h2>
-        <p class="muted">Podés empezar con los ${PRODUCTS.length} productos de muestra que tiene hoy la web y editarlos, o cargar los tuyos desde cero.</p>
-        <div class="p-head-btns"><button class="btn btn-ghost" id="importar">Empezar con los de muestra</button><button class="btn btn-primary" id="nuevo2">Cargar el primero</button></div>
+        <p class="muted">Pasá al panel los ${PRODUCTS.length} productos que hoy muestra la web (con sus fotos) para editarlos, ponerles precio y stock, o cargá uno nuevo.</p>
+        <div class="p-head-btns"><button class="btn btn-ghost" id="importar">Pasar los productos de la web al panel</button><button class="btn btn-primary" id="nuevo2">Cargar el primero</button></div>
       </section>`}`;
 
     const $ = (id) => document.getElementById(id);

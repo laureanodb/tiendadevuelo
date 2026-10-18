@@ -51,8 +51,8 @@
   const art = (p, big) => {
     if (p.fotos && p.fotos.length) {
       // Miniatura: primero la WebP, si no existe la JPG chica y si tampoco, la foto grande
-      const f = p.fotos[0], chica = !big && /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f);
-      const webp = chica && Number((f.match(/\/(\d{13})-[a-f0-9]+\.jpg$/) || [])[1]) > 1792296541731; // fotos subidas desde que existe la miniatura WebP
+      const f = p.fotos[0], propia = /^\/img\/productos\/.+\.jpg$/.test(f), chica = !big && (propia || /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f));
+      const webp = chica && propia || chica && Number((f.match(/\/(\d{13})-[a-f0-9]+\.jpg$/) || [])[1]) > 1792296541731; // fotos subidas desde que existe la miniatura WebP
       const src = chica ? f.replace(/\.jpg$/, webp ? "-t.webp" : "-t.jpg") : f, resto = chica ? [webp && f.replace(/\.jpg$/, "-t.jpg"), f].filter(Boolean).join(" ") : "";
       return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" decoding="async"${resto ? ` data-alt="${esc(resto)}" onerror="var a=(this.dataset.alt||'').split(' ').filter(Boolean);if(a.length){this.dataset.alt=a.slice(1).join(' ');this.src=a[0]}else{this.onerror=null}"` : ""}></div>`;
     }
@@ -251,9 +251,9 @@
             <a role="menuitem" href="/usados"><span>♻️</span>Usados y reacondicionados</a><a role="menuitem" href="/novedades"><span>✨</span>Novedades del mes</a></div>
         </div>
         ${PRODUCTS.some(enOferta) ? '<a href="/ofertas" class="link-sale">Ofertas</a>' : ""}${PRODUCTS.some((p) => p.liquidacion && !p.agotado) ? '<a href="/liquidacion" class="link-sale">Liquidación</a>' : ""}
-        <a href="${h("#kits")}">Kits</a>
-        <a href="${h("#tripulantes")}">Tripulantes</a>
-        <a href="${h("#regalos")}">Regalos</a>
+        ${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}
+        ${PRODUCTS.some((p) => p.tcp && !p.agotado) ? `<a href="${h("#tripulantes")}">Tripulantes</a>` : ""}
+        ${PRODUCTS.some((p) => p.regalo && !p.agotado) ? `<a href="${h("#regalos")}">Regalos</a>` : '<a href="/regalos-para-pilotos">Regalos</a>'}
         ${PRODUCTS.some((p) => p.alquiler) ? `<a href="/alquiler"${page === "alquiler" ? ' aria-current="page"' : ""}>Alquiler</a>` : ""}
         <a href="/envios"${page === "envios" ? ' aria-current="page"' : ""}>Envíos</a>
         <a href="/contacto"${page === "contacto" ? ' aria-current="page"' : ""}>Contacto</a>
@@ -272,7 +272,7 @@
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h2 class="foot-h">Contacto</h2>

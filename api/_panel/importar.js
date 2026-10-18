@@ -8,7 +8,9 @@ export default panel(async (req, res) => {
   const lista = Array.isArray(body(req).productos) ? body(req).productos.slice(0, 300) : [];
   let n = 0;
   for (const [i, p] of lista.entries()) {
-    const row = { ...toRow(p), orden: i };
+    // Las fotos que vienen con la web (/img/productos/…) se guardan con la dirección completa
+    const fotos = (Array.isArray(p.fotos) ? p.fotos : []).map((f) => (String(f).startsWith("/") ? "https://www.tiendadevuelo.com.ar" + f : f));
+    const row = { ...toRow({ ...p, fotos }), orden: i };
     if (!row.name) continue;
     const cols = Object.keys(row);
     await q(`insert into tdv_productos (id, ${cols.join(", ")}) values ($1, ${cols.map((_, k) => "$" + (k + 2)).join(", ")}) on conflict (id) do nothing`,
