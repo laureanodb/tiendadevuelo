@@ -106,6 +106,22 @@ const PRODUCTS = [
     desc: "Plotter con transportador giratorio para medir rumbos verdaderos o magnéticos sobre la carta, con escalas en millas náuticas y terrestres.",
     specs: ["Transportador: Giratorio (azimut)", "Escalas: 1:500.000 y 1:1.000.000", "Unidades: Millas náuticas y terrestres", "Material: Plástico transparente"],
     fotos: ["/img/productos/jeppesen-pj1-1.jpg"] },
+  { id: "asa-flight-timer-3", name: "Cronómetro de vuelo ASA Flight Timer 3", brand: "ASA", model: "Flight Timer 3", cat: "Aviónica", icon: "watch",
+    etapas: ["alumno", "privado", "comercial"],
+    desc: "Cronómetro de vuelo de mano con tres timers simultáneos, timer de combustible y memoria para tiempos de aproximación. Pantalla retroiluminada y alarmas sonoras y visuales.",
+    specs: ["Timers: 3 simultáneos, más combustible y cronómetro", "Reloj: Hora local o UTC (Zulu)", "Aproximaciones: Memoria para 12 tiempos", "Bloc de notas: Squawk y frecuencias", "Pantalla: LCD retroiluminada", "Pilas: 2 AAA"],
+    fotos: ["/img/productos/asa-flight-timer-3-1.jpg"] },
+  { id: "icom-ic-a220", name: "Transceptor de panel Icom IC-A220", brand: "Icom", model: "IC-A220", cat: "Aviónica", icon: "radio",
+    etapas: ["privado", "comercial"],
+    desc: "Transceptor VHF aeronáutico para montar en el panel, con pantalla OLED, intercomunicador incorporado y doble escucha. Hay versión TSO para aviones certificados y versión sin TSO para experimentales y deportivos livianos.",
+    specs: ["Separación: 8,33 / 25 kHz", "Pantalla: OLED", "Intercomunicador: Incorporado, activado por voz", "Funciones: Doble escucha, squelch automático y memorias", "Alimentación: 12 / 24 V", "Peso: 1 kg"],
+    variantes: ["Versión TSO (aviones certificados)", "Versión sin TSO (experimentales y LSA)"],
+    fotos: ["/img/productos/icom-a220-1.jpg"] },
+  { id: "qyt-kt-a16", name: "Transceptor portátil QYT KT-A16", brand: "QYT", model: "KT-A16", cat: "Comunicaciones", icon: "radio",
+    etapas: ["alumno", "privado"],
+    desc: "Radio portátil de banda aeronáutica económica, con pantalla color, 6 W de potencia y 200 canales. Una buena opción como equipo de respaldo.",
+    specs: ["Potencia: 6 W", "Transmisión: 118 a 136,975 MHz", "Separación: 8,33 / 25 kHz", "Canales: 200 memorias", "Batería: 2000 mAh", "Pantalla: Color"],
+    fotos: ["/img/productos/qyt-kt-a16-1.jpg"] },
 ];
 
 // Kits armables: el cliente puede sacar productos y el descuento se mantiene.
