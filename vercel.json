@@ -4,15 +4,15 @@
   "rewrites": [
     {
       "source": "/producto/:id",
-      "destination": "/"
+      "destination": "/api/ficha?tipo=producto&id=:id"
     },
     {
       "source": "/categoria/:slug",
-      "destination": "/"
+      "destination": "/api/ficha?tipo=categoria&id=:slug"
     },
     {
       "source": "/marca/:slug",
-      "destination": "/"
+      "destination": "/api/ficha?tipo=marca&id=:slug"
     },
     {
       "source": "/ofertas",
@@ -37,6 +37,10 @@
     {
       "source": "/liquidacion",
       "destination": "/"
+    },
+    {
+      "source": "/google-shopping.tsv",
+      "destination": "/api/catalogo?formato=google"
     }
   ],
   "redirects": [
@@ -98,7 +102,7 @@
   ],
   "functions": {
     "api/[fn].js": {
-      "includeFiles": "products.js",
+      "includeFiles": "{products.js,index.html}",
       "maxDuration": 60
     },
     "api/panel/[fn].js": {

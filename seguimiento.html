@@ -50,6 +50,7 @@
           box.innerHTML = p.estado === "cancelado"
             ? `<div class="notice-inline">Este pedido fue cancelado. Si tenés dudas, escribinos.</div>`
             : `<ol class="steps">${PASOS.map(([k, t, d], i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><b>${t}</b><span>${i === idx ? d : ""}${cuando(k) ? ` <small>${fecha(cuando(k).at)}</small>` : ""}</span></li>`).join("")}</ol>`;
+          if (p.descargas?.length) box.innerHTML += `<div class="pay-box"><h4>📩 Tus descargas</h4>${p.descargas.map((d) => `<a class="btn btn-primary" href="${esc(d.url)}" target="_blank" rel="noopener">Descargar ${esc(d.nombre)}</a>`).join("")}<p class="muted small">Guardá el archivo: el link es personal.</p></div>`;
           if (p.pago && Object.keys(p.pago).length) { CONFIG.pago = p.pago; box.innerHTML += window.TDV.pagoHTML(p.totalArs); }
           if (["nuevo", "señado"].includes(p.estado)) box.innerHTML += `<div class="up-box no-print"><h3>¿Ya pagaste?</h3>
             <p class="small">Subí la captura o el PDF de la transferencia y lo verificamos. ${p.comprobantes ? `<b>Ya recibimos ${p.comprobantes === 1 ? "1 comprobante" : p.comprobantes + " comprobantes"}.</b>` : ""}</p>

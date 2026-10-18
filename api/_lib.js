@@ -51,6 +51,8 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists oficial boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
+    await q(`alter table tdv_productos add column if not exists faqs jsonb not null default '[]'`);
+    await q(`alter table tdv_productos add column if not exists descarga text not null default ''`);
     await q(`alter table tdv_productos add column if not exists nota text not null default ''`);
     await q(`alter table tdv_productos add column if not exists digital boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists codigo text not null default ''`);
@@ -137,7 +139,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -154,7 +156,7 @@ export function fromRow(r, admin = false) {
     return p;
   }
   return { ...p, llega: r.llega ? new Date(r.llega).toISOString().slice(0, 10) : null, antes: num(r.antes), ofertaHasta: r.oferta_hasta ? new Date(r.oferta_hasta).toISOString().slice(0, 10) : null, variantes: r.variantes, costo: num(r.costo), costoMoneda: r.costo_moneda, stock: r.stock, stockMin: r.stock_min,
-    visible: r.visible, proveedor: r.proveedor, notas: r.notas, codigo: r.codigo || "", orden: r.orden, actualizado: r.actualizado };
+    visible: r.visible, proveedor: r.proveedor, notas: r.notas, codigo: r.codigo || "", descarga: r.descarga || "", orden: r.orden, actualizado: r.actualizado };
 }
 
 const str = (v, max = 300) => String(v ?? "").trim().slice(0, max);
@@ -169,6 +171,8 @@ export function toRow(p) {
     usd: money(p.usd), ars: money(p.ars), costo: money(p.costo), costo_moneda: p.costoMoneda === "ARS" ? "ARS" : "USD",
     stock: int(p.stock), stock_min: int(p.stockMin),
     encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion, digital: !!p.digital, nota: str(p.nota, 60),
+    faqs: JSON.stringify((Array.isArray(p.faqs) ? p.faqs : String(p.faqs || "").split("\n").map((l) => l.split("|"))).map((x) => [str(x[0], 200), str(x[1], 600)]).filter((x) => x[0] && x[1]).slice(0, 10)),
+    descarga: /^https:\/\//.test(str(p.descarga, 400)) ? str(p.descarga, 400) : "",
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
     antes: money(p.antes), oferta_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(p.ofertaHasta || "")) ? p.ofertaHasta : null,
@@ -347,7 +351,10 @@ export const redondear = (n) => (n >= 20000 ? Math.ceil(n / 1000) * 1000 : Math.
 export async function extrasPublicos() {
   const t = await ajuste("testimonios", []);
   const b = await ajuste("beneficio", {});
+  const m = await ajuste("marketing", {});
+  const px = String((m && m.metaPixel) || "").replace(/\D/g, "").slice(0, 20);
   return {
+    metaPixel: px.length >= 10 ? px : "",
     testimonios: (Array.isArray(t) ? t : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), nombre: String(x.nombre || "").slice(0, 40) })),
     beneficio: b && String(b.texto || "").trim() ? String(b.texto).trim().slice(0, 300) : "",
   };

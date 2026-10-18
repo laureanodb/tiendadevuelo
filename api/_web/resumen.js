@@ -29,7 +29,20 @@ export default async function handler(req, res) {
     c.n ? `Comprobantes por revisar: ${c.n}` : "",
     k.n ? `Carritos sin terminar hoy: ${k.n}` : "",
     Number(o.n) ? `Opiniones y preguntas por responder: ${o.n}` : "",
-    "https://www.tiendadevuelo.com.ar/panel",
-  ].filter(Boolean);
-  send(res, 200, { enviado: await avisar(lineas.join("\n")) });
+  ];
+  // El día 1 de cada mes, además, el control de calidad del catálogo.
+  const dia = Number(new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric" }).format(new Date()));
+  if (dia === 1) {
+    const { rows: [k2] } = await q(`select count(*)::int as total,
+      count(*) filter (where usd is null and ars is null)::int as sin_precio,
+      count(*) filter (where cardinality(fotos) = 0)::int as sin_foto,
+      count(*) filter (where length(descr) < 80)::int as sin_desc
+      from tdv_productos where visible`);
+    lineas.push(`📋 Control de calidad del mes (${k2.total} productos visibles)`,
+      k2.sin_precio ? `Sin precio: ${k2.sin_precio}` : "", k2.sin_foto ? `Sin foto: ${k2.sin_foto}` : "", k2.sin_desc ? `Descripción corta: ${k2.sin_desc}` : "",
+      !k2.sin_precio && !k2.sin_foto && !k2.sin_desc ? "Todo completo 👌" : "Detalle en Panel → Actividad");
+  }
+  lineas.push("https://www.tiendadevuelo.com.ar/panel");
+  const texto = lineas.filter(Boolean).join("\n");
+  send(res, 200, { enviado: await avisar(texto) });
 }

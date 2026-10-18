@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bautismo de vuelo y simulador · Tienda de Vuelo</title>
+  <meta name="description" content="Bautismo de vuelo en avión y vuelo en simulador en Argentina, para vivir o para regalar con voucher. Coordinamos día, lugar y precio por WhatsApp.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/experiencias">
+  <meta property="og:title" content="Bautismo de vuelo y simulador · Tienda de Vuelo">
+  <meta property="og:description" content="Bautismo de vuelo en avión y vuelo en simulador en Argentina, para vivir o para regalar con voucher. Coordinamos día, lugar y precio por WhatsApp.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="experiencias" data-wa="¡Hola! Quería consultar por una experiencia de vuelo.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Experiencias</span>
+      <h1>Bautismo de vuelo y simulador</h1>
+      <p>Para vivirlo o para regalarlo. Coordinamos la experiencia con escuelas y simuladores, y te confirmamos día, lugar y precio por WhatsApp antes de reservar.</p>
+    </div></section>
+    <section class="wrap prose">
+      <div class="exp-grid">
+        <article class="form-card"><h2>✈️ Bautismo en avión</h2><p>Un vuelo de cabotaje con piloto instructor, en avión de escuela. Despegás, tomás los comandos un rato si querés y volvés a aterrizar. Duración y aeródromo según disponibilidad.</p></article>
+        <article class="form-card"><h2>🕹️ Vuelo en simulador</h2><p>Una sesión guiada en simulador: despegue, circuito y aterrizaje, o una ruta a elección. Sirve para probar antes de anotarte en el curso o para practicar procedimientos.</p></article>
+        <article class="form-card"><h2>🎁 Para regalar</h2><p>Te mandamos un voucher digital con el nombre de quien lo recibe. La fecha se elige después, cuando le quede cómoda.</p></article>
+      </div>
+      <h2>Disponibles en la tienda</h2>
+      <div class="grid grid-4" id="expGrid"></div>
+      <h2 id="expForm">Pedí tu experiencia</h2>
+      <form class="form-card" id="expF" style="max-width:640px">
+        <label>Experiencia<select id="eTipo"><option>Bautismo en avión</option><option>Vuelo en simulador</option><option>No sé, quiero que me asesoren</option></select></label>
+        <div class="p-grid2-mini"><label>Personas<input id="ePers" type="number" min="1" max="10" value="1" required></label><label>Fecha aproximada<input id="eFecha" type="date"></label></div>
+        <label class="exp-check"><input type="checkbox" id="eRegalo"> Es para regalar (voucher)</label>
+        <label>Zona preferida<input id="eZona" maxlength="80" placeholder="Ej.: zona norte, La Plata, Córdoba"></label>
+        <label>Tu nombre<input id="eNom" required autocomplete="name" maxlength="80"></label>
+        <button class="btn btn-primary" type="submit">Pedir por WhatsApp</button>
+        <p class="muted small">Sujeto a disponibilidad y a condiciones meteorológicas: si el día no da para volar, se reprograma sin costo.</p>
+      </form>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { card, waLink, $ } = window.TDV;
+      const exp = PRODUCTS.filter((p) => p.cat === "Cursos y experiencias");
+      $("#expGrid").innerHTML = exp.length ? exp.map(card).join("")
+        : `<p class="muted" style="grid-column:1/-1">Las experiencias se arman a pedido. Completá el formulario y te pasamos opciones.</p>`;
+      const hoy = new Date().toISOString().slice(0, 10); $("#eFecha").min = hoy;
+      $("#expF").onsubmit = (e) => {
+        e.preventDefault();
+        const f = $("#eFecha").value ? $("#eFecha").value.split("-").reverse().join("/") : "a definir";
+        window.open(waLink(`¡Hola! Soy ${$("#eNom").value}. Quiero: ${$("#eTipo").value}${$("#eRegalo").checked ? " (para regalar, con voucher)" : ""}.\nPersonas: ${$("#ePers").value}. Fecha: ${f}.${$("#eZona").value ? " Zona: " + $("#eZona").value + "." : ""}`), "_blank", "noopener");
+      };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

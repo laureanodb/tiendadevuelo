@@ -7,6 +7,7 @@
     if (d.pago) CONFIG.pago = d.pago;
     if (d.testimonios) CONFIG.testimonios = d.testimonios;
     if (d.beneficio) CONFIG.beneficio = d.beneficio;
+    CONFIG.metaPixel = d.metaPixel || "";
     if (d.dolar) { CONFIG.dolarTipo = d.dolar.tipo; CONFIG.dolarManual = d.dolar.manual; }
     if (d.ventas) CONFIG.ventas = "+" + Number(d.ventas).toLocaleString("es-AR");
     if (d.configurado && d.productos.length) {

@@ -256,6 +256,8 @@
           <label><span>Descripción corta ${estado.ia ? '<button type="button" class="link-btn" id="iaDesc">✨ Redactar con IA</button>' : ""}</span><textarea id="desc" rows="2" maxlength="600">${esc(p.desc)}</textarea></label>
           <label><span>Características <span class="muted">(una por renglón; para la ficha técnica usá “Atenuación: 24 dB”)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
+          <label><span>Preguntas frecuentes <span class="muted">(una por renglón: «¿Pregunta? | Respuesta»)</span></span><textarea id="faqs" rows="3">${esc((p.faqs || []).map((f) => f[0] + " | " + f[1]).join("\n"))}</textarea></label>
+          <label id="descargaWrap"${p.digital ? "" : " hidden"}><span>Link de descarga <span class="muted">(producto digital: solo lo ve quien pagó, en la página de su pedido)</span></span><input id="descarga" type="url" inputmode="url" placeholder="https://drive.google.com/…" value="${esc(p.descarga || "")}"></label>
           <label><span>Video <span class="muted">(link de YouTube o Instagram, opcional)</span></span><input id="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(p.video || "")}"></label>
         </section>
 
@@ -382,6 +384,7 @@
       fotos.push(d.url); renderFotos(); dirty = true;
       return data;
     }
+    $("f_digital").addEventListener("change", (e) => { $("descargaWrap").hidden = !e.target.checked; });
     if ($("fondoBlanco")) $("fondoBlanco").onchange = (e) => guardar("tdv-fondo", e.target.checked);
     $("codScan").onclick = async () => { const c = await escanear(); if (c) { $("codigo").value = c; dirty = true; } };
     if ($("iaDesc")) $("iaDesc").onclick = async () => {
@@ -465,7 +468,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        codigo: val("codigo"), nota: val("nota"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
@@ -578,7 +581,9 @@
     const m = {
       nuevo: `¡Hola ${nombre}! Recibimos tu pedido ${p.num}. Ya te confirmamos stock, envío y forma de pago.`,
       "señado": `¡Hola ${nombre}! Recibimos la seña de tu pedido ${p.num}: el producto queda reservado. Podés seguirlo acá: ${link}`,
-      pagado: `¡Hola ${nombre}! Recibimos el pago de tu pedido ${p.num}. Ya lo estamos preparando. Seguilo acá: ${link}`,
+      pagado: p.items.some((i) => productos.find((x) => x.id === i.id)?.digital)
+        ? `¡Hola ${nombre}! Recibimos el pago de tu pedido ${p.num}. Tus descargas ya están disponibles acá: ${link}`
+        : `¡Hola ${nombre}! Recibimos el pago de tu pedido ${p.num}. Ya lo estamos preparando. Seguilo acá: ${link}`,
       enviado: `¡Hola ${nombre}! Tu pedido ${p.num} ya salió${p.envioEmpresa ? " por " + p.envioEmpresa : ""}.${p.envioCodigo ? " Código de seguimiento: " + p.envioCodigo + "." : ""} Seguilo acá: ${link} ¡Buen vuelo! ✈`,
       entregado: `¡Hola ${nombre}! ¿Te llegó bien tu pedido ${p.num}? Gracias por comprar en Tienda de Vuelo. Si tenés un minuto, contanos qué te pareció acá: ${sitio}/resena#${p.num}.${p.token} ✈`,
       cancelado: `¡Hola ${nombre}! Cancelamos tu pedido ${p.num}. Si fue un error o querés retomarlo, escribinos.`,
@@ -817,6 +822,24 @@
     "Uniforme": ["Las alas y las charreteras se cuidan guardándolas en su estuche: el plateado dura mucho más."],
     "Libros y regalos": ["Estudiar con preguntas de práctica ayuda a llegar tranquilo al examen teórico."],
   };
+  // Campaña de lanzamiento: 10 publicaciones y 3 anuncios, en orden, con los productos reales de la tienda.
+  const CAMPANA = [
+    { t: "1 · Presentación", id: "bose-a30", texto: (u) => `Tienda de Vuelo: equipos originales para pilotos.\n\nSomos distribuidor oficial Bose en Argentina y llevamos más de 2.500 ventas a pilotos, alumnos y tripulaciones.\n\nAuriculares, radios VHF, computadoras de vuelo, plotters y accesorios, con garantía y factura.\n\nCatálogo completo: ${u}\n\n#aviacion #pilotos #pilotshop #tiendadevuelo` },
+    { t: "2 · Bose A30", id: "bose-a30", texto: (u) => `Bose A30, el auricular de aviación más nuevo de Bose.\n\n· Cancelación activa de ruido con tres modos\n· Bluetooth para teléfono y música\n· Presión lateral baja: cómodo en vuelos largos\n\nDisponible con ficha Dual plug (GA), LEMO (alimentada por el panel) o XLR de 5 pines.\n\nUnidades originales, distribuidor oficial.\n${u}\n\n#bose #boseA30 #aviacion #pilotos` },
+    { t: "3 · ¿Qué ficha usa tu avión?", id: "bose-a30", texto: (u) => `¿Qué ficha usa tu avión?\n\n· Dual plug (GA): dos fichas, la más común en aviones de escuela y aviación general.\n· LEMO 6 pines: el auricular toma energía del panel, sin pilas.\n· XLR 5 pines: típica de Airbus y otros aviones de línea.\n· U-174/U: helicópteros.\n\nEn cada producto de la web hay un selector que te dice cuál elegir. Si tenés dudas, mandanos foto del panel.\n${u}\n\n#aviacion #pilotos #auriculares` },
+    { t: "4 · David Clark", id: "david-clark-dc-pro-x2", texto: (u) => `David Clark DC PRO-X2 y DC ONE-X.\n\nCancelación de ruido digital, Bluetooth y la construcción robusta que David Clark tiene hace décadas en cabina.\n\nConsultá versiones de ficha y disponibilidad.\n${u}\n\n#davidclark #aviacion #pilotos` },
+    { t: "5 · Radios portátiles", id: "icom-ic-a16", texto: (u) => `Radio VHF portátil: la segunda opción de comunicación a bordo.\n\nIcom IC-A16 y Yaesu FTA-250L: banda aeronáutica, batería de larga duración y construcción resistente. También Icom IC-A220 de panel.\n\nUna radio de mano te saca de apuros ante una falla eléctrica y sirve en tierra para escuchar la frecuencia.\n${u}\n\n#icom #yaesu #radioVHF #aviacion` },
+    { t: "6 · Jeppesen CR-3", id: "jeppesen-cr-3", texto: (u) => `Computadora de vuelo Jeppesen CR-3.\n\nCircular, compacta y sin pilas: resuelve triángulo de velocidades, consumo, TAS y altitud de densidad. Es la que se usa en los exámenes.\n\nCombinala con el plotter Jeppesen PJ-1 para planificar tus travesías.\n${u}\n\n#jeppesen #navegacion #pilotos #alumnopiloto` },
+    { t: "7 · Kit de navegación", id: "jeppesen-pj-1", texto: (u) => `Kit de navegación: Jeppesen CR-3 + plotter PJ-1 + ASA Flight Timer 3.\n\nTodo lo que necesita un alumno para la parte de navegación, con descuento por llevarlo junto.\n${u}\n\n#navegacion #alumnopiloto #jeppesen #asa` },
+    { t: "8 · Llaveros", id: "llavero-remove-before-flight", texto: (u) => `Llaveros de aviación: Remove Before Flight, Crew, Pilot, Seat Belt y EGPWS.\n\nUn regalo simple para pilotos, alumnos y tripulantes. Ideales para el recibido o el primer solo.\n${u}\n\n#removebeforeflight #regalosparapilotos #aviacion` },
+    { t: "9 · Cómo comprar", id: "", texto: (u) => `Cómo comprar en Tienda de Vuelo:\n\n1. Elegí en la web y armá el carrito.\n2. Nos llega tu pedido por WhatsApp y te confirmamos stock.\n3. Pagás por transferencia en pesos o dólares, efectivo o USDT. Podés reservar con seña.\n4. Envío a todo el país, en el día en CABA o entrega en aeródromo.\n\nPrecios en dólares y en pesos al dólar del día.\n${u}\n\n#pilotshop #aviacion` },
+    { t: "10 · Garantía y respaldo", id: "", texto: (u) => `Equipos originales, con garantía.\n\n· Distribuidor oficial Bose\n· Más de 2.500 ventas\n· Asesoramiento técnico antes y después de la compra\n· Usados revisados con 3 meses de garantía legal\n\nEscribinos al ${CONFIG.whatsappVisible} o entrá a ${u}\n\n#pilotos #aviacion #tiendadevuelo` },
+  ];
+  const ANUNCIOS = [
+    { t: "Anuncio A · Bose A30", id: "bose-a30", texto: (u) => `Título: Bose A30 original · Distribuidor oficial\nTexto principal: El auricular de aviación más nuevo de Bose, con ficha Dual plug, LEMO o XLR. Garantía oficial y envío a todo el país.\nDescripción: Consultá el precio por WhatsApp\nBotón: Enviar mensaje de WhatsApp\nLink: ${u}\nPúblico sugerido: Argentina, 20 a 60 años, intereses: aviación, piloto, aviación civil, Bose.` },
+    { t: "Anuncio B · Alumnos", id: "jeppesen-cr-3", texto: (u) => `Título: Todo para tu curso de piloto\nTexto principal: Computadora Jeppesen CR-3, plotter PJ-1, timer y radio VHF. Originales, con asesoramiento técnico y envío a todo el país.\nDescripción: Kit de navegación con descuento\nBotón: Comprar\nLink: ${u}\nPúblico sugerido: Argentina, 17 a 35 años, intereses: escuela de vuelo, piloto privado, aviación.` },
+    { t: "Anuncio C · Retargeting", id: "", texto: (u) => `Título: ¿Te quedó alguna duda?\nTexto principal: Te asesoramos para elegir la ficha correcta para tu avión y te pasamos el precio al dólar del día. Respondemos por WhatsApp.\nDescripción: Equipos originales para pilotos\nBotón: Enviar mensaje de WhatsApp\nLink: ${u}\nPúblico sugerido: personas que visitaron la web en los últimos 30 días (necesita el píxel de Meta activo en Ajustes).` },
+  ];
   function verRedes() {
     const sem = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1)) / 6048e5);
     const vis = productos.filter((p) => p.visible && (p.usd !== null || p.ars !== null));
@@ -846,8 +869,24 @@
       const p = nuevos[(sem + 2) % nuevos.length];
       posts.push({ t: "Para historias", p, texto: `Nuevo en la tienda: ${p.name}.\n${precio(p)}\nLink en la bio o por WhatsApp.` });
     }
+    const porIdR = Object.fromEntries(productos.map((p) => [p.id, p]));
+    const web = sitio.replace("https://", "");
+    const deCamp = (lista) => lista.map((c) => { const p = porIdR[c.id] || { name: "Tienda de Vuelo", fotos: [] }; return { t: c.t, p, texto: c.texto(c.id && porIdR[c.id] ? `${web}/producto/${c.id}` : web) }; });
+    const camp = deCamp(CAMPANA), anun = deCamp(ANUNCIOS);
+    const tarjeta = (x, i) => `
+        <section class="p-card p-post"><div class="p-post-head"><b>${esc(x.t)}</b><span class="muted small">${esc(x.p.name)}</span></div>
+          <div class="p-post-body">${x.p.fotos?.[0] ? `<a href="${esc(x.p.fotos[0])}" target="_blank" rel="noopener" class="p-post-foto"><img src="${esc(x.p.fotos[0])}" alt="" loading="lazy"><span>Abrir foto ↗</span></a>` : '<div class="p-post-foto sin">Sin foto</div>'}
+          <textarea rows="9" data-post="${i}" aria-label="Texto de la publicación">${esc(x.texto.replace(/\n{3,}/g, "\n\n"))}</textarea></div>
+          <div class="p-head-btns"><button class="btn btn-primary btn-sm" data-pcopy="${i}">Copiar texto</button>${estado.ia ? `<button class="btn btn-ghost btn-sm" data-pia="${i}">✨ Mejorar con IA</button>` : ""}</div>
+        </section>`;
+    const n1 = posts.length, n2 = n1 + camp.length;
     app.innerHTML = tabsHTML("redes") + `
       <div class="p-head"><div><h1>Ideas para publicar</h1><p class="muted">Textos listos para Instagram (@${esc(CONFIG.instagram || "tiendadevueloar")}) armados con tus productos. Cambian cada semana. Editalos, copialos y publicá con la foto.</p></div></div>
+      <details class="p-card"><summary><b>🚀 Campaña de lanzamiento</b> · 10 publicaciones y 3 anuncios listos</summary>
+        <p class="muted small">Publicá una cada dos o tres días, en este orden. Los anuncios se cargan en el Administrador de anuncios de Meta; el C necesita el píxel activo (Ajustes).</p>
+        <h2 class="small">Publicaciones</h2><div class="p-list">${camp.map((x, i) => tarjeta(x, n1 + i)).join("")}</div>
+        <h2 class="small">Anuncios</h2><div class="p-list">${anun.map((x, i) => tarjeta(x, n2 + i)).join("")}</div>
+      </details>
       ${posts.length ? `<div class="p-list">${posts.map((x, i) => `
         <section class="p-card p-post"><div class="p-post-head"><b>${esc(x.t)}</b><span class="muted small">${esc(x.p.name)}</span></div>
           <div class="p-post-body">${x.p.fotos?.[0] ? `<a href="${esc(x.p.fotos[0])}" target="_blank" rel="noopener" class="p-post-foto"><img src="${esc(x.p.fotos[0])}" alt="" loading="lazy"><span>Abrir foto ↗</span></a>` : '<div class="p-post-foto sin">Sin foto</div>'}
@@ -994,8 +1033,8 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {}, vp = {}, vb = {}, caps = [];
-    try { [v, vp, vb, caps] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios")])).map((x) => x.valor || {}); } catch {}
+    let v = {}, vp = {}, vb = {}, caps = [], vm = {};
+    try { [v, vp, vb, caps, vm] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing")])).map((x) => x.valor || {}); } catch {}
     if (!Array.isArray(caps)) caps = [];
     const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
     app.innerHTML = tabsHTML("ajustes") + `
@@ -1031,7 +1070,25 @@
           <li>Elegí <b>Programar feed</b>, pegá la dirección y poné que se actualice <b>todos los días</b>.</li>
           <li>Moneda: <b>ARS</b>. Listo: vas a poder etiquetar productos en Instagram y Facebook.</li>
           <li>Para WhatsApp: en la app de WhatsApp Business → <b>Herramientas para la empresa</b> → <b>Catálogo</b> → conectá el mismo catálogo de Meta.</li></ol>
-        <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al dólar del día.</p></section>`;
+        <p class="muted small">Solo salen los productos visibles que tienen al menos una foto <b>y precio</b>. Los precios en dólares se pasan a pesos al dólar del día.</p></section>
+      <section class="p-card p-form"><h2>Google Shopping (gratis)</h2>
+        <p>Para que tus productos aparezcan en la pestaña de compras de Google:</p>
+        <div class="p-doc"><input readonly value="${sitio}/google-shopping.tsv" id="gUrl" aria-label="Dirección del catálogo de Google"><button type="button" class="btn btn-ghost btn-sm" data-copy-url="gUrl">Copiar</button></div>
+        <ol class="small"><li>Entrá a <b>merchants.google.com</b> con tu cuenta de Google y creá la cuenta de la tienda (país: Argentina, moneda: ARS).</li>
+          <li>Verificá el sitio <b>tiendadevuelo.com.ar</b> (te deja hacerlo con Search Console).</li>
+          <li>En <b>Productos → Fuentes de datos → Agregar</b>, elegí <b>Recuperación programada</b>, pegá la dirección de arriba y poné que se actualice todos los días.</li>
+          <li>En <b>Crecimiento → Administrar programas</b>, activá las <b>fichas gratuitas</b>.</li></ol></section>
+      <form class="p-card p-form" id="mktForm"><h2>Píxel de Meta (medir la publicidad)</h2>
+        <p class="muted small">Con el píxel, Instagram y Facebook saben qué anuncio trajo a cada persona que mira un producto, pide precio o manda un pedido. Lo encontrás en <b>business.facebook.com/events_manager</b> → <b>Conectar orígenes de datos</b> → <b>Web</b>: es un número de 15 o 16 cifras.</p>
+        <label>Identificador del píxel<input id="pixelId" inputmode="numeric" maxlength="20" value="${esc(vm.metaPixel || "")}" placeholder="Ej.: 123456789012345"></label>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>`;
+    document.querySelectorAll("[data-copy-url]").forEach((b) => (b.onclick = async () => { const i = document.getElementById(b.dataset.copyUrl); try { await navigator.clipboard.writeText(i.value); toast("Copiado."); } catch { i.select(); } }));
+    document.getElementById("mktForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("pixelId").value.replace(/\D/g, "");
+      if (id && !/^\d{12,20}$/.test(id)) return toast("El identificador del píxel son solo números (15 o 16 cifras).");
+      try { await api("ajustes", { method: "POST", body: { clave: "marketing", valor: { metaPixel: id } } }); toast(id ? "Píxel guardado. Ya mide la web." : "Píxel quitado."); } catch (x) { toast(x.message); }
+    };
     const guardarCaps = () => api("ajustes", { method: "POST", body: { clave: "testimonios", valor: caps } });
     const pintarCaps = () => {
       document.getElementById("capLista").innerHTML = caps.length ? caps.map((c, i) => `<figure class="p-foto"><img src="${esc(c.url)}" alt=""><figcaption><input data-capn="${i}" value="${esc(c.nombre || "")}" placeholder="Nombre" aria-label="Nombre del cliente" class="p-cap-nom"><button type="button" data-capx="${i}" aria-label="Quitar">✕</button></figcaption></figure>`).join("") : '<p class="muted small">Todavía no subiste capturas.</p>';
@@ -1100,8 +1157,39 @@
         <section class="p-card"><h2>Productos más consultados</h2><p class="muted small">Toques en “Lo quiero”, “Consultar” y “Hacer una pregunta”.</p>
           ${d.consultas.length ? `<ol class="p-rank">${d.consultas.map((c) => `<li><span>${esc(c.name)}</span><b>${c.n}</b>${c.quiero ? `<small>${c.quiero} “Lo quiero”</small>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía nada.</p>'}</section>
       </div>
+      <section class="p-card" id="calidad"><h2>Control de calidad</h2><p class="muted small">Lo que le falta a cada producto para vender mejor y salir bien en Google. Se revisa cada vez que entrás.</p><p class="p-loading">Revisando…</p></section>
       <section class="p-card p-hist" id="historial"><h2>Historial de cambios</h2><p class="muted small">Precios, stock, productos y pedidos. Si te equivocaste, tocá “Deshacer”.</p><p class="p-loading">Cargando…</p></section>`;
-    verHistorial();
+    verHistorial(); verCalidad();
+  }
+  // Revisa los productos visibles: precio, fotos (que abran y que no pesen de más), descripción, ficha técnica y preguntas.
+  async function verCalidad() {
+    const box = document.getElementById("calidad");
+    if (!box) return;
+    const vis = productos.filter((p) => p.visible);
+    const peso = async (url) => {
+      try { const r = await fetch(url, { method: "HEAD", cache: "no-store" }); if (!r.ok) return -1; return Number(r.headers.get("content-length")) || 0; } catch { return 0; }
+    };
+    const fotos = [...new Set(vis.flatMap((p) => (p.fotos || []).slice(0, 3)))];
+    const pesos = Object.fromEntries(await Promise.all(fotos.map(async (f) => [f, await peso(f)])));
+    const filas = vis.map((p) => {
+      const f = [];
+      if (p.usd === null && p.ars === null) f.push("sin precio (no entra en Google Shopping)");
+      if (!(p.fotos || []).length) f.push("sin foto");
+      for (const u of (p.fotos || []).slice(0, 3)) {
+        if (pesos[u] === -1) f.push("una foto no abre");
+        else if (pesos[u] > 600e3) f.push(`foto pesada (${Math.round(pesos[u] / 1024)} KB)`);
+      }
+      if (String(p.desc || "").trim().length < 80) f.push("descripción corta");
+      if ((p.specs || []).length < 3) f.push("pocos datos técnicos");
+      if (!p.brand) f.push("sin marca");
+      if (!(p.faqs || []).length) f.push("sin preguntas frecuentes");
+      return { p, f };
+    }).filter((x) => x.f.length);
+    const ok = vis.length - filas.length;
+    box.querySelector(".p-loading").outerHTML = `<p><b>${ok} de ${vis.length}</b> productos completos.</p>` + (filas.length
+      ? `<ol class="p-hist-list">${filas.map((x) => `<li><span aria-hidden="true">${x.f.some((t) => /precio|sin foto|no abre/.test(t)) ? "🔴" : "🟡"}</span><div><b>${esc(x.p.name)}</b><br><span class="small">${esc(x.f.join(" · "))}</span></div><button class="btn btn-ghost btn-sm" data-cedit="${esc(x.p.id)}">Completar</button></li>`).join("")}</ol>`
+      : '<p class="muted">Todo en orden. 👌</p>');
+    box.querySelectorAll("[data-cedit]").forEach((b) => (b.onclick = () => editar(productos.find((p) => p.id === b.dataset.cedit))));
   }
   async function verHistorial() {
     const box = document.getElementById("historial");

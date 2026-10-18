@@ -120,7 +120,7 @@
     let f = "Todos", brand = "", kicker = baseHead.kicker, title = baseHead.title, text = "", pageTitle = "";
     const m = path.match(/^\/(categoria|marca)\/([\w-]+)/);
     if (m && m[1] === "categoria") { const c = CATEGORIES.find((x) => slug(x) === m[2]); if (c) { f = c; kicker = "Categoría"; title = c; text = CAT_INFO[c] || ""; pageTitle = `${c} para pilotos`; } }
-    else if (m) { const b = marcasTodas.find((x) => slug(x) === m[2]); if (b) { brand = b; kicker = "Marca"; title = b; text = `Productos ${b} originales para pilotos, con envío a todo el país.`; pageTitle = `${b} en Argentina`; } }
+    else if (m) { const b = marcasTodas.find((x) => slug(x) === m[2]); if (b) { brand = b; kicker = MARCAS[b]?.oficial ? "Distribuidor oficial" : "Marca"; title = b; text = MARCAS[b]?.texto || `Productos ${b} originales para pilotos, con envío a todo el país.`; pageTitle = `${b} en Argentina`; } }
     else if (path === "/ofertas") { f = "Ofertas"; kicker = "Ofertas"; title = "Ofertas del momento"; text = "Precios rebajados por tiempo limitado."; pageTitle = "Ofertas"; }
     else if (path === "/liquidacion") { f = "Liquidación"; kicker = "Liquidación"; title = "Liquidación"; text = "Saldos y últimas unidades a precio de liquidación, hasta agotar stock."; pageTitle = "Liquidación"; }
     else if (path === "/usados") { f = "Usados y reacondicionados"; kicker = "Usados"; title = "Usados y reacondicionados"; text = "Equipos revisados y probados, a mejor precio."; pageTitle = "Usados y reacondicionados"; }
@@ -130,6 +130,10 @@
     $("#search").value = ""; $("#brand").value = brand; $("#pMin").value = ""; $("#pMax").value = "";
     $("#catKicker").textContent = kicker; $("#catTitle").textContent = title;
     $("#catText").textContent = text; $("#catText").hidden = !text;
+    // Página de marca: sello oficial y preguntas frecuentes
+    const info = brand && MARCAS[brand];
+    $("#catMarca").hidden = !(info && (info.oficial || info.faqs?.length));
+    $("#catMarca").innerHTML = info ? `${info.oficial ? `<p class="marca-sello">✔ Somos distribuidores oficiales de ${esc(brand)} en Argentina · Garantía oficial</p>` : ""}${info.faqs?.length ? `<div class="faq">${info.faqs.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>` : ""}` : "";
     document.title = `${pageTitle} · Tienda de Vuelo`;
     if (text) metaDesc.content = text;
     if (push) history.pushState({ ruta: path }, "", path);
@@ -137,7 +141,7 @@
     $("#catalogo").scrollIntoView({ behavior: push && !reduceMotion ? "smooth" : "auto" });
     return true;
   }
-  const rutaBase = () => { $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; metaDesc.content = baseDesc; };
+  const rutaBase = () => { $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; $("#catMarca").hidden = true; metaDesc.content = baseDesc; };
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a[href^='/categoria/'], a[href^='/marca/'], a[href='/ofertas'], a[href='/usados'], a[href='/novedades'], a[href='/liquidacion']");
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -189,6 +193,7 @@
     const p = byId[id];
     if (!p) return;
     current = p;
+    TDV.medir("ViewContent", { content_ids: [p.id], content_type: "product", content_name: p.name });
     if (view.hidden) lastScroll = scrollY;
     const fotos = p.fotos && p.fotos.length ? p.fotos : null;
     $("#pvGallery").innerHTML = fotos
@@ -212,6 +217,8 @@
     const { tabla, sueltas } = TDV.fichaTecnica(p);
     $("#pvSpecs").innerHTML = (tabla.length ? `<table class="spec-table"><tbody>${tabla.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</tbody></table>` : "") +
       (sueltas.length ? `<ul class="specs">${sueltas.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
+    $("#pvFaqsWrap").hidden = !p.faqs?.length;
+    $("#pvFaqs").innerHTML = (p.faqs || []).map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
     $("#pvEtapas").innerHTML = p.etapas?.length ? `<span class="muted small">Ideal para:</span> ${p.etapas.map((e) => `<span class="tag">${ETAPAS[e]}</span>`).join("")}` : "";
     $("#pvVariantWrap").hidden = !p.variantes;
     const ops = opciones(p);

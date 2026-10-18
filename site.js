@@ -309,7 +309,7 @@
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h2 class="foot-h">Contacto</h2>
@@ -450,7 +450,7 @@
       e.preventDefault();
       const nombre = m.querySelector("#ppNom").value.trim(), tel = m.querySelector("#ppTel").value.trim();
       store.set("tdv-datos", { ...store.get("tdv-datos", {}), nombre, tel });
-      evento("consulta", "", p.id);
+      evento("consulta", "", p.id); medir("Lead", { content_ids: [p.id], content_type: "product" });
       try {
         const r = await fetch("/api/consulta", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ producto: p.id, nombre: p.name, opcion, cliente: nombre, tel, web: m.querySelector('[name="web"]').value }) });
         if (!r.ok) throw new Error();
@@ -669,6 +669,7 @@
     store.set("tdv-pedidos", pedidos.slice(0, 20));
     window.open(waLink(msg), "_blank", "noopener");
     const montoPedido = Math.round(total());
+    medir("InitiateCheckout", { value: montoPedido, currency: "ARS", num_items: cart.reduce((a, l) => a + l.qty, 0) });
     cart = []; save(); step = "listo"; store.set("tdv-cid", "");
     $("#cartCount").textContent = "0"; $("#cartCount").classList.remove("show");
     $("#drawerTitle").textContent = "¡Pedido enviado!";
@@ -741,8 +742,21 @@
     box.addEventListener("click", (e) => { if (e.target.closest("a[href^='/producto/']")) toggle(false); });
   }
 
+  // Píxel de Meta: solo se carga si el dueño puso su identificador en el panel.
+  const pixel = () => {
+    const id = CONFIG.metaPixel;
+    if (!id || window.fbq) return;
+    const f = window.fbq = function () { f.callMethod ? f.callMethod.apply(f, arguments) : f.queue.push(arguments); };
+    window._fbq = f; f.push = f; f.loaded = true; f.version = "2.0"; f.queue = [];
+    const s = document.createElement("script"); s.async = true; s.src = "https://connect.facebook.net/en_US/fbevents.js";
+    document.head.appendChild(s);
+    f("init", id); f("track", "PageView");
+  };
+  const medir = (ev, datos) => { try { if (window.fbq) window.fbq("track", ev, datos || {}); } catch {} };
+  pixel();
+  document.addEventListener("click", (e) => { if (e.target.closest("a[href*='wa.me/']")) medir("Contact"); });
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };

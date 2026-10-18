@@ -707,3 +707,10 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
 .pp-card label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
 .pp-card p { margin: 0; }
 .dolar-hoy { margin-left: auto; }
+.marca-info { margin-top: 10px; max-width: 760px; }
+.marca-sello { display: inline-block; margin: 0 0 6px; padding: 6px 12px; border-radius: 999px; background: #e9f7f0; color: var(--green); font-weight: 700; font-size: 14px; }
+.pv-faqs .faq summary { font-size: 16px; padding: 12px 0; }
+.exp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.exp-grid h2 { margin-top: 0; }
+.form-card label.exp-check { display: flex; flex-direction: row; gap: 10px; align-items: center; font-weight: 500; }
+.form-card label.exp-check input { width: auto; margin: 0; }
