@@ -45,6 +45,9 @@ export default panel(async (req, res) => {
       { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.imagen } },
       { type: "text", text: `Es una foto de un producto para un pilot shop argentino (Tienda de Vuelo). Completá los datos para cargarlo en el catálogo. ${tono}${b.nota ? `\nDato del vendedor: ${String(b.nota).slice(0, 300)}` : ""}` },
     ];
+  } else if (b.modo === "post") {
+    schema = { type: "object", additionalProperties: false, required: ["texto"], properties: { texto: { type: "string", description: "Texto listo para publicar en Instagram, con 3 a 6 hashtags al final" } } };
+    content = [{ type: "text", text: `Mejorá este texto para una publicación de Instagram de Tienda de Vuelo (@tiendadevueloar), un pilot shop argentino. Mantené los datos (precio, link, WhatsApp) tal cual. Máximo 900 caracteres. Sin emojis en exceso (2 como mucho). ${tono}\n\nTexto:\n${String(b.texto || "").slice(0, 1500)}` }];
   } else {
     const p = b.producto || {};
     schema = { type: "object", additionalProperties: false, required: ["desc"], properties: { desc: { type: "string", description: "Descripción de 2 a 4 oraciones" } } };

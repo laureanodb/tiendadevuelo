@@ -50,8 +50,11 @@
 
   const art = (p, big) => {
     if (p.fotos && p.fotos.length) {
-      const f = p.fotos[0], mini = !big && /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f) ? f.replace(/\.jpg$/, "-t.jpg") : f;
-      return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(mini)}" alt="${esc(p.name)}" loading="lazy"${mini !== f ? ` onerror="this.onerror=null;this.src='${esc(f)}'"` : ""}></div>`;
+      // Miniatura: primero la WebP, si no existe la JPG chica y si tampoco, la foto grande
+      const f = p.fotos[0], chica = !big && /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f);
+      const webp = chica && Number((f.match(/\/(\d{13})-[a-f0-9]+\.jpg$/) || [])[1]) > 1792296541731; // fotos subidas desde que existe la miniatura WebP
+      const src = chica ? f.replace(/\.jpg$/, webp ? "-t.webp" : "-t.jpg") : f, resto = chica ? [webp && f.replace(/\.jpg$/, "-t.jpg"), f].filter(Boolean).join(" ") : "";
+      return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" decoding="async"${resto ? ` data-alt="${esc(resto)}" onerror="var a=(this.dataset.alt||'').split(' ').filter(Boolean);if(a.length){this.dataset.alt=a.slice(1).join(' ');this.src=a[0]}else{this.onerror=null}"` : ""}></div>`;
     }
     const [a, b] = CAT_COLORS[p.cat] || ["#0e8be0", "#d6ebfc"];
     return `<div class="art${big ? " art-big" : ""}" style="--a:${a};--b:${b}">
@@ -68,6 +71,7 @@
     p.encargo && '<span class="badge badge-order">Por encargo</span>',
     p.reacond && '<span class="badge badge-re">Reacondicionado</span>',
     p.liquidacion && '<span class="badge badge-sale">Liquidación</span>',
+    p.digital && '<span class="badge badge-new">Digital</span>',
   ].filter(Boolean).slice(0, 2).join("");
 
   // ---------- Favoritos ----------
@@ -160,7 +164,7 @@
 
   // ---------- Links por categoría y marca ----------
   const slug = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚" };
+  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚", "Cursos y experiencias": "🎓" };
 
   // ---------- Feriados y fechas patrias (Argentina) ----------
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -219,9 +223,11 @@
   const despacho = avisoDespacho();
   const metar = ["METAR SABE", "CAVOK", "ENVÍOS A TODO EL PAÍS", "DESPACHO EN 48 H", "ENVÍO EN EL DÍA EN CABA", `${CONFIG.ventas} VENTAS`, "PRODUCTOS ORIGINALES", "ROGER, TE ESPERAMOS"];
   $("#siteHeader").outerHTML = `
+    <div role="region" aria-label="Avisos de la tienda">
     ${evento_ ? `<a class="notice notice-sale" href="/ofertas">🔥 ${esc(evento_.nombre)}: ofertas hasta el ${fechaCorta(evento_.hasta)} → Ver ofertas</a>` : ""}
     ${despacho || patria ? `<div class="notice${patria ? " notice-ar" : ""}">${esc(patria ? patria + (despacho ? " · " + despacho : "") : despacho)}</div>` : ""}
-    <div class="metar" aria-label="Novedades"><div class="metar-track">${[...metar, ...metar].map((t) => `<span>${t}</span>`).join("")}</div></div>
+    <div class="metar" aria-hidden="true"><div class="metar-track">${[...metar, ...metar].map((t) => `<span>${t}</span>`).join("")}</div></div>
+    </div>
     <header class="nav" id="nav">
       <div class="wrap nav-inner">
         <a href="/" class="brand" aria-label="Tienda de Vuelo, inicio">
@@ -230,7 +236,7 @@
         </a>
         <form class="nav-search" id="navSearch" role="search">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <input id="navQ" type="search" placeholder="¿Qué estás buscando?" aria-label="Buscar en la tienda" autocomplete="off" aria-controls="sugg" aria-expanded="false">
+          <input id="navQ" type="search" role="combobox" aria-autocomplete="list" placeholder="¿Qué estás buscando?" aria-label="Buscar en la tienda" autocomplete="off" aria-controls="sugg" aria-expanded="false">
           <div class="sugg" id="sugg" role="listbox" hidden></div>
         </form>
         <button class="cart-btn" id="cartBtn" aria-label="Abrir carrito">
@@ -241,7 +247,7 @@
       <nav class="wrap links" aria-label="Secciones">
         <div class="menu-cat">
           <a href="${h("#catalogo")}" aria-haspopup="true">Catálogo ▾</a>
-          <div class="mega" role="menu">${CATEGORIES.map((c) => `<a role="menuitem" href="/categoria/${slug(c)}"><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("")}
+          <div class="mega" role="menu">${CATEGORIES.filter((c) => PRODUCTS.some((p) => p.cat === c && !p.agotado)).map((c) => `<a role="menuitem" href="/categoria/${slug(c)}"><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("")}
             <a role="menuitem" href="/usados"><span>♻️</span>Usados y reacondicionados</a><a role="menuitem" href="/novedades"><span>✨</span>Novedades del mes</a></div>
         </div>
         ${PRODUCTS.some(enOferta) ? '<a href="/ofertas" class="link-sale">Ofertas</a>' : ""}${PRODUCTS.some((p) => p.liquidacion && !p.agotado) ? '<a href="/liquidacion" class="link-sale">Liquidación</a>' : ""}
@@ -265,11 +271,11 @@
           <p class="made"><svg viewBox="0 0 9 6" width="22" height="15" aria-hidden="true"><rect width="9" height="6" fill="#74acdf"/><rect y="2" width="9" height="2" fill="#fff"/><circle cx="4.5" cy="3" r=".6" fill="#f6b40e"/></svg> Hecho en Argentina</p>
         </div>
         <div>
-          <h4>Tienda</h4>
-          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a><a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <h2 class="foot-h">Tienda</h2>
+          <a href="${h("#catalogo")}">Catálogo</a><a href="${h("#kits")}">Kits</a><a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
-          <h4>Contacto</h4>
+          <h2 class="foot-h">Contacto</h2>
           <a href="${waLink("¡Hola Tienda de Vuelo! Quería hacerles una consulta.")}" target="_blank" rel="noopener">WhatsApp ${esc(CONFIG.whatsappVisible)}</a>
           <a href="mailto:${CONFIG.email}">${CONFIG.email}</a>
           ${CONFIG.instagram ? `<a href="https://www.instagram.com/${esc(CONFIG.instagram)}/" target="_blank" rel="noopener">Instagram @${esc(CONFIG.instagram)}</a>` : ""}
@@ -277,7 +283,7 @@
           ${CONFIG.googleResenas ? `<a href="${esc(CONFIG.googleResenas)}" target="_blank" rel="noopener">⭐ Dejanos tu reseña en Google</a>` : ""}
         </div>
         <div>
-          <h4>Legales</h4>
+          <h2 class="foot-h">Legales</h2>
           <a href="/legales#terminos">Términos y condiciones</a>
           <a href="/legales#privacidad">Privacidad</a>
           <a href="/legales#arrepentimiento" class="strong">Botón de arrepentimiento</a>
@@ -289,10 +295,10 @@
       ${CONFIG.dataFiscal ? `<div class="wrap"><a href="${esc(CONFIG.dataFiscal)}" target="_blank" rel="noopener" class="data-fiscal">Data Fiscal</a></div>` : ""}
       <div class="wrap foot-bottom">© ${new Date().getFullYear()} Tienda de Vuelo · ${esc(CONFIG.ciudad)}</div>
     </footer>
-    ${avisoHorario() ? `<div class="wa-bubble" id="waBubble">${esc(avisoHorario())}. Dejanos tu mensaje 👋</div>` : ""}
-    <a class="wa-float" id="waFloat" href="${waLink(document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta.")}" target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp">
+    ${avisoHorario() ? `<div class="wa-bubble" id="waBubble" role="status">${esc(avisoHorario())}. Dejanos tu mensaje 👋</div>` : ""}
+    <aside aria-label="WhatsApp"><a class="wa-float" id="waFloat" href="${waLink(document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta.")}" target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp">
       <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
-    </a>
+    </a></aside>
     <div class="overlay" id="overlay" hidden></div>
     <aside class="drawer" id="drawer" aria-label="Carrito" aria-hidden="true">
       <div class="drawer-head"><h3 id="drawerTitle">Tu carrito</h3><button class="icon-btn" id="closeCart" aria-label="Cerrar carrito">✕</button></div>
@@ -438,6 +444,7 @@
   }
 
   const datos = store.get("tdv-datos", {});
+  const soloDigital = () => cart.length > 0 && cart.every((l) => !l.kit && byId[l.id]?.digital);
   const ENTREGAS = [["Envío a domicilio", "Envío por correo (a domicilio o sucursal)"], ["Envío en el día (CABA)", "Envío en el día (CABA)"], ["Retiro en CABA", "Retiro en CABA (coordinamos por WhatsApp)"], ["Entrega en aeródromo", "Entrega en aeródromo (San Fernando, Morón y otros, a coordinar)"]];
   const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
   const regaloPara = () => { try { const n = sessionStorage.getItem("tdv-regalo-para"); return n ? `Regalo para ${n} (de su lista de deseos)` : ""; } catch { return ""; } };
@@ -458,7 +465,7 @@
     }
     const t = total();
     const totalBlock = `<div class="total-row"><span>Total${hasUsd() ? " aprox." : ""}</span><b>${ars(t)}</b></div>
-      <p class="muted small">${hasUsd() ? "Productos en dólares convertidos al dólar del día. " : ""}El envío se cotiza aparte según destino.</p>`;
+      <p class="muted small">${hasUsd() ? "Productos en dólares convertidos al dólar del día. " : ""}${soloDigital() ? "Producto digital: sin envío." : "El envío se cotiza aparte según destino."}</p>`;
 
     if (step === "items") {
       $("#drawerTitle").textContent = "Tu carrito";
@@ -504,7 +511,7 @@
         <label>Nombre y apellido<input id="fNombre" required autocomplete="name" value="${esc(datos.nombre || "")}"></label>
         <label>Teléfono<input id="fTel" required type="tel" autocomplete="tel" value="${esc(datos.tel || "")}"></label>
         <fieldset><legend>Entrega</legend>
-          ${ENTREGAS.map(([v, t]) => `<label class="opt"><input type="radio" name="entrega" value="${v}" ${(ENTREGAS.some((x) => x[0] === datos.entrega) ? datos.entrega : ENTREGAS[0][0]) === v ? "checked" : ""}> ${t}</label>`).join("")}
+          ${(soloDigital() ? [["Digital", "Lo recibo por WhatsApp o mail (sin envío)"]] : ENTREGAS).map(([v, t], i, arr) => `<label class="opt"><input type="radio" name="entrega" value="${v}" ${(arr.some((x) => x[0] === datos.entrega) ? datos.entrega : arr[0][0]) === v ? "checked" : ""}> ${t}</label>`).join("")}
         </fieldset>
         <div id="fCorreoWrap" class="p-grid2-mini">
           <label>Empresa<select id="fEmpresa">${["Me da igual", "Andreani", "Correo Argentino", "OCA", "Vía Cargo"].map((x) => `<option${x === datos.empresa ? " selected" : ""}>${x}</option>`).join("")}</select></label>
@@ -528,7 +535,7 @@
       </form>`;
     foot.innerHTML = totalBlock + `<div class="foot-btns"><button class="btn btn-ghost" id="toItems">← Volver</button><button class="btn btn-primary" id="send" form="orderForm" type="submit">Enviar pedido por WhatsApp</button></div>`;
     const syncDir = () => {
-      const v = document.querySelector('input[name="entrega"]:checked').value, correo = v === "Envío a domicilio", sinDir = v === "Retiro en CABA" || v === "Entrega en aeródromo";
+      const v = document.querySelector('input[name="entrega"]:checked').value, correo = v === "Envío a domicilio", sinDir = v === "Retiro en CABA" || v === "Entrega en aeródromo" || v === "Digital";
       $("#fDirWrap").hidden = sinDir; $("#fDir").required = !sinDir; $("#fProvWrap").hidden = !correo; $("#fProv").required = correo; $("#fCorreoWrap").hidden = !correo;
       $("#fAeroWrap").hidden = v !== "Entrega en aeródromo"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA";
       $("#fDir").previousSibling.textContent = correo && $("#fModo").value === "A sucursal del correo" ? "Ciudad y código postal (buscamos la sucursal más cercana)" : "Dirección, ciudad y código postal";
@@ -552,7 +559,7 @@
       entrega: document.querySelector('input[name="entrega"]:checked').value, dir: $("#fDir").value.trim(), notas: $("#fNotas").value.trim(),
     };
     const correo = d.entrega === "Envío a domicilio";
-    d.provincia = correo ? $("#fProv").value : d.entrega === "Entrega en aeródromo" ? "Buenos Aires" : "CABA";
+    d.provincia = correo ? $("#fProv").value : d.entrega === "Entrega en aeródromo" ? "Buenos Aires" : d.entrega === "Digital" ? "" : "CABA";
     if (correo) { d.empresa = $("#fEmpresa").value; d.modo = $("#fModo").value; }
     if (d.entrega === "Entrega en aeródromo") d.aerodromo = $("#fAero").value;
     d.cumple = $("#fCumple").value; d.escuela = $("#fEscuela").value.trim();
@@ -568,9 +575,9 @@
       const link = l.kit ? "" : `\n  ${CONFIG.sitio}/producto/${l.id}`;
       return `• ${l.qty} x ${i.name}${i.sub ? ` (${i.sub})` : ""} — ${l.kit ? ars(i.unit * l.qty) : i.label}${link}`;
     });
-    const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())} + envío\n\n` +
+    const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\nTotal${hasUsd() ? " aprox." : ""}: ${ars(total())}${soloDigital() ? "" : " + envío"}\n\n` +
       `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.aerodromo ? ` · ${d.aerodromo}` : "") +
-      (correo ? `\nCorreo: ${d.empresa} · ${d.modo}` : "") + (d.entrega !== "Retiro en CABA" && d.entrega !== "Entrega en aeródromo" ? `\nDirección: ${d.dir}${correo ? ", " + d.provincia : ""}` : "") +
+      (correo ? `\nCorreo: ${d.empresa} · ${d.modo}` : "") + (!["Retiro en CABA", "Entrega en aeródromo", "Digital"].includes(d.entrega) ? `\nDirección: ${d.dir}${correo ? ", " + d.provincia : ""}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {

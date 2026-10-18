@@ -96,7 +96,7 @@
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
+  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["redes", "Redes"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
   const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.filter(([k]) => esDueno() || !["ventas", "ajustes"].includes(k)).map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
@@ -107,6 +107,7 @@
     if (tab === "respuestas") return verRespuestas();
     if (tab === "ajustes" && esDueno()) return verAjustes();
     if (tab === "ventas" && esDueno()) return verVentas();
+    if (tab === "redes") return verRedes();
     lista();
   }
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
@@ -289,7 +290,7 @@
           <h2>En la web</h2>
           <label class="p-switch"><input type="checkbox" id="visible"${p.visible ? " checked" : ""}> Mostrar en la web</label>
           <div class="p-checks">
-            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"], ["oficial", "Distribuidor oficial de la marca"], ["liquidacion", "Liquidación (sección de saldos)"]]
+            ${[["nuevo", "Nuevo ingreso"], ["top", "Más vendido"], ["encargo", "Por encargo (15 a 30 días)"], ["reacond", "Reacondicionado"], ["regalo", "Sección Regalos"], ["tcp", "Sección Tripulantes"], ["oficial", "Distribuidor oficial de la marca"], ["liquidacion", "Liquidación (sección de saldos)"], ["digital", "Producto digital (sin envío)"]]
               .map(([k, t]) => `<label><input type="checkbox" id="f_${k}"${p[k] ? " checked" : ""}> ${t}</label>`).join("")}
           </div>
           <label><span>Preventa: llega el <span class="muted">(vacío = no es preventa)</span></span><input id="llega" type="date" value="${esc(p.llega || "")}"></label>
@@ -375,8 +376,8 @@
     async function subirFoto(f) {
       let img = f;
       if ($("fondoBlanco")?.checked) { toast("Poniendo fondo blanco…"); img = await fondoBlanco(f).catch((x) => { toast(x.message); return f; }); }
-      const [data, mini] = await Promise.all([achicar(img), achicar(img, 600, 0.8)]);
-      const d = await api("foto", { method: "POST", body: { data, mini, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
+      const [data, m] = await Promise.all([achicar(img), miniatura(img)]);
+      const d = await api("foto", { method: "POST", body: { data, ...m, tipo: "image/jpeg", producto: val("name") || p.id || "producto" } });
       fotos.push(d.url); renderFotos(); dirty = true;
       return data;
     }
@@ -468,7 +469,7 @@
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
       };
-      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp", "oficial", "liquidacion"]) datos[k] = $("f_" + k).checked;
+      for (const k of ["nuevo", "top", "encargo", "reacond", "regalo", "tcp", "oficial", "liquidacion", "digital"]) datos[k] = $("f_" + k).checked;
       Object.assign(datos, { llega: val("llega"), alquiler: val("alquiler"), alquilerMoneda: $("alqMon").value, docs });
       $("guardar").disabled = true;
       try {
@@ -792,6 +793,60 @@
     pintar();
   }
 
+  // ---------- Redes: textos listos para publicar cada semana ----------
+  const CONSEJOS = {
+    "Comunicaciones": ["Antes de comprar un auricular, revisá la ficha de tu avión: la mayoría de los aviones de escuela usan GA dual (dos fichas), los aviones con alimentación en el panel suelen usar LEMO de 6 pines y los helicópteros, U-174/U.", "Las almohadillas del auricular se gastan con el uso y el calor. Cambiarlas cada uno o dos años mejora el aislamiento y la comodidad.", "Un micrófono bien ubicado, a un dedo de los labios y apenas de costado, hace que la torre te entienda a la primera."],
+    "Navegación": ["La computadora de vuelo E6B sigue siendo la herramienta de los exámenes: no usa pilas y te obliga a entender el triángulo de velocidades.", "Antes de cada travesía, revisá que tus cartas estén vigentes. Las frecuencias y el espacio aéreo cambian.", "Un kneeboard ordenado (checklist, frecuencias y espacio para anotar autorizaciones) reduce la carga de trabajo en cabina."],
+    "Aviónica": ["Un GPS portátil es una gran ayuda, pero la navegación se planifica igual: carta, rumbos y tiempos estimados.", "Llevá siempre una batería externa para la tablet o el GPS en vuelos largos."],
+    "Accesorios": ["La linterna también sirve de día: para mirar adentro de tanques y capots en la prevuelo.", "Anteojos de sol para volar: mejor sin polarizar, para leer bien las pantallas."],
+    "Uniforme": ["Las alas y las charreteras se cuidan guardándolas en su estuche: el plateado dura mucho más."],
+    "Libros y regalos": ["Estudiar con preguntas de práctica ayuda a llegar tranquilo al examen teórico."],
+  };
+  function verRedes() {
+    const sem = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1)) / 6048e5);
+    const vis = productos.filter((p) => p.visible && (p.usd !== null || p.ars !== null));
+    const pesosDe = (p, v) => (p.usd !== null ? Math.ceil((v * dolar) / 1000) * 1000 : v);
+    const precio = (p) => (p.usd !== null ? `US$ ${p.usd} (≈ ${ars(pesosDe(p, p.usd))})` : ars(p.ars));
+    const tag = (s) => "#" + String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+    const pie = (p) => `Consultas por WhatsApp al ${CONFIG.whatsappVisible} o en ${sitio.replace("https://", "")}/producto/${p.id}\nEnvíos a todo el país y en el día en CABA.`;
+    const tags = (p) => ["#aviacion", "#pilotos", "#pilotshop", p.brand && tag(p.brand), p.cat && tag(p.cat)].filter(Boolean).join(" ");
+    const orden = [...vis].sort((a, b) => (b.nuevo ? 2 : 0) + (b.top ? 1 : 0) - ((a.nuevo ? 2 : 0) + (a.top ? 1 : 0)));
+    const posts = [];
+    if (orden.length) {
+      const p = orden[sem % orden.length];
+      posts.push({ t: "Producto de la semana", p, texto: `${p.name}${p.brand ? ` · ${p.brand}${p.model ? " " + p.model : ""}` : ""}\n\n${p.desc || ""}\n${(p.specs || []).slice(0, 4).map((s) => "· " + s).join("\n")}\n\nPrecio: ${precio(p)}.\n${pie(p)}\n\n${tags(p)}` });
+    }
+    const ofertas = vis.filter((p) => p.antes && p.antes > (p.usd ?? p.ars));
+    if (ofertas.length) {
+      const p = ofertas[sem % ofertas.length];
+      posts.push({ t: "Oferta", p, texto: `Oferta: ${p.name}\n\nAntes ${p.usd !== null ? "US$ " + p.antes : ars(p.antes)}, ahora ${precio(p)}${p.ofertaHasta ? `, hasta el ${p.ofertaHasta.split("-").reverse().slice(0, 2).join("/")}` : ""}.\n\n${pie(p)}\n\n${tags(p)} #oferta` });
+    }
+    const conConsejo = vis.filter((p) => CONSEJOS[p.cat]);
+    if (conConsejo.length) {
+      const p = conConsejo[(sem + 1) % conConsejo.length], lista = CONSEJOS[p.cat];
+      posts.push({ t: "Consejo técnico", p, texto: `Consejo para pilotos\n\n${lista[sem % lista.length]}\n\nSi necesitás ayuda para elegir, escribinos: ${CONFIG.whatsappVisible}.\n\n#aviacion #pilotos #consejosdevuelo ${tag(p.cat)}` });
+    }
+    const nuevos = vis.filter((p) => p.nuevo);
+    if (nuevos.length) {
+      const p = nuevos[(sem + 2) % nuevos.length];
+      posts.push({ t: "Para historias", p, texto: `Nuevo en la tienda: ${p.name}.\n${precio(p)}\nLink en la bio o por WhatsApp.` });
+    }
+    app.innerHTML = tabsHTML("redes") + `
+      <div class="p-head"><div><h1>Ideas para publicar</h1><p class="muted">Textos listos para Instagram (@${esc(CONFIG.instagram || "tiendadevueloar")}) armados con tus productos. Cambian cada semana. Editalos, copialos y publicá con la foto.</p></div></div>
+      ${posts.length ? `<div class="p-list">${posts.map((x, i) => `
+        <section class="p-card p-post"><div class="p-post-head"><b>${esc(x.t)}</b><span class="muted small">${esc(x.p.name)}</span></div>
+          <div class="p-post-body">${x.p.fotos?.[0] ? `<a href="${esc(x.p.fotos[0])}" target="_blank" rel="noopener" class="p-post-foto"><img src="${esc(x.p.fotos[0])}" alt="" loading="lazy"><span>Abrir foto ↗</span></a>` : '<div class="p-post-foto sin">Sin foto</div>'}
+          <textarea rows="9" data-post="${i}" aria-label="Texto de la publicación">${esc(x.texto.replace(/\n{3,}/g, "\n\n"))}</textarea></div>
+          <div class="p-head-btns"><button class="btn btn-primary btn-sm" data-pcopy="${i}">Copiar texto</button>${estado.ia ? `<button class="btn btn-ghost btn-sm" data-pia="${i}">✨ Mejorar con IA</button>` : ""}</div>
+        </section>`).join("")}</div>` : '<p class="muted">Cargá productos con precio para que aparezcan ideas.</p>'}`;
+    app.querySelectorAll("[data-pcopy]").forEach((b) => (b.onclick = async () => { const t = app.querySelector(`[data-post="${b.dataset.pcopy}"]`); try { await navigator.clipboard.writeText(t.value); toast("Copiado. Pegalo en Instagram."); } catch { t.select(); } }));
+    app.querySelectorAll("[data-pia]").forEach((b) => (b.onclick = async () => {
+      const t = app.querySelector(`[data-post="${b.dataset.pia}"]`); b.disabled = true; b.textContent = "Escribiendo…";
+      try { const d = await api("ia", { method: "POST", body: { modo: "post", texto: t.value } }); t.value = d.datos.texto; toast("Listo. Revisalo antes de publicar."); } catch (x) { toast(x.message); }
+      b.disabled = false; b.textContent = "✨ Mejorar con IA";
+    }));
+  }
+
   // ---------- Ventas: gráficos y descarga para Excel ----------
   const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   async function verVentas() {
@@ -924,8 +979,9 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {}, vp = {};
-    try { [v, vp] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios")])).map((x) => x.valor || {}); } catch {}
+    let v = {}, vp = {}, vb = {}, caps = [];
+    try { [v, vp, vb, caps] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios")])).map((x) => x.valor || {}); } catch {}
+    if (!Array.isArray(caps)) caps = [];
     const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
     app.innerHTML = tabsHTML("ajustes") + `
       <div class="p-head"><div><h1>Ajustes</h1><p class="muted">Lo que cargues acá aparece al cliente cuando hace un pedido y en la página de seguimiento, con botón para copiar.</p></div></div>
@@ -938,6 +994,16 @@
         <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
         <p class="muted small">Dejá vacío lo que no uses. Revisá bien el CBU y las direcciones cripto: un error hace que el dinero vaya a otra cuenta.</p>
         <button class="btn btn-primary" type="submit">Guardar datos de pago</button></form>
+      <section class="p-card p-form" id="capturasBox"><h2>Capturas de clientes</h2>
+        <p class="muted small">Capturas de mensajes de clientes contentos (siempre con su permiso). Se muestran en la portada. Tapá el número de teléfono antes de subirlas.</p>
+        <div class="p-fotos" id="capLista"></div>
+        ${estado.fotos ? '<label class="btn btn-ghost p-upload">📷 Subir captura<input type="file" id="capIn" accept="image/*" hidden></label>' : ""}
+      </section>
+      <form class="p-card p-form" id="benefForm"><h2>Beneficio para recibidos</h2>
+        <p class="muted small">Lo que le das a quien se recibe (por ejemplo: “10% de descuento en tu próxima compra”). Si lo dejás vacío, no se muestra.</p>
+        <label>Beneficio<input id="benefTxt" maxlength="300" value="${esc(vb.texto || "")}" placeholder="Ej.: 10% de descuento en tu primer auricular"></label>
+        <p class="muted small">Se ve en <a href="/recibidos" target="_blank" rel="noopener">tiendadevuelo.com.ar/recibidos</a> y en el pie de la web.</p>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
       <section class="p-card p-form" id="usuariosBox"><h2>Ayudantes</h2>
         <p class="muted small">Personas que pueden entrar al panel con su propia clave. Ven productos, pedidos y clientes, pero no costos, ganancias, ventas ni ajustes. Lo que cambian queda anotado con su nombre en el historial.</p>
         <div id="usuariosLista"><p class="p-loading">Cargando…</p></div>
@@ -951,6 +1017,28 @@
           <li>Moneda: <b>ARS</b>. Listo: vas a poder etiquetar productos en Instagram y Facebook.</li>
           <li>Para WhatsApp: en la app de WhatsApp Business → <b>Herramientas para la empresa</b> → <b>Catálogo</b> → conectá el mismo catálogo de Meta.</li></ol>
         <p class="muted small">Solo salen los productos visibles que tienen al menos una foto. Los precios en dólares se pasan a pesos al dólar del día.</p></section>`;
+    const guardarCaps = () => api("ajustes", { method: "POST", body: { clave: "testimonios", valor: caps } });
+    const pintarCaps = () => {
+      document.getElementById("capLista").innerHTML = caps.length ? caps.map((c, i) => `<figure class="p-foto"><img src="${esc(c.url)}" alt=""><figcaption><input data-capn="${i}" value="${esc(c.nombre || "")}" placeholder="Nombre" aria-label="Nombre del cliente" class="p-cap-nom"><button type="button" data-capx="${i}" aria-label="Quitar">✕</button></figcaption></figure>`).join("") : '<p class="muted small">Todavía no subiste capturas.</p>';
+      document.querySelectorAll("[data-capx]").forEach((b) => (b.onclick = async () => { caps.splice(+b.dataset.capx, 1); pintarCaps(); await guardarCaps().catch((x) => toast(x.message)); }));
+      document.querySelectorAll("[data-capn]").forEach((x) => (x.onchange = async () => { caps[+x.dataset.capn].nombre = x.value.trim(); await guardarCaps().catch((e) => toast(e.message)); toast("Guardado."); }));
+    };
+    pintarCaps();
+    if (document.getElementById("capIn")) document.getElementById("capIn").onchange = async (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      if (caps.length >= 12) return toast("Ya hay 12 capturas. Quitá alguna.");
+      toast("Subiendo…");
+      try {
+        const data = await achicar(f, 1400, 0.85);
+        const d = await api("foto", { method: "POST", body: { data, tipo: "image/jpeg", producto: "capturas" } });
+        caps.push({ url: d.url, nombre: "" }); await guardarCaps(); pintarCaps(); toast("Captura agregada. Ya se ve en la portada.");
+      } catch (x) { toast(x.message); }
+    };
+    document.getElementById("benefForm").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("ajustes", { method: "POST", body: { clave: "beneficio", valor: { texto: document.getElementById("benefTxt").value.trim() } } }); toast("Guardado."); } catch (x) { toast(x.message); }
+    };
     const pintarUsuarios = async () => {
       try {
         const { usuarios } = await api("usuarios");
@@ -1070,7 +1158,12 @@
   }
 
   // Achica la foto en el celular antes de subirla (máx. 1600 px, JPG).
-  function achicar(file, max = 1600, calidad = 0.85) {
+  // Versión chica para tarjetas: WebP si el navegador lo sabe generar, si no JPG
+  async function miniatura(file) {
+    const webp = await achicar(file, 600, 0.8, "image/webp");
+    return webp.startsWith("UklGR") ? { mini: webp, miniTipo: "image/webp" } : { mini: await achicar(file, 600, 0.8), miniTipo: "image/jpeg" };
+  }
+  function achicar(file, max = 1600, calidad = 0.85, formato = "image/jpeg") {
     return new Promise((ok, mal) => {
       const img = new Image();
       img.onload = () => {
@@ -1081,7 +1174,7 @@
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
         ctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(img.src);
-        ok(c.toDataURL("image/jpeg", calidad).split(",")[1]);
+        ok(c.toDataURL(formato, calidad).split(",")[1]);
       };
       img.onerror = () => mal(new Error("No se pudo leer la foto."));
       img.src = URL.createObjectURL(file);

@@ -51,6 +51,7 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists oficial boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists docs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
+    await q(`alter table tdv_productos add column if not exists digital boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists codigo text not null default ''`);
     await q(`alter table tdv_productos add column if not exists liquidacion boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists alquiler_moneda text not null default 'ARS'`);
@@ -131,7 +132,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -162,7 +163,7 @@ export function toRow(p) {
     name: str(p.name, 120), brand: str(p.brand, 60), model: str(p.model, 60), cat: str(p.cat, 40) || "Accesorios", icon: str(p.icon, 30) || "tag",
     usd: money(p.usd), ars: money(p.ars), costo: money(p.costo), costo_moneda: p.costoMoneda === "ARS" ? "ARS" : "USD",
     stock: int(p.stock), stock_min: int(p.stockMin),
-    encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion,
+    encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion, digital: !!p.digital,
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
     descr: str(p.desc, 600), fotos: list(p.fotos, 8).filter((u) => /^https:\/\//.test(u) || /^http:\/\/localhost[:/]/.test(u)),
     antes: money(p.antes), oferta_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(p.ofertaHasta || "")) ? p.ofertaHasta : null,
@@ -337,6 +338,15 @@ export async function valorDolar() {
   } catch { return 1500; }
 }
 export const redondear = (n) => (n >= 20000 ? Math.ceil(n / 1000) * 1000 : Math.ceil(n / 100) * 100);
+// Capturas de clientes y beneficio para recibidos (se cargan en el panel → Ajustes)
+export async function extrasPublicos() {
+  const t = await ajuste("testimonios", []);
+  const b = await ajuste("beneficio", {});
+  return {
+    testimonios: (Array.isArray(t) ? t : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), nombre: String(x.nombre || "").slice(0, 40) })),
+    beneficio: b && String(b.texto || "").trim() ? String(b.texto).trim().slice(0, 300) : "",
+  };
+}
 export async function pagoPublico() {
   const v = await ajuste("pago", {});
   const o = {};

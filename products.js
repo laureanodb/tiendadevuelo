@@ -26,9 +26,10 @@ const CAT_INFO = {
   "Uniforme": "Alas, charreteras y porta credenciales para pilotos y tripulantes de cabina.",
   "Accesorios": "Flight bags, linternas, anteojos, testers de combustible y todo lo que llevás en cada vuelo.",
   "Libros y regalos": "Manuales de estudio y regalos para pilotos.",
+  "Cursos y experiencias": "Material de estudio digital, simuladores y experiencias de vuelo.",
 };
 
-const CATEGORIES = ["Comunicaciones", "Navegación", "Aviónica", "Uniforme", "Accesorios", "Libros y regalos"];
+const CATEGORIES = ["Comunicaciones", "Navegación", "Aviónica", "Uniforme", "Accesorios", "Libros y regalos", "Cursos y experiencias"];
 
 // Para qué etapa sirve cada producto
 const ETAPAS = { alumno: "Alumno", privado: "Piloto privado", comercial: "Comercial y línea", tcp: "Tripulante de cabina" };
@@ -67,6 +68,7 @@ const CAT_COLORS = {
   "Uniforme": ["#5b6b82", "#e7edf4"],
   "Accesorios": ["#e0742c", "#fde6d6"],
   "Libros y regalos": ["#b7791f", "#f9ecd2"],
+  "Cursos y experiencias": ["#7a4fc4", "#ece4fb"],
 };
 
 // Precio: `usd` (se muestra en dólares y en pesos al dólar del día), `ars` (solo pesos) o ninguno (a consultar).

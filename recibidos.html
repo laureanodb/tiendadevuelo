@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beneficio para recibidos · Tienda de Vuelo</title>
+  <meta name="description" content="¿Te recibiste de piloto o tripulante? Tienda de Vuelo te da un beneficio para festejarlo.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/recibidos">
+  <meta property="og:title" content="Beneficio para recibidos · Tienda de Vuelo">
+  <meta property="og:description" content="¿Te recibiste de piloto o tripulante? Tienda de Vuelo te da un beneficio para festejarlo.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="recibidos" data-wa="¡Hola! Me recibí y quiero mi beneficio.">
+  <div id="siteHeader"></div>
+
+  <main>
+    <section class="page-hero"><div class="wrap narrow">
+      <span class="kicker">Recibidos</span>
+      <h1>¿Te recibiste? ¡Felicitaciones!</h1>
+      <p id="rbTxt">Sacar la licencia es un gran paso. Queremos festejarlo con vos.</p>
+    </div></section>
+    <section class="wrap narrow">
+      <form class="form-card" id="rbForm">
+        <label>Tu nombre<input id="rbNom" required autocomplete="name" maxlength="80"></label>
+        <label>¿De qué te recibiste?<select id="rbLic"><option>Piloto privado (PPA)</option><option>Piloto comercial</option><option>Piloto de línea (TLA)</option><option>Instructor de vuelo</option><option>Tripulante de cabina</option><option>Piloto de helicóptero</option><option>Otra licencia o habilitación</option></select></label>
+        <label><span>Escuela o aeroclub <span class="muted">(opcional)</span></span><input id="rbEsc" maxlength="80"></label>
+        <button class="btn btn-primary" type="submit">Pedir mi beneficio por WhatsApp</button>
+        <p class="muted small">Te vamos a pedir una foto de la licencia o del certificado. Un beneficio por persona y por licencia.</p>
+      </form>
+    </section>
+  </main>
+
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  <script src="/mapa-ar.js"></script>
+  <script>
+    // Mapa de envíos: un punto por provincia, más grande cuantos más pedidos. Aparece cuando hay datos suficientes.
+    fetch("/api/envios").then((r) => r.json()).then(({ provincias }) => {
+      const M = window.MAPA_AR, e = Object.entries(provincias || {}).filter(([k]) => M.provincias[k]).sort((a, b) => b[1] - a[1]);
+      const total = e.reduce((s, x) => s + x[1], 0);
+      if (e.length < 3 || total < 10) return;
+      const max = e[0][1], r = (n) => 4 + Math.sqrt(n / max) * 14;
+      const svg = document.getElementById("mapa");
+      svg.setAttribute("viewBox", `-12 -12 ${M.ancho + 24} ${M.alto + 24}`);
+      svg.innerHTML = `<path d="${M.contorno}" class="mapa-pais"/>` + e.slice().reverse().map(([k, n]) => { const [x, y] = M.provincias[k];
+        return `<g class="mapa-punto"><title>${k}: ${n} ${n === 1 ? "pedido" : "pedidos"}</title><circle cx="${x}" cy="${y}" r="${r(n) + 6}" class="hit"/><circle cx="${x}" cy="${y}" r="${r(n)}"/></g>`; }).join("");
+      document.getElementById("mapaTxt").textContent = `Pilotos de ${e.length} provincias ya recibieron su pedido. Los puntos más grandes son donde más enviamos.`;
+      document.getElementById("mapaLista").innerHTML = e.slice(0, 8).map(([k, n]) => `<li><span>${k}</span><b>${n}</b></li>`).join("");
+      document.getElementById("mapaBox").hidden = false;
+    }).catch(() => {});
+  </script>
+  
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { waLink } = window.TDV;
+      if (CONFIG.beneficio) document.getElementById("rbTxt").innerHTML = `Sacar la licencia es un gran paso y lo queremos festejar: <b>${window.TDV.esc(CONFIG.beneficio)}</b>`;
+      document.getElementById("rbForm").onsubmit = (e) => {
+        e.preventDefault();
+        const v = (id) => document.getElementById(id).value.trim();
+        window.open(waLink(`¡Hola Tienda de Vuelo! Me recibí de ${v("rbLic")}${v("rbEsc") ? " en " + v("rbEsc") : ""}. Soy ${v("rbNom")} y quiero mi beneficio para recibidos. Te mando la foto de la licencia.`), "_blank", "noopener");
+      };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

@@ -31,14 +31,20 @@
   showBanner(0); autoBanner();
 
   // ---------- Categorías ----------
-  $("#cats").innerHTML = CATEGORIES.map((c) => `<a class="cat-card" href="/categoria/${slug(c)}" data-ruta><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("");
+  $("#cats").innerHTML = CATEGORIES.filter((c) => visibles.some((p) => p.cat === c)).map((c) => `<a class="cat-card" href="/categoria/${slug(c)}" data-ruta><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("");
+
+  // ---------- Capturas de mensajes de clientes (con su permiso) ----------
+  if (CONFIG.testimonios?.length) {
+    $("#capturas").hidden = false;
+    $("#capturasGrid").innerHTML = CONFIG.testimonios.map((t) => `<a class="captura" href="${esc(t.url)}" target="_blank" rel="noopener"><img src="${esc(t.url)}" alt="Mensaje de ${esc(t.nombre || "un cliente")} por WhatsApp" loading="lazy"><span>${esc(t.nombre || "")}</span></a>`).join("");
+  }
 
   // ---------- Catálogo ----------
   const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados", brand: "", min: "", max: "", vista: "grid" };
   try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
   const hace30 = Date.now() - 30 * 864e5;
   const esNovedad = (p) => p.nuevo || (p.creado && new Date(p.creado).getTime() > hace30);
-  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), "Por encargo", "Favoritos", ...CATEGORIES];
+  const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), "Novedades del mes", "Más vendidos", ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), "Por encargo", "Favoritos", ...CATEGORIES.filter((c) => visibles.some((p) => p.cat === c))];
   const marcasTodas = [...new Set(visibles.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   // Franja de marcas: primero las que somos distribuidor oficial
   const oficiales = new Set(visibles.filter((p) => p.oficial).map((p) => p.brand));
@@ -177,7 +183,7 @@
     if (view.hidden) lastScroll = scrollY;
     const fotos = p.fotos && p.fotos.length ? p.fotos : null;
     $("#pvGallery").innerHTML = fotos
-      ? `<div class="swipe" id="pvSwipe">${fotos.map((f, i) => `<div class="zoom"><img src="${esc(f)}" alt="${esc(p.name)} (foto ${i + 1})" ${i ? 'loading="lazy"' : ""}></div>`).join("")}</div>
+      ? `<div class="swipe" id="pvSwipe" tabindex="0" role="group" aria-label="Fotos del producto (deslizá para ver más)">${fotos.map((f, i) => `<div class="zoom"><img src="${esc(f)}" alt="${esc(p.name)} (foto ${i + 1})" ${i ? 'loading="lazy"' : ""}></div>`).join("")}</div>
          ${fotos.length > 1 ? `<div class="thumbs">${fotos.map((f, i) => `<button data-foto="${i}" aria-label="Foto ${i + 1}"${i ? "" : ' aria-current="true"'}><img src="${esc(f)}" alt=""></button>`).join("")}</div>` : ""}`
       : art(p, true);
     $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
@@ -229,7 +235,8 @@
     $("#pvAlq").hidden = !p.alquiler;
     $("#pvExtra").innerHTML = [
       p.reacond && "♻️ <b>Usado o reacondicionado:</b> revisado y probado. Tiene la garantía legal de 3 meses.",
-      "🎁 Cada pedido va con un regalito de la tienda.",
+      p.digital && "📩 <b>Producto digital:</b> lo recibís por WhatsApp o mail cuando se acredita el pago. No lleva envío.",
+      !p.digital && "🎁 Cada pedido va con un regalito de la tienda.",
       `💬 ¿Lo viste más barato en otra tienda? <a href="${waLink(`¡Hola! Vi el ${p.name} más barato en otro lado. ¿Lo pueden revisar?`)}" target="_blank" rel="noopener">Escribinos y lo revisamos</a>.`,
     ].filter(Boolean).map((x) => `<li>${x}</li>`).join("");
     if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por semana</b>, con depósito en garantía. <a href="/alquiler">Ver alquileres</a>`;
