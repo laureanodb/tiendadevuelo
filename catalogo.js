@@ -1,12 +1,9 @@
 // Trae los productos cargados en el panel. Si el panel todavía no está conectado (o tarda), se usan los de products.js.
+// Catálogo instantáneo: se muestra al toque la última versión guardada en el navegador y se actualiza por detrás.
 (async () => {
   const me = document.currentScript;
-  try {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 2500);
-    const r = await fetch("/api/productos", { signal: ctl.signal });
-    clearTimeout(t);
-    const d = await r.json();
+  const CLAVE = "tdv-cat-v1", VIGENCIA = 864e5;
+  function aplicar(d) {
     if (d.pago) CONFIG.pago = d.pago;
     if (d.testimonios) CONFIG.testimonios = d.testimonios;
     if (d.beneficio) CONFIG.beneficio = d.beneficio;
@@ -29,7 +26,24 @@
         if (KITS[i].items.length < 2) KITS.splice(i, 1);
       }
     }
-  } catch { /* se usan los productos de muestra */ }
+  }
+  const traer = async (ms) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    const r = await fetch("/api/productos", { signal: ctl.signal });
+    clearTimeout(t);
+    const d = await r.json();
+    try { localStorage.setItem(CLAVE, JSON.stringify({ at: Date.now(), d })); } catch {}
+    return d;
+  };
+  let guardado = null;
+  try { guardado = JSON.parse(localStorage.getItem(CLAVE) || "null"); } catch {}
+  if (guardado && Date.now() - guardado.at < VIGENCIA && guardado.d) {
+    aplicar(guardado.d);
+    traer(8000).catch(() => {}); // queda lista la versión nueva para la próxima vez
+  } else {
+    try { aplicar(await traer(2500)); } catch { /* se usan los productos de muestra */ }
+  }
   for (const src of (me.dataset.load || "").split(",").filter(Boolean)) {
     await new Promise((ok) => { const s = document.createElement("script"); s.src = src; s.onload = s.onerror = ok; document.body.appendChild(s); });
   }

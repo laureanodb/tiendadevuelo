@@ -161,7 +161,11 @@ const PRODUCTS = [
 ];
 
 // Kits armables: el cliente puede sacar productos y el descuento se mantiene.
-const KITS = [];
+const KITS = [
+  { id: "kit-navegacion", name: "Kit Navegación", emoji: "🧭", tagline: "Computadora, plotter y cronómetro para tus primeras navegaciones.", items: ["jeppesen-cr-3", "jeppesen-pj-1", "asa-flight-timer-3"], off: 0.10, highlight: true },
+  { id: "kit-recibido", name: "Regalo para recibidos", emoji: "🎓", tagline: "Para festejar la licencia: cronómetro y llaveros de piloto.", items: ["asa-flight-timer-3", "llavero-remove-before-flight", "llavero-pilot-amarillo"], off: 0.10 },
+  { id: "kit-tripulante", name: "Kit Tripulante", emoji: "🧳", tagline: "Los llaveros que más eligen los tripulantes de cabina.", items: ["llavero-crew-rojo", "llavero-seat-belt-negro", "llavero-boeing-egpws"], off: 0.10 },
+];
 
 // Banners de la portada (se rotan solos)
 const BANNERS = [

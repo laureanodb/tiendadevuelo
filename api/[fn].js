@@ -15,6 +15,7 @@ const RUTAS = {
   salud: () => import("./_web/salud.js"),
   resumen: () => import("./_web/resumen.js"),
   suscribir: () => import("./_web/suscribir.js"),
+  consulta: () => import("./_web/consulta.js"),
 };
 
 export default async function handler(req, res) {

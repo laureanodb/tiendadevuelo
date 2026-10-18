@@ -75,7 +75,7 @@
     let list = visibles.filter((p) => (pass[state.f] ? pass[state.f](p) : p.cat === state.f) &&
       (!state.brand || p.brand === state.brand) &&
       (!state.min && !state.max || (pesos(p) !== null && pesos(p) >= min && pesos(p) <= max)) &&
-      (!q || q.split(/\s+/).every((w) => norm([p.name, p.brand, p.model, p.desc, p.cat].join(" ")).includes(w))));
+      (!q || TDV.coincide(p, state.q)));
     const precio = (p) => pesos(p) ?? Infinity;
     const sorters = {
       destacados: (a, b) => (a.destacado || (a.top ? 50 : 99)) - (b.destacado || (b.top ? 50 : 99)),
@@ -151,14 +151,17 @@
     $("#kitsGrid").innerHTML = KITS.map((k) => {
       const sel = [...kitSel[k.id]];
       const price = sel.reduce((s, id) => s + (pesos(byId[id]) || 0), 0) * (1 - k.off);
+      const sinPrecio = sel.some((id) => pesos(byId[id]) === null);
       return `<article class="kit${k.highlight ? " kit-hl" : ""}">
         ${k.highlight ? '<span class="badge">El más elegido</span>' : ""}
         <div class="kit-emoji">${k.emoji}</div>
         <h3>${esc(k.name)}</h3>
         <p class="muted">${esc(k.tagline)}</p>
         <ul>${k.items.map((id) => `<li><label><input type="checkbox" data-kit="${k.id}" data-item="${id}" ${kitSel[k.id].has(id) ? "checked" : ""}> ${esc(byId[id].name)}</label></li>`).join("")}</ul>
-        <div class="kit-price"><b>${sel.length ? ars(price) : "—"}</b><span class="muted small">con 10% off</span></div>
-        <button class="btn btn-primary btn-block" data-addkit="${k.id}" ${sel.length < 2 ? "disabled" : ""}>${sel.length < 2 ? "Elegí al menos 2" : "Agregar kit"}</button>
+        <div class="kit-price"><b>${!sel.length ? "—" : sinPrecio ? "Consultá el precio" : ars(price)}</b><span class="muted small">con ${Math.round(k.off * 100)}% off</span></div>
+        ${sinPrecio && sel.length >= 2
+          ? `<a class="btn btn-primary btn-block" target="_blank" rel="noopener" href="${waLink(`¡Hola! Quiero el ${k.name} con ${Math.round(k.off * 100)}% off: ${sel.map((id) => byId[id].name).join(", ")}. ¿Cuánto sale?`)}">Pedir precio del kit</a>`
+          : `<button class="btn btn-primary btn-block" data-addkit="${k.id}" ${sel.length < 2 ? "disabled" : ""}>${sel.length < 2 ? "Elegí al menos 2" : "Agregar kit"}</button>`}
       </article>`;
     }).join("");
   }
@@ -215,13 +218,35 @@
     $("#pvVariant").innerHTML = ops.map((o) => `<option value="${esc(o.nombre)}">${esc(o.nombre)}${o.precio !== null && o.precio !== (p.usd || p.ars) ? ` — ${p.usd ? "US$ " + o.precio.toLocaleString("es-AR") : ars(o.precio)}` : ""}</option>`).join("");
     const precioOpcion = () => {
       const pp = p.variantes ? conOpcion(p, $("#pvVariant").value) : p;
-      $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? '<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar del día.</p>' : "");
+      $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? `<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar del día: ${ars(TDV.dolar)}.</p>` : "");
+      $("#pvStickPrice").innerHTML = pp.usd ? `US$ ${pp.usd.toLocaleString("es-AR")}` : pp.ars ? ars(pp.ars) : "Consultar precio";
       const o = ops.find((x) => x.nombre === $("#pvVariant").value);
       const sw = $("#pvSwipe");
       if (o && o.foto !== null && sw) sw.scrollTo({ left: sw.clientWidth * o.foto, behavior: reduceMotion ? "auto" : "smooth" });
     };
     const conPrecio = p.usd || p.ars;
     $("#pvAdd").hidden = !conPrecio;
+    $("#pvPedir").hidden = !!conPrecio;
+    $("#pvPedir").onclick = () => TDV.pedirPrecio(p, p.variantes ? $("#pvVariant").value : "");
+    // Selector "¿Qué ficha usa tu avión?" para los auriculares que vienen con varias fichas
+    const FICHAS = [
+      ["dual", "Avión de escuela o aviación general (Cessna, Piper, Tecnam, Diamond…)", "La mayoría usa dos fichas separadas: Dual plug (GA)."],
+      ["lemo", "Avión con ficha redonda de 6 pines en el panel", "Es la ficha LEMO: además alimenta el auricular desde el avión, sin pilas."],
+      ["xlr", "Avión de línea (Airbus y otros con ficha de 5 pines)", "Usan la ficha XLR de 5 pines."],
+      ["u-174", "Helicóptero", "Los helicópteros usan la ficha U-174. Si no figura en las opciones, consultanos."],
+    ];
+    const opsFicha = (p.variantes || []).map((v) => String(v).split("|")[0].trim());
+    const disponibles = FICHAS.filter(([k]) => k === "u-174" || opsFicha.some((o) => o.toLowerCase().includes(k)));
+    $("#pvFichaWrap").hidden = !(p.icon === "headset" && opsFicha.length > 1 && disponibles.length > 1);
+    $("#pvFicha").innerHTML = '<option value="">Elegí dónde vas a volar</option>' + disponibles.map(([k, t]) => `<option value="${k}">${esc(t)}</option>`).join("");
+    $("#pvFichaTxt").textContent = "";
+    $("#pvFicha").onchange = () => {
+      const f = FICHAS.find(([k]) => k === $("#pvFicha").value);
+      if (!f) { $("#pvFichaTxt").textContent = ""; return; }
+      const op = opsFicha.find((o) => o.toLowerCase().includes(f[0]));
+      $("#pvFichaTxt").textContent = f[2] + (op ? " Te la dejamos elegida." : "");
+      if (op) { $("#pvVariant").value = op; $("#pvVariant").dispatchEvent(new Event("change")); }
+    };
     const consulta = `¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`;
     $("#pvAsk").href = waLink(consulta);
     $("#pvAsk").hidden = !conPrecio;
@@ -248,7 +273,12 @@
     if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por semana</b>, con depósito en garantía. <a href="/alquiler">Ver alquileres</a>`;
     cargarSocial(p);
     $("#pvWant").dataset.quiero = p.id; $("#pvAsk").dataset.consulta = p.id;
-    $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar precio por WhatsApp";
+    $("#pvWant").textContent = conPrecio ? "Lo quiero por WhatsApp" : "Consultar por WhatsApp";
+    $("#pvWant").classList.toggle("btn-ghost-wa", !conPrecio);
+    // Barra fija abajo en el celular con el precio y el botón
+    $("#pvStickName").textContent = p.name;
+    $("#pvStickBtn").textContent = conPrecio ? (p.llega ? "Reservar" : "Agregar") : "📩 Pedime el precio";
+    $("#pvStickBtn").onclick = () => (conPrecio ? $("#pvAdd") : $("#pvPedir")).click();
     setWa(consulta);
     const yt = (p.video || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/);
     $("#pvVideo").hidden = !p.video;
@@ -269,7 +299,7 @@
     if (push) history.pushState({ id }, "", `/producto/${id}`);
     view.scrollTop = 0; window.scrollTo(0, 0);
   }
-  function closeView(push = true) {
+  function closeView(push = true) { $("#pvStick").hidden = true;
     if (view.hidden) return;
     view.hidden = true; current = null;
     document.body.classList.remove("viewing");
@@ -282,6 +312,8 @@
   $("#pvFav").onclick = () => { toggleFav(current.id); };
   $("#pvBack").onclick = () => (history.state && history.length > 1 ? history.back() : closeView());
   $("#pvAdd").onclick = () => add({ id: current.id, variante: current.variantes ? $("#pvVariant").value : "" }, current.name);
+  // La barra fija aparece cuando los botones principales quedan fuera de la pantalla
+  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { $("#pvStick").hidden = $("#pview").hidden || e.isIntersecting || e.boundingClientRect.top > 0; }).observe(document.querySelector(".pv-actions"));
   document.addEventListener("click", (e) => { if (e.target.closest("#pvRating")) { e.preventDefault(); $("#pvResenasH").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); } });
   $("#pvGallery").addEventListener("click", (e) => {
     const t = e.target.closest("[data-foto]"); if (!t) return;

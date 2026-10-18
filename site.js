@@ -98,6 +98,42 @@
     for (const s of p.specs || []) { const m = String(s).match(/^([^:]{2,32}):\s*(.+)$/); if (m) tabla.push([m[1].trim(), m[2].trim()]); else sueltas.push(s); }
     return { tabla, sueltas };
   }
+  // Búsqueda que perdona errores: "dabid clark", "bose a 30", "auricular helicoptero"
+  const sinTilde = (x) => String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  function distancia(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 9;
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  const indice = new Map();
+  function palabrasDe(p) {
+    if (!indice.has(p.id)) {
+      const texto = sinTilde([p.name, p.brand, p.model, p.cat, p.desc, (p.variantes || []).join(" "), (p.specs || []).join(" ")].join(" "));
+      const pal = texto.split(/[^a-z0-9]+/).filter(Boolean);
+      // también los pares pegados: "a 30" → "a30", "dc one" → "dcone"
+      indice.set(p.id, { texto: texto.replace(/[^a-z0-9]/g, ""), pal: new Set([...pal, ...pal.slice(1).map((w, i) => pal[i] + w)]) });
+    }
+    return indice.get(p.id);
+  }
+  function coincide(p, q) {
+    const ws = sinTilde(q).split(/[^a-z0-9]+/).filter(Boolean);
+    if (!ws.length) return true;
+    const { texto, pal } = palabrasDe(p);
+    if (texto.includes(ws.join(""))) return true;
+    return ws.every((w) => {
+      if (texto.includes(w)) return true;
+      if (w.length < 4) return false;
+      const tol = w.length >= 7 ? 2 : 1;
+      for (const x of pal) if (Math.abs(x.length - w.length) <= tol && distancia(w, x) <= tol) return true;
+      for (const x of pal) if (x.length > w.length && distancia(w, x.slice(0, w.length)) <= tol) return true; // palabra a medio escribir
+      return false;
+    });
+  }
   const enComparar = (id) => comparar.includes(id);
   function toggleComparar(id) {
     if (enComparar(id)) comparar = comparar.filter((x) => x !== id);
@@ -157,7 +193,7 @@
         ${p.llega ? `<div class="note">Preventa · llega el ${fechaCorta(p.llega)}</div>` : p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
       </div>
       ${p.usd || p.ars ? `<button class="add" data-add="${p.id}">Agregar <span aria-hidden="true">+</span></button>`
-        : `<a class="add" href="${waLink(`¡Hola! Quiero consultar el precio de: ${p.name}`)}" target="_blank" rel="noopener" data-consulta="${p.id}">Consultar</a>`}
+        : `<button class="add" data-pedir="${p.id}">Pedime el precio</button>`}
     </article>`;
 
   // ---------- WhatsApp ----------
@@ -292,7 +328,7 @@
         </div>
       </div>
       <div class="wrap pay-row" aria-label="Medios de pago"><span class="muted small">Pagás con:</span>
-        <span class="pay">🏦 Transferencia</span><span class="pay">💵 Efectivo al retirar</span><span class="pay">💲 Dólares</span><span class="pay">₿ Cripto</span><span class="pay">🔒 Seña para reservar</span></div>
+        <span class="pay">🏦 Transferencia</span><span class="pay">💵 Efectivo al retirar</span><span class="pay">💲 Dólares</span><span class="pay">₿ Cripto</span><span class="pay">🔒 Seña para reservar</span><span class="muted small dolar-hoy" id="dolarHoy"></span></div>
       ${CONFIG.dataFiscal ? `<div class="wrap"><a href="${esc(CONFIG.dataFiscal)}" target="_blank" rel="noopener" class="data-fiscal">Data Fiscal</a></div>` : ""}
       <div class="wrap foot-bottom">© ${new Date().getFullYear()} Tienda de Vuelo · ${esc(CONFIG.ciudad)}</div>
     </footer>
@@ -315,7 +351,7 @@
   const evento = (tipo, dato = "", producto = "") => { try { fetch("/api/evento", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ tipo, dato, producto }) }).catch(() => {}); } catch {} };
   let ultimaVacia = "";
   const normQ = (x) => String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const buscar = (q) => { const w = normQ(q).split(/\s+/).filter(Boolean); return PRODUCTS.filter((p) => !p.agotado && w.every((x) => normQ([p.name, p.brand, p.model, p.cat, p.desc].join(" ")).includes(x))); };
+  const buscar = (q) => PRODUCTS.filter((p) => !p.agotado && coincide(p, q));
   const sugg = $("#sugg"), navQ = $("#navQ");
   const cerrarSugg = () => { sugg.hidden = true; navQ.setAttribute("aria-expanded", "false"); };
   navQ.addEventListener("input", () => {
@@ -393,6 +429,47 @@
       if (r.ok) f.querySelector("#newsMail").value = "";
     } catch { msg.textContent = "No se pudo. Probá de nuevo."; }
   });
+
+  // ---------- "Pedime el precio": deja su WhatsApp y le respondemos ----------
+  function pedirPrecio(p, opcion = "") {
+    const m = document.createElement("div");
+    m.className = "cmp-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-label", "Pedir el precio");
+    m.innerHTML = `<form class="cmp-card pp-card" id="ppForm"><div class="drawer-head"><h3>Te pasamos el precio</h3><button type="button" class="icon-btn" id="ppClose" aria-label="Cerrar">✕</button></div>
+      <p class="small"><b>${esc(p.name)}</b>${opcion ? ` · ${esc(opcion)}` : ""}</p>
+      <label>Tu nombre<input id="ppNom" required maxlength="80" autocomplete="name" value="${esc(store.get("tdv-datos", {}).nombre || "")}"></label>
+      <label>Tu WhatsApp<input id="ppTel" required type="tel" autocomplete="tel" value="${esc(store.get("tdv-datos", {}).tel || "")}"></label>
+      <input name="web" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn btn-primary btn-block">Pedir el precio</button>
+      <p class="muted small" id="ppMsg" role="status">Te escribimos por WhatsApp${avisoHorario() ? " a partir de las " + CONFIG.horario.desde + " h" : " en un rato"}. ¿Apurado? <a href="${waLink(`¡Hola! Quiero consultar el precio de: ${p.name}${opcion ? " (" + opcion + ")" : ""}`)}" target="_blank" rel="noopener">Escribinos directo</a>.</p></form>`;
+    document.body.appendChild(m);
+    const cerrar = () => m.remove();
+    m.querySelector("#ppClose").onclick = cerrar;
+    m.addEventListener("click", (e) => { if (e.target === m) cerrar(); });
+    m.querySelector("#ppNom").focus();
+    m.querySelector("#ppForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const nombre = m.querySelector("#ppNom").value.trim(), tel = m.querySelector("#ppTel").value.trim();
+      store.set("tdv-datos", { ...store.get("tdv-datos", {}), nombre, tel });
+      evento("consulta", "", p.id);
+      try {
+        const r = await fetch("/api/consulta", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ producto: p.id, nombre: p.name, opcion, cliente: nombre, tel, web: m.querySelector('[name="web"]').value }) });
+        if (!r.ok) throw new Error();
+        m.querySelector("#ppForm").innerHTML = `<div class="drawer-head"><h3>¡Listo, ${esc(nombre.split(" ")[0])}!</h3><button type="button" class="icon-btn" id="ppClose2" aria-label="Cerrar">✕</button></div><p>Te escribimos por WhatsApp con el precio de <b>${esc(p.name)}</b>.</p>`;
+        m.querySelector("#ppClose2").onclick = cerrar;
+      } catch { window.open(waLink(`¡Hola! Quiero consultar el precio de: ${p.name}${opcion ? " (" + opcion + ")" : ""}`), "_blank", "noopener"); cerrar(); }
+    };
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-pedir]"); if (b) { e.preventDefault(); pedirPrecio(byId[b.dataset.pedir]); } });
+
+  // Precarga: al apoyar el dedo o el mouse sobre un producto, se empieza a bajar su foto grande
+  const precargadas = new Set();
+  const precargar = (e) => {
+    const a = e.target.closest?.("[data-view]"); if (!a) return;
+    const p = byId[a.dataset.view]; if (!p || !p.fotos?.length || precargadas.has(p.id)) return;
+    precargadas.add(p.id); const img = new Image(); img.src = p.fotos[0];
+  };
+  document.addEventListener("pointerdown", precargar, { passive: true });
+  document.addEventListener("mouseover", precargar, { passive: true });
 
   // ---------- Carrito ----------
   let cart = store.get("tdv-cart", []).filter((l) => (l.kit ? KITS.some((k) => k.id === l.kit) : byId[l.id]));
@@ -665,9 +742,11 @@
   }
 
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, resumenCarrito, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
+  const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };
+  pintarDolar(); document.addEventListener("tdv:precios", pintarDolar);
   asistente();
   window.dispatchEvent(new Event("tdv:listo"));
 })();

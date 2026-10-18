@@ -690,3 +690,20 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
 .banner-con-foto { padding-right: min(38%, 280px); min-height: 240px; }
 .banner-img { position: absolute; right: 28px; top: 18px; width: min(30%, 190px); aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 20px; padding: 10px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .5); }
 @media (max-width: 640px) { .banner-con-foto { padding-right: 22px; padding-top: 150px; } .banner-img { top: 18px; right: auto; left: 22px; transform: none; width: 120px; } }
+/* Tanda 25 mejoras */
+.pv-ficha { min-width: 0; display: grid; gap: 6px; margin: 4px 0 12px; padding: 12px 14px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line); }
+.pv-ficha label { font-weight: 700; font-size: 14px; }
+.pv-ficha select { width: 100%; min-width: 0; max-width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); font: inherit; background: #fff; }
+.pv-ficha p { margin: 0; }
+.btn-ghost-wa { background: #fff; color: #0b6b3a; border: 1.5px solid #25d366; box-shadow: none; }
+.pv-stick { display: none; }
+@media (max-width: 760px) {
+  .pv-stick:not([hidden]) { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, .97); border-top: 1px solid var(--line); box-shadow: 0 -10px 30px -20px rgba(12, 35, 64, .5); }
+  .pv-stick-info { display: grid; min-width: 0; }
+  .pv-stick-info b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv-stick-info span { font-size: 13px; color: var(--accent-2); font-weight: 700; }
+}
+.pp-card { display: grid; gap: 12px; max-width: 420px; }
+.pp-card label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+.pp-card p { margin: 0; }
+.dolar-hoy { margin-left: auto; }

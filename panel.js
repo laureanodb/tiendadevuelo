@@ -533,14 +533,28 @@
             <span class="muted small">${esc(p.items.map((i) => `${i.qty}× ${i.name}`).join(", "))}</span></span>
           <span class="p-row-num">${sinVer(p) ? '<i class="p-estado e-comp">💳 Comprobante</i>' : ""}<i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i><b>${p.cobradoArs || p.cobradoUsd ? [p.cobradoArs ? ars(p.cobradoArs) : "", p.cobradoUsd ? usd(p.cobradoUsd) : ""].filter(Boolean).join(" + ") : p.totalArs ? "≈ " + ars(p.totalArs) : ""}</b></span>
         </button>`).join("") || '<p class="empty">No hay pedidos con ese filtro.</p>'}</div>
+      <section class="p-card p-carritos" id="consultasBox"><h2>Te pidieron precio</h2><p class="muted small">Clientes que tocaron “Pedime el precio”. Escribiles y marcalos como respondidos.</p><p class="p-loading">Cargando…</p></section>
       <section class="p-card p-carritos" id="carritos"><h2>Carritos sin terminar</h2><p class="muted small">Dejaron nombre y teléfono pero no mandaron el pedido. Un mensaje a tiempo suele cerrar la venta.</p><p class="p-loading">Cargando…</p></section>`;
-    verCarritos();
+    verCarritos(); verConsultas();
     app.querySelectorAll("[data-fp]").forEach((b) => (b.onclick = () => { filtroPed = b.dataset.fp; verPedidos(); }));
     app.querySelectorAll("[data-ped]").forEach((b) => (b.onclick = () => verPedido(d.pedidos.find((p) => p.num === b.dataset.ped))));
     const bp = document.getElementById("buscaPed");
     bp.oninput = () => { buscaPed = bp.value; clearTimeout(bp._t); bp._t = setTimeout(() => { const pos = bp.selectionStart; verPedidos().then(() => { const n = document.getElementById("buscaPed"); n.focus(); n.setSelectionRange(pos, pos); }); }, 250); };
   }
 
+  async function verConsultas() {
+    const box = document.getElementById("consultasBox");
+    if (!box) return;
+    let d;
+    try { d = await api("consultas"); } catch { box.querySelector(".p-loading").textContent = "No se pudieron cargar."; return; }
+    box.querySelector(".p-loading").outerHTML = d.consultas.length ? `<div class="p-list">${d.consultas.map((c) => {
+      const p = productos.find((x) => x.id === c.producto);
+      const precio = p ? (p.usd !== null ? `US$ ${p.usd}` : p.ars !== null ? ars(p.ars) : "") : "";
+      const msg = `¡Hola ${c.cliente.split(" ")[0]}! Te escribo de Tienda de Vuelo ✈ El ${c.nombre}${c.opcion ? " (" + c.opcion + ")" : ""} ${precio ? "sale " + precio : "sale $COMPLETAR"}. ¿Te lo reservo?`;
+      return `<div class="p-cart-row" data-qid="${c.id}"><div><b>${esc(c.cliente)}</b> <span class="muted small">${fechaCorta(c.fecha)}</span><br><span class="muted small">${esc(c.nombre)}${c.opcion ? " · " + esc(c.opcion) : ""}</span></div>
+        <div class="p-head-btns"><a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(c.tel, msg)}">Responder</a><button class="btn btn-ghost btn-sm" data-qok>Respondida</button></div></div>`; }).join("")}</div>` : '<p class="muted">No hay pedidos de precio pendientes. 👌</p>';
+    box.querySelectorAll("[data-qok]").forEach((b) => (b.onclick = () => { const row = b.closest("[data-qid]"); api("consultas", { method: "POST", body: { id: row.dataset.qid } }).then(() => row.remove()).catch((x) => toast(x.message)); }));
+  }
   async function verCarritos() {
     const box = document.getElementById("carritos");
     if (!box) return;

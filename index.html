@@ -43,12 +43,12 @@
       </div>
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <span class="pill">✈ Pilot shop · Argentina</span>
-          <h1>Todo para tu <span class="grad">próximo vuelo</span>.</h1>
-          <p class="lead">Auriculares, aviónica, navegación y accesorios originales, elegidos por pilotos. Envíos a todo el país.</p>
+          <span class="pill">✔ Distribuidor oficial Bose · Argentina</span>
+          <h1>Equipos originales <span class="grad">para pilotos</span>.</h1>
+          <p class="lead">Auriculares Bose y David Clark, radios Icom y Yaesu, navegación Jeppesen y regalos para pilotos. Envíos a todo el país y en el día en CABA.</p>
           <div class="cta-row">
-            <a href="#catalogo" class="btn btn-primary">Ver catálogo</a>
-            <a href="#kits" class="btn btn-ghost">Armá tu kit</a>
+            <a href="/producto/bose-a30" class="btn btn-primary" data-view="bose-a30">Ver Bose A30</a>
+            <a href="#catalogo" class="btn btn-ghost">Ver catálogo</a>
           </div>
           <ul class="hero-points" id="heroPoints">
             <li><b data-cfg="ventas">+2.500</b> ventas realizadas</li>
@@ -236,6 +236,7 @@
   <div id="siteFooter"></div>
 
   <!-- Ficha de producto (se abre en /producto/...) -->
+  <div class="pv-stick" id="pvStick" hidden><div class="pv-stick-info"><b id="pvStickName"></b><span id="pvStickPrice"></span></div><button class="btn btn-primary btn-sm" id="pvStickBtn"></button></div>
   <div class="pview" id="pview" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
     <div class="pview-inner wrap">
       <button class="back-btn" id="pvBack">← Volver</button>
@@ -248,12 +249,18 @@
           <div class="pv-tags" id="pvTags"></div>
           <div class="pv-price" id="pvPrice"></div>
           <p class="pv-desc" id="pvDesc"></p>
+          <div class="pv-ficha" id="pvFichaWrap" hidden>
+            <label for="pvFicha">¿Qué ficha usa tu avión?</label>
+            <select id="pvFicha"></select>
+            <p class="muted small" id="pvFichaTxt"></p>
+          </div>
           <div class="pv-variant" id="pvVariantWrap" hidden>
             <label for="pvVariant">Opción</label>
             <select id="pvVariant"></select>
           </div>
           <div class="pv-actions">
             <button class="btn btn-primary" id="pvAdd">Agregar al carrito</button>
+            <button class="btn btn-primary" id="pvPedir" hidden>📩 Pedime el precio</button>
             <a class="btn btn-wa" id="pvWant" target="_blank" rel="noopener">Lo quiero por WhatsApp</a>
           </div>
           <div class="pv-mini">
