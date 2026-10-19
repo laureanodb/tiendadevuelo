@@ -47,6 +47,10 @@ const COMPARATIVAS = [
     resumen: "Los dos tienen escalas 1:500.000 y 1:1.000.000 en millas náuticas y terrestres. Cambia el transportador.",
     puntos: [["Elegí el PJ-1 si…", "querés medir rumbos rápido: su transportador giratorio se alinea con un meridiano y leés el rumbo directo."],
       ["Elegí el PN-1 si…", "medís tramos largos: su regla es más larga y el transportador fijo es simple y robusto."]] },
+  { slug: "garmin-g5-certificado-vs-experimental", a: "garmin-g5-certificado", b: "garmin-g5-experimental", titulo: "Garmin G5 certificado o experimental",
+    resumen: "Es el mismo instrumento de 3,5 pulgadas. Cambia la aprobación: de eso depende en qué avión lo podés instalar.",
+    puntos: [["Elegí el G5 certificado si…", "tu avión está certificado (la mayoría de los aviones de escuela y de aviación general). Tiene aprobación STC, batería de respaldo incluida y lo instala un taller habilitado."],
+      ["Elegí el G5 experimental si…", "volás un avión experimental o deportivo liviano (LSA). No se puede instalar en aviones certificados, y la batería de respaldo es opcional."]] },
 ];
 
 const cabeza = (titulo, desc, url, ld) => `<!doctype html>
