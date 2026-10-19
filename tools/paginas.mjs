@@ -113,6 +113,9 @@ for (const av of AVIONES) {
       </div>
       <h2>Auriculares que le sirven</h2>
       <div class="grid grid-4" id="avAuris"></div>
+      ${av.ficha === "dual" ? `<h2>Adaptadores de ficha</h2>
+      <p>Para usar en este avión un auricular que tiene otra ficha.</p>
+      <div class="grid grid-4" id="avAdapt"></div>` : ""}
       <h2>Radios portátiles</h2>
       <p>Para escuchar la frecuencia en tierra o como respaldo ante una falla eléctrica.</p>
       <div class="grid grid-4" id="avRadios"></div>
@@ -130,6 +133,7 @@ for (const av of AVIONES) {
       const llenar = (id, lista, vacio) => { const el = $(id); if (el) el.innerHTML = lista.length ? lista.map(card).join("") : '<p class="muted" style="grid-column:1/-1">' + vacio + '</p>'; };
       const sinDato = (p) => !/dual|lemo|xlr|u-?174/i.test((p.variantes || []).concat(p.specs || [], p.nota || "").join(" "));
       llenar("#avAuris", [...auris.filter(sirve), ...(fichas[0] === "dual" ? auris.filter((p) => !sirve(p) && sinDato(p)) : [])].slice(0, 8), "Consultanos por WhatsApp: te conseguimos el auricular con la ficha que necesitás.");
+      llenar("#avAdapt", vis.filter((p) => p.icon === "plug" && /a dual/i.test(p.name)), "Consultanos: te conseguimos el adaptador que necesitás.");
       llenar("#avRadios", vis.filter((p) => p.icon === "radio" && !/panel/i.test(p.name)), "Consultanos por radios portátiles.");
       llenar("#avNav", vis.filter((p) => p.cat === "Navegación"), "");
     });`);
