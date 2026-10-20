@@ -568,7 +568,7 @@
       // Antes de seguir: lo que completa la compra (primero lo que el dueño cargó como complemento, después por tipo de producto)
       const enCarrito = new Set(cart.flatMap((l) => (l.kit ? l.items : [l.id])));
       const deCarrito = cart.flatMap((l) => (l.kit ? l.items : [l.id])).map((id) => byId[id]).filter(Boolean);
-      const COMPLEMENTA = { headset: ["plug", "radio", "watch"], plug: ["headset"], radio: ["headset", "watch"], plotter: ["calc", "plotter", "watch"], calc: ["plotter", "watch"], watch: ["calc", "plotter"], keychain: ["keychain"] };
+      const COMPLEMENTA = { headset: ["case", "plug", "radio", "watch"], plug: ["headset"], case: ["headset"], radio: ["headset", "watch"], plotter: ["calc", "plotter", "watch"], calc: ["plotter", "watch"], watch: ["calc", "plotter"], keychain: ["keychain"] };
       const puntos = {};
       for (const p of deCarrito) {
         (p.complementos || []).forEach((id, i) => { puntos[id] = (puntos[id] || 0) + 10 - i; });
