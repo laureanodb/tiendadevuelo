@@ -48,13 +48,13 @@
     return `<div class="price${big ? " price-big" : ""}"><b class="consult">Consultar precio</b></div>`;
   };
 
-  const art = (p, big) => {
+  const art = (p, big, ya) => {
     if (p.fotos && p.fotos.length) {
       // Miniatura: primero la WebP, si no existe la JPG chica y si tampoco, la foto grande
       const f = p.fotos[0], propia = /^\/img\/productos\/.+\.jpg$/.test(f), chica = !big && (propia || /\/storage\/v1\/object\/public\/productos\/.+\.jpg$/.test(f));
       const webp = chica && propia || chica && Number((f.match(/\/(\d{13})-[a-f0-9]+\.jpg$/) || [])[1]) > 1792296541731; // fotos subidas desde que existe la miniatura WebP
       const src = chica ? f.replace(/\.jpg$/, webp ? "-t.webp" : "-t.jpg") : f, resto = chica ? [webp && f.replace(/\.jpg$/, "-t.jpg"), f].filter(Boolean).join(" ") : "";
-      return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" decoding="async"${resto ? ` data-alt="${esc(resto)}" onerror="var a=(this.dataset.alt||'').split(' ').filter(Boolean);if(a.length){this.dataset.alt=a.slice(1).join(' ');this.src=a[0]}else{this.onerror=null}"` : ""}></div>`;
+      return `<div class="art art-photo${big ? " art-big" : ""}"><img src="${esc(src)}" alt="${esc(p.name)}" loading="${ya ? "eager" : "lazy"}" decoding="async"${resto ? ` data-alt="${esc(resto)}" onerror="var a=(this.dataset.alt||'').split(' ').filter(Boolean);if(a.length){this.dataset.alt=a.slice(1).join(' ');this.src=a[0]}else{this.onerror=null}"` : ""}></div>`;
     }
     const [a, b] = CAT_COLORS[p.cat] || ["#0e8be0", "#d6ebfc"];
     return `<div class="art${big ? " art-big" : ""}" style="--a:${a};--b:${b}">
@@ -178,6 +178,9 @@
     m.querySelector("#cmpClose").focus();
   }
 
+  // Qué es el producto, para los que no tienen marca (en lugar de la categoría)
+  const TIPOS = { keychain: "Llavero", plug: "Adaptador", case: "Repuesto", badge: "Accesorio", wings: "Pin", headset: "Auricular", radio: "Radio" };
+  const tipoDe = (p) => p.tipo || TIPOS[p.icon] || p.cat;
   const card = (p, i = 0) => `
     <article class="card" style="--i:${i}">
       <div class="badges">${badges(p)}</div>
@@ -185,11 +188,11 @@
       <button class="fav${isFav(p.id) ? " on" : ""}" data-fav="${p.id}" aria-label="${isFav(p.id) ? "Quitar de" : "Guardar en"} favoritos" aria-pressed="${isFav(p.id)}">${isFav(p.id) ? "♥" : "♡"}</button>
       <a class="card-art" href="/producto/${p.id}" data-view="${p.id}" aria-label="Ver ${esc(p.name)}">${art(p)}</a>
       <div class="card-body">
-        <span class="card-cat">${esc(p.brand || p.cat)}</span>
+        <span class="card-cat">${esc(p.brand || tipoDe(p))}</span>
         <h3><a href="/producto/${p.id}" data-view="${p.id}">${esc(p.name)}</a></h3>
         ${p.rating ? `<div class="stars-sm" aria-label="${p.rating} de 5 estrellas">${estrellas(p.rating)} <span>(${p.resenas})</span></div>` : ""}
         ${p.nota ? `<div class="card-nota">${esc(p.nota)}</div>` : ""}
-        ${priceHTML(p)}
+        ${p.usd || p.ars ? priceHTML(p) : ""}
         ${p.llega ? `<div class="note">Preventa · llega el ${fechaCorta(p.llega)}</div>` : p.encargo ? '<div class="note">Llega en 15 a 30 días</div>' : ""}
       </div>
       ${p.usd || p.ars ? `<button class="add" data-add="${p.id}">Agregar <span aria-hidden="true">+</span></button>`
@@ -201,7 +204,7 @@
 
   // ---------- Links por categoría y marca ----------
   const slug = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚", "Cursos y experiencias": "🎓" };
+  const catEmoji = { "Comunicaciones": "🎧", "Navegación": "🧭", "Aviónica": "🛰️", "Uniforme": "🪽", "Accesorios": "🎒", "Libros y regalos": "📚", "Cursos y experiencias": "🎓", "Repuestos y adaptadores": "🔧", "Seguridad y emergencia": "🛟" };
 
   // ---------- Feriados y fechas patrias (Argentina) ----------
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -309,7 +312,11 @@
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a><a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/aviones">¿Qué ficha usa tu avión?</a><a href="/comparativas">Comparativas</a><a href="/guia-primer-vuelo">Guía: tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+        </div>
+        <div>
+          <h2 class="foot-h">Guías</h2>
+          <a href="/guia-auriculares">¿Qué auricular me conviene?</a><a href="/aviones">¿Qué ficha usa tu avión?</a><a href="/comparativas">Comparativas</a><a href="/guia-primer-vuelo">Tu primer vuelo</a><a href="/auriculares-de-aviacion">Auriculares de aviación</a><a href="/equipo-para-curso-de-piloto">Equipo para el curso</a><a href="/regalos-para-pilotos">Regalos para pilotos</a>
         </div>
         <div>
           <h2 class="foot-h">Contacto</h2>
@@ -803,7 +810,7 @@
   };
   const pintarGoogle = () => document.querySelectorAll("[data-google]").forEach((el) => { el.innerHTML = googleHTML(el.dataset.google); el.hidden = !CONFIG.google; });
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, tipoDe, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };

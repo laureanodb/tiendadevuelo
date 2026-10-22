@@ -6,12 +6,19 @@
 
   // ---------- Destacados, tripulantes, regalos ----------
   const renderRows = () => {
-    $("#destacados").innerHTML = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map(card).join("");
-    const tcp = visibles.filter((p) => p.tcp), regalos = visibles.filter((p) => p.regalo);
+    const dest = visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4);
+    $("#destacados").innerHTML = dest.map(card).join("");
+    // Cada producto aparece una sola vez en la portada
+    const ya = new Set(dest.map((p) => p.id));
+    const tcp = visibles.filter((p) => p.tcp && !ya.has(p.id)).slice(0, 4);
+    tcp.forEach((p) => ya.add(p.id));
+    const regalos = visibles.filter((p) => p.regalo && !ya.has(p.id));
     $("#tripulantes").hidden = !tcp.length; $("#regalos").hidden = !regalos.length;
-    $("#tcpGrid").innerHTML = tcp.slice(0, 4).map(card).join("");
+    $("#tcpGrid").innerHTML = tcp.map(card).join("");
     $("#regalosGrid").innerHTML = regalos.slice(0, 4).map(card).join("");
     $("#kits").hidden = !KITS.length;
+    $("#kitsGrid").style.setProperty("--n", Math.min(Math.max(KITS.length, 1), 4));
+    $("#kitsGrid").style.setProperty("--n3", Math.min(Math.max(KITS.length, 1), 3));
     document.querySelectorAll('a[href="#kits"]').forEach((a) => (a.hidden = !KITS.length));
     const usados = visibles.filter((p) => p.reacond);
     $("#usados").hidden = !usados.length;
@@ -37,7 +44,16 @@
   showBanner(0); autoBanner();
 
   // ---------- Categorías ----------
-  $("#cats").innerHTML = CATEGORIES.filter((c) => visibles.some((p) => p.cat === c)).map((c) => `<a class="cat-card" href="/categoria/${slug(c)}" data-ruta><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("");
+  const tiles = CATEGORIES.filter((c) => visibles.some((p) => p.cat === c)).map((c) => ({ href: `/categoria/${slug(c)}`, e: catEmoji[c] || "✈", t: c }));
+  const extras = [
+    visibles.some((p) => p.brand === "Garmin") && { href: "/marca/garmin", e: "📟", t: "Aviónica Garmin" },
+    KITS.length && { href: "#kits", e: "🧰", t: "Kits con descuento" },
+    visibles.some((p) => p.tcp) && { href: "#tripulantes", e: "🧑‍✈️", t: "Tripulantes" },
+    { href: "/aviones", e: "✈️", t: "Equipos por avión" },
+    { href: "/comparativas", e: "⚖️", t: "Comparativas" },
+  ].filter(Boolean);
+  while (tiles.length % 4 && extras.length) tiles.push(extras.shift());
+  $("#cats").innerHTML = tiles.map((x) => `<a class="cat-card" href="${x.href}"${x.href.startsWith("/categoria/") ? " data-ruta" : ""}><span aria-hidden="true">${x.e}</span>${esc(x.t)}</a>`).join("");
 
   // ---------- Capturas de mensajes de clientes (con su permiso) ----------
   if (CONFIG.testimonios?.length) {
@@ -84,7 +100,16 @@
       nombre: (a, b) => a.name.localeCompare(b.name, "es"),
     };
     list.sort(sorters[state.sort]);
-    $("#grid").innerHTML = list.map(card).join("");
+    // En la portada sin filtros se muestran 8 (sin repetir los destacados) y un botón para ver todos
+    const portada = !state.todos && state.f === "Todos" && !state.brand && !q && !state.min && !state.max;
+    let mostrar = list;
+    if (portada) {
+      const dest = new Set(visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map((p) => p.id));
+      mostrar = list.filter((p) => !dest.has(p.id)).slice(0, 8);
+    }
+    $("#grid").innerHTML = mostrar.map(card).join("");
+    $("#verTodos").hidden = !portada || mostrar.length >= list.length;
+    $("#verTodos").textContent = `Ver los ${list.length} productos`;
     $("#grid").classList.toggle("as-list", state.vista === "list");
     $("#vGrid").setAttribute("aria-pressed", state.vista === "grid"); $("#vList").setAttribute("aria-pressed", state.vista === "list");
     $("#empty").hidden = list.length > 0;
@@ -106,6 +131,7 @@
       : `No encontramos nada con esa búsqueda. <a href="/contacto#pedido">Pedinos el producto</a> y lo conseguimos.`;
   }
   $("#search").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  $("#verTodos").onclick = () => { state.todos = true; render(); };
   $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
   $("#brand").addEventListener("change", (e) => { state.brand = e.target.value; render(); });
   $("#pMin").addEventListener("input", (e) => { state.min = e.target.value; render(); });
@@ -181,9 +207,6 @@
     add({ kit: k.id, items: k.items.filter((id) => kitSel[k.id].has(id)) }, k.name);
   });
 
-  // ---------- Marcas ----------
-  const marcas = [...new Set(PRODUCTS.map((p) => p.brand).filter(Boolean))];
-  $("#brands").innerHTML = marcas.map((m) => `<a class="brand-chip" href="/marca/${slug(m)}">${esc(m)}</a>`).join("");
 
   // ---------- Ficha de producto (/producto/id) ----------
   const view = $("#pview");
@@ -203,7 +226,7 @@
     $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
     $("#pvTitle").textContent = p.name;
     $("#pvTags").innerHTML = [
-      '<span class="seal seal-sm">✈ Recomendado por pilotos</span>',
+      !p.oficial && '<span class="seal seal-sm">✈ Recomendado por pilotos</span>',
       p.encargo && '<span class="tag tag-order">Por encargo · 15 a 30 días</span>',
       p.reacond && '<span class="tag">Reacondicionado</span>',
       p.nuevo && '<span class="tag tag-new">Nuevo ingreso</span>',
@@ -225,6 +248,7 @@
     $("#pvVariant").innerHTML = ops.map((o) => `<option value="${esc(o.nombre)}">${esc(o.nombre)}${o.precio !== null && o.precio !== (p.usd || p.ars) ? ` — ${p.usd ? "US$ " + o.precio.toLocaleString("es-AR") : ars(o.precio)}` : ""}</option>`).join("");
     const precioOpcion = () => {
       const pp = p.variantes ? conOpcion(p, $("#pvVariant").value) : p;
+      $("#pvPrice").hidden = !(pp.usd || pp.ars);
       $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? `<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar del día: ${ars(TDV.dolar)}.</p>` : "");
       $("#pvStickPrice").innerHTML = pp.usd ? `US$ ${pp.usd.toLocaleString("es-AR")}` : pp.ars ? ars(pp.ars) : "Consultar precio";
       const o = ops.find((x) => x.nombre === $("#pvVariant").value);
@@ -235,24 +259,15 @@
     $("#pvAdd").hidden = !conPrecio;
     $("#pvPedir").hidden = !!conPrecio;
     $("#pvPedir").onclick = () => TDV.pedirPrecio(p, p.variantes ? $("#pvVariant").value : "");
-    // Selector "¿Qué ficha usa tu avión?" para los auriculares que vienen con varias fichas
-    const FICHAS = [
-      ["dual", "Avión de escuela o aviación general (Cessna, Piper, Tecnam, Diamond…)", "La mayoría usa dos fichas separadas: Dual plug (GA)."],
-      ["lemo", "Avión con ficha redonda de 6 pines en el panel", "Es la ficha LEMO: además alimenta el auricular desde el avión, sin pilas."],
-      ["xlr", "Avión de línea (Airbus y otros con ficha de 5 pines)", "Usan la ficha XLR de 5 pines."],
-      ["u-174", "Helicóptero", "Los helicópteros usan la ficha U-174. Si no figura en las opciones, consultanos."],
-    ];
-    const opsFicha = (p.variantes || []).map((v) => String(v).split("|")[0].trim());
-    const disponibles = FICHAS.filter(([k]) => k === "u-174" || opsFicha.some((o) => o.toLowerCase().includes(k)));
-    $("#pvFichaWrap").hidden = !(p.icon === "headset" && opsFicha.length > 1 && disponibles.length > 1);
-    $("#pvFicha").innerHTML = '<option value="">Elegí dónde vas a volar</option>' + disponibles.map(([k, t]) => `<option value="${k}">${esc(t)}</option>`).join("");
-    $("#pvFichaTxt").textContent = "";
-    $("#pvFicha").onchange = () => {
-      const f = FICHAS.find(([k]) => k === $("#pvFicha").value);
-      if (!f) { $("#pvFichaTxt").textContent = ""; return; }
-      const op = opsFicha.find((o) => o.toLowerCase().includes(f[0]));
-      $("#pvFichaTxt").textContent = f[2] + (op ? " Te la dejamos elegida." : "");
-      if (op) { $("#pvVariant").value = op; $("#pvVariant").dispatchEvent(new Event("change")); }
+    // Si las opciones son fichas, el selector explica cuál usa cada tipo de avión
+    const FICHAS = { dual: "La de los aviones de escuela y de aviación general (Cessna, Piper, Tecnam, Diamond): dos fichas separadas.", lemo: "Ficha redonda de 6 pines en el panel: además alimenta el auricular desde el avión, sin pilas.", xlr: "Ficha redonda de 5 pines, la de los aviones de línea Airbus.", "u-174": "La de los helicópteros." };
+    const claveFicha = (v) => Object.keys(FICHAS).find((k) => String(v).toLowerCase().includes(k));
+    const sonFichas = !!p.variantes && p.variantes.filter(claveFicha).length > 1;
+    $("#pvVariantLbl").textContent = sonFichas ? "Ficha según tu avión" : "Opción";
+    const ayudaFicha = () => {
+      const k = sonFichas && claveFicha($("#pvVariant").value);
+      $("#pvVarAyuda").hidden = !sonFichas;
+      if (sonFichas) $("#pvVarAyuda").innerHTML = `${k ? esc(FICHAS[k]) + " " : ""}<a href="/aviones">¿Qué ficha usa tu avión?</a>`;
     };
     const consulta = `¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`;
     $("#pvAsk").href = waLink(consulta);
@@ -263,7 +278,7 @@
       const precio = pp.usd ? `US$ ${pp.usd.toLocaleString("es-AR")}` : pp.ars ? ars(pp.ars) : "";
       $("#pvWant").href = waLink(`¡Hola! ${p.llega ? "Quiero reservar (preventa)" : "Lo quiero"}: ${p.name}${p.brand ? ` (${p.brand}${p.model ? " " + p.model : ""})` : ""}${op ? `\nOpción: ${op}` : ""}${precio ? `\nPrecio: ${precio}` : ""}\n${CONFIG.sitio}/producto/${p.id}`);
     };
-    $("#pvVariant").onchange = () => { loQuiero(); precioOpcion(); }; loQuiero(); precioOpcion();
+    $("#pvVariant").onchange = () => { loQuiero(); precioOpcion(); ayudaFicha(); }; loQuiero(); precioOpcion(); ayudaFicha();
     $("#pvAdd").textContent = p.llega ? "Reservar (preventa)" : "Agregar al carrito";
     $("#pvRating").hidden = !p.rating;
     if (p.rating) $("#pvRating").innerHTML = `<span class="stars">${estrellas(p.rating)}</span> ${p.rating} · ${p.resenas} ${p.resenas === 1 ? "opinión" : "opiniones"}`;
@@ -423,15 +438,15 @@
     $("#showcase").innerHTML = `
       <div class="sc-stage">${lista.map((p, i) => `
         <a class="sc-slide" href="/producto/${p.id}" data-view="${p.id}" data-i="${i}" aria-label="${esc(p.name)}">
-          <div class="sc-img">${art(p, true)}</div>
+          <div class="sc-img">${art(p, true, i === 0)}</div>
           <div class="sc-info">
             <span class="sc-brand">${esc(p.brand || p.cat)}</span>
             <b class="sc-name">${esc(p.name)}</b>
-            ${priceHTML(p)}
+            ${p.usd || p.ars ? priceHTML(p) : p.nota ? `<span class="sc-nota">${esc(p.nota)}</span>` : ""}
             <span class="sc-cta">Ver producto →</span>
           </div>
         </a>`).join("")}</div>
-      <div class="sc-thumbs">${lista.map((p, i) => `<button class="sc-thumb" data-sc="${i}" aria-label="Ver ${esc(p.name)}">${art(p)}</button>`).join("")}</div>`;
+      <div class="sc-thumbs">${lista.map((p, i) => `<button class="sc-thumb" data-sc="${i}" aria-label="Ver ${esc(p.name)}">${art(p, false, true)}</button>`).join("")}</div>`;
     showSlide(vi % lista.length);
     clearInterval(vTimer);
     if (!reduceMotion && lista.length > 1) vTimer = setInterval(() => showSlide((vi + 1) % lista.length), 4500);

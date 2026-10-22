@@ -120,6 +120,7 @@
         </div>
         <div class="fav-share" id="favShare" hidden></div>
         <div class="grid" id="grid"></div>
+        <p class="ver-todos"><button type="button" class="btn btn-ghost" id="verTodos" hidden>Ver todos los productos</button></p>
         <p class="empty" id="empty" hidden>No encontramos nada con esa búsqueda. <a href="/contacto#pedido">Pedinos el producto</a> y lo conseguimos.</p>
       </div>
     </section>
@@ -180,11 +181,6 @@
       </div>
     </section>
 
-    <!-- Marcas -->
-    <section class="wrap section-tight" aria-labelledby="marcasTitle">
-      <h2 id="marcasTitle" class="small-title">Marcas que trabajamos</h2>
-      <div class="brands" id="brands"></div>
-    </section>
 
     <!-- Por qué -->
     <section class="section" id="nosotros">
@@ -252,14 +248,10 @@
           <div class="pv-tags" id="pvTags"></div>
           <div class="pv-price" id="pvPrice"></div>
           <p class="pv-desc" id="pvDesc"></p>
-          <div class="pv-ficha" id="pvFichaWrap" hidden>
-            <label for="pvFicha">¿Qué ficha usa tu avión?</label>
-            <select id="pvFicha"></select>
-            <p class="muted small" id="pvFichaTxt"></p><p class="small"><a href="/aviones">Ver la ficha de cada avión y helicóptero</a></p>
-          </div>
           <div class="pv-variant" id="pvVariantWrap" hidden>
-            <label for="pvVariant">Opción</label>
+            <label for="pvVariant" id="pvVariantLbl">Opción</label>
             <select id="pvVariant"></select>
+            <p class="muted small" id="pvVarAyuda" hidden></p>
           </div>
           <div class="pv-actions">
             <button class="btn btn-primary" id="pvAdd">Agregar al carrito</button>
