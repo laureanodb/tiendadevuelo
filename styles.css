@@ -84,16 +84,6 @@ img, svg { display: block; max-width: 100%; }
 /* Hero */
 .hero { position: relative; padding: 48px 0 56px; overflow: hidden; }
 .sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(1000px 500px at 80% 10%, rgba(56, 189, 248, .18), transparent 60%), linear-gradient(180deg, #f2f8fe, #fff); }
-.cloud { position: absolute; height: 60px; border-radius: 60px; background: rgba(14, 139, 224, .07); filter: blur(4px); animation: drift linear infinite; }
-.cloud::before, .cloud::after { content: ""; position: absolute; background: inherit; border-radius: 50%; }
-.cloud::before { width: 70px; height: 70px; top: -35px; left: 30px; }
-.cloud::after { width: 90px; height: 90px; top: -45px; right: 30px; }
-.c1 { width: 220px; top: 22%; animation-duration: 70s; }
-.c2 { width: 160px; top: 60%; animation-duration: 95s; animation-delay: -40s; }
-.c3 { width: 260px; top: 85%; animation-duration: 120s; animation-delay: -80s; }
-@keyframes drift { from { transform: translateX(-320px); } to { transform: translateX(110vw); } }
-.plane { position: absolute; top: 12%; left: 0; width: 150px; color: rgba(12, 35, 64, .5); filter: drop-shadow(0 6px 6px rgba(12, 35, 64, .12)); animation: fly 24s linear infinite; }
-@keyframes fly { 0% { transform: translate(-140px, 60px) rotate(-7deg); } 100% { transform: translate(110vw, -70px) rotate(-7deg); } }
 .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; align-items: center; gap: 48px; }
 .pill { display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 14px; color: var(--muted); }
 .hero h1 { font-size: clamp(38px, 6vw, 72px); margin: 18px 0 16px; }
