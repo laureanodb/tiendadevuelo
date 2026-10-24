@@ -290,6 +290,7 @@
       p.reacond && "♻️ <b>Usado o reacondicionado:</b> revisado y probado. Tiene la garantía legal de 3 meses.",
       p.digital && "📩 <b>Producto digital:</b> lo recibís por WhatsApp o mail cuando se acredita el pago. No lleva envío.",
       !p.digital && "🎁 Cada pedido va con un regalito de la tienda.",
+      p.regalo && CONFIG.porCantidad && `🔑 <b>Llevá ${CONFIG.porCantidad.min} o más</b> llaveros o regalos y tenés ${Math.round(CONFIG.porCantidad.off * 100)}% de descuento en ellos.`,
       `💬 ¿Lo viste más barato en otra tienda? <a href="${waLink(`¡Hola! Vi el ${p.name} más barato en otro lado. ¿Lo pueden revisar?`)}" target="_blank" rel="noopener">Escribinos y lo revisamos</a>.`,
     ].filter(Boolean).map((x) => `<li>${x}</li>`).join("");
     if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por semana</b>, con depósito en garantía. <a href="/alquiler">Ver alquileres</a>`;
@@ -309,10 +310,15 @@
       : p.video ? `<a class="btn btn-ghost" href="${esc(p.video)}" target="_blank" rel="noopener">▶ Ver video del producto</a>` : "";
     $("#pvShare").href = `https://wa.me/?text=${encodeURIComponent(`Mirá esto en Tienda de Vuelo: ${p.name} ${CONFIG.sitio}/producto/${p.id}`)}`;
     syncFav();
-    // Se lleva junto con: productos de los kits donde está, o de la misma etapa
+    // Se lleva junto con: primero lo que lo complementa (repuestos, adaptadores), después los kits y la misma etapa
+    const compl = TDV.complementosDe(p, 4).map((x) => x.id);
     const enKits = KITS.filter((k) => k.items.includes(p.id)).flatMap((k) => k.items);
-    const etapa = visibles.filter((x) => x.etapas?.some((e) => p.etapas?.includes(e)));
-    const together = [...new Set([...enKits, ...etapa.map((x) => x.id)])].filter((id) => id !== p.id && byId[id].cat !== p.cat).slice(0, 4);
+    const etapa = visibles.filter((x) => x.etapas?.some((e) => p.etapas?.includes(e)) && x.cat !== p.cat);
+    const together = [...new Set([...compl, ...enKits, ...etapa.map((x) => x.id)])].filter((id) => id !== p.id && byId[id] && !byId[id].agotado).slice(0, 4);
+    $("#pvJunto").hidden = !compl.length;
+    $("#pvJuntoLista").innerHTML = compl.slice(0, 3).map((id) => { const x = byId[id]; return `<a class="pv-junto-item" href="/producto/${x.id}" data-view="${x.id}">${art(x)}<span><b>${esc(x.name)}</b>${x.nota ? `<small>${esc(x.nota)}</small>` : ""}</span><span class="pv-junto-ver" aria-hidden="true">›</span></a>`; }).join("");
+    $("#pvInstala").href = `/avionica?equipo=${encodeURIComponent(p.id)}#presupuesto`;
+    $("#pvInstala").hidden = !(p.cat === "Aviónica" || p.cat === "Seguridad y emergencia") || p.icon === "watch" || p.id === "garmin-aera-660";
     $("#pvTogether").innerHTML = together.map((id) => card(byId[id])).join("");
     $("#pvRelated").innerHTML = visibles.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4).map(card).join("");
     view.hidden = false;

@@ -17,6 +17,17 @@ function datosWeb() {
   vm.runInContext(fs.readFileSync(new URL("../../products.js", import.meta.url), "utf8") + ";this.__d={PRODUCTS,MARCAS,CAT_INFO}", ctx);
   return (web = ctx.__d);
 }
+// Opiniones aprobadas y preguntas respondidas del producto (para mostrarlas en Google)
+async function social(id) {
+  if (!DB_URL) return { resenas: [], preguntas: [] };
+  try {
+    const [{ rows: resenas }, { rows: preguntas }] = await Promise.all([
+      q("select nombre, estrellas, texto, creado from tdv_resenas where estado = 'aprobada' and producto = $1 order by creado desc limit 50", [id]),
+      q("select pregunta, respuesta from tdv_preguntas where estado = 'respondida' and producto = $1 and respuesta <> '' order by respondido desc limit 10", [id]),
+    ]);
+    return { resenas, preguntas };
+  } catch (e) { console.error(e); return { resenas: [], preguntas: [] }; }
+}
 async function productos() {
   if (DB_URL) {
     try {
@@ -61,15 +72,24 @@ export default async function handler(req, res) {
       const corta = base.length <= 140 ? base : base.slice(0, 140).replace(/[\s,;:.]+\S*$/, "") + "…";
       const desc = corta + (/[.…!?]$/.test(corta) ? "" : ".") + (precioTxt ? "" : " Consultá el precio.") + " Envíos a todo el país.";
       const fotos = (p.fotos || []).map(abs);
+      const { resenas, preguntas } = await social(p.id);
+      const prom = resenas.length ? Math.round((resenas.reduce((a, r) => a + r.estrellas, 0) / resenas.length) * 10) / 10 : 0;
       const ld = {
         "@context": "https://schema.org", "@type": "Product", name: p.name, description: p.desc || p.name, sku: p.id,
         ...(fotos.length ? { image: fotos } : {}), ...(p.brand ? { brand: { "@type": "Brand", name: p.brand } } : {}), ...(p.model ? { model: p.model } : {}),
-        ...(p.rating ? { aggregateRating: { "@type": "AggregateRating", ratingValue: p.rating, reviewCount: p.resenas } } : {}),
+        ...(resenas.length ? {
+          aggregateRating: { "@type": "AggregateRating", ratingValue: prom, reviewCount: resenas.length, bestRating: 5, worstRating: 1 },
+          review: resenas.filter((r) => r.texto).slice(0, 5).map((r) => ({ "@type": "Review", author: { "@type": "Person", name: String(r.nombre || "Cliente").split(" ")[0] },
+            datePublished: new Date(r.creado).toISOString().slice(0, 10), reviewRating: { "@type": "Rating", ratingValue: r.estrellas, bestRating: 5 }, reviewBody: r.texto })),
+        } : {}),
         ...(p.usd || p.ars ? { offers: { "@type": "Offer", url: `${SITIO}/producto/${p.id}`, priceCurrency: p.usd ? "USD" : "ARS", price: p.usd || p.ars,
           availability: p.llega ? "https://schema.org/PreOrder" : "https://schema.org/InStock", itemCondition: p.reacond ? "https://schema.org/RefurbishedCondition" : "https://schema.org/NewCondition",
           seller: { "@type": "Organization", name: "Tienda de Vuelo" } } } : {}),
       };
-      const faq = p.faqs?.length ? { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: p.faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) } : null;
+      // Preguntas frecuentes del producto más las que respondiste en la web
+      const vistas = new Set();
+      const pares = [...(p.faqs || []), ...preguntas.map((x) => [x.pregunta, x.respuesta])].filter(([q]) => { const k = String(q).trim().toLowerCase(); if (vistas.has(k)) return false; vistas.add(k); return true; });
+      const faq = pares.length ? { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: pares.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) } : null;
       const miga = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
         { "@type": "ListItem", position: 1, name: "Inicio", item: SITIO + "/" },
         { "@type": "ListItem", position: 2, name: p.cat, item: `${SITIO}/categoria/${slug(p.cat)}` },

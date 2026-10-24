@@ -51,6 +51,18 @@ const COMPARATIVAS = [
     resumen: "Es el mismo instrumento de 3,5 pulgadas. Cambia la aprobación: de eso depende en qué avión lo podés instalar.",
     puntos: [["Elegí el G5 certificado si…", "tu avión está certificado (la mayoría de los aviones de escuela y de aviación general). Tiene aprobación STC, batería de respaldo incluida y lo instala un taller habilitado."],
       ["Elegí el G5 experimental si…", "volás un avión experimental o deportivo liviano (LSA). No se puede instalar en aviones certificados, y la batería de respaldo es opcional."]] },
+  { slug: "elt-ack-e04-vs-artex-345", a: "elt-ack-e04", b: "elt-artex-345", titulo: "ELT ACK E-04 o Artex ELT 345",
+    resumen: "Los dos transmiten en 406 MHz al sistema satelital Cospas-Sarsat y en 121,5 MHz para la búsqueda final, y se registran con la matrícula del avión.",
+    puntos: [["Elegí el ACK E-04 si…", "buscás el equipo más liviano y compacto (0,73 kg con batería) y querés conectarlo al GPS del avión: acepta Garmin, Bendix/King y NMEA 0183."],
+      ["Elegí el Artex ELT 345 si…", "preferís espaciar el recambio de batería (cada 6 años) y una marca con muchísimos equipos instalados en aviación general."]] },
+  { slug: "almohadillas-bose-originales-vs-alternativas", a: "almohadillas-bose-a20-a30", b: "almohadillas-alternativas", titulo: "Almohadillas Bose originales o alternativas",
+    resumen: "Las dos renuevan el aislamiento y la comodidad del auricular. Cambian el ajuste exacto, el material y el precio.",
+    puntos: [["Elegí las originales Bose si…", "querés el ajuste y el aislamiento de fábrica de tu A20 o A30, con la garantía de un repuesto original."],
+      ["Elegí las alternativas si…", "buscás una opción más económica o preferís el gel, que sella mejor con anteojos y es más fresco en verano."]] },
+  { slug: "almohadillas-david-clark-originales-vs-alternativas", a: "almohadillas-david-clark-gel", b: "almohadillas-alternativas", titulo: "Almohadillas David Clark originales o alternativas",
+    resumen: "Para la serie H10 de David Clark: las originales de gel y las alternativas de gel o espuma.",
+    puntos: [["Elegí las originales David Clark si…", "querés el repuesto de fábrica para tu H10, con el gel y la forma exacta del original."],
+      ["Elegí las alternativas si…", "buscás gastar menos o necesitás almohadillas para otro modelo de auricular."]] },
 ];
 
 const cabeza = (titulo, desc, url, ld) => `<!doctype html>

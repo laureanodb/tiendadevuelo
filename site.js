@@ -120,19 +120,54 @@
     }
     return indice.get(p.id);
   }
+  // Vocabulario de aviación: sinónimos en inglés y castellano, y qué ficha usa cada avión
+  const FRASES = [[/ear ?seals?|ear ?cushions?|ear ?pads?|earseals?/g, "almohadilla"], [/horizonte artificial|attitude indicator|indicador de actitud/g, "g5"], [/flight ?computer/g, "computadora"], [/emergency locator( transmitter)?/g, "elt"], [/remove before flight/g, "removebeforeflight"]];
+  const SINONIMOS = {
+    almohadilla: ["almohadilla", "almohadillas"], almohadillas: ["almohadilla"], kneeboard: ["piernera", "kneeboard"], piernera: ["piernera", "kneeboard"],
+    headset: ["auricular"], headsets: ["auricular"], casco: ["auricular"], auriculares: ["auricular"], vincha: ["auricular"],
+    baliza: ["elt"], balizas: ["elt"], radiobaliza: ["elt"], elt: ["elt"],
+    handy: ["transceptor"], walkie: ["transceptor"], radio: ["transceptor", "radio"], radios: ["transceptor", "radio"], vhf: ["vhf", "transceptor"],
+    regla: ["plotter"], e6b: ["computadora", "e6b"], timer: ["cronometro"], reloj: ["cronometro", "reloj"],
+    keychain: ["llavero"], keyring: ["llavero"], llaveros: ["llavero"], insignia: ["pin"], broche: ["pin"], portacredencial: ["lanyard"], cinta: ["lanyard"],
+    adapter: ["adaptador"], adaptadores: ["adaptador"], horizonte: ["actitud", "g5"], attitude: ["actitud"], efis: ["g5", "electronico"], navegador: ["gps"],
+  };
+  const AVIONES = { cessna: "dual", piper: "dual", tecnam: "dual", diamond: "dual", cirrus: "dual", beechcraft: "dual", bonanza: "dual", baron: "dual", boero: "dual", aeroboero: "dual", seneca: "dual", cherokee: "dual", boeing: "dual", airbus: "xlr", a320: "xlr", robinson: "u174", helicoptero: "u174", helicopteros: "u174", bell: "u174" };
+  const VACIAS = new Set(["para", "de", "del", "con", "el", "la", "los", "las", "un", "una", "mi", "y", "que", "en", "por", "avion", "aviones"]);
   function coincide(p, q) {
-    const ws = sinTilde(q).split(/[^a-z0-9]+/).filter(Boolean);
+    let t = sinTilde(q);
+    for (const [re, por] of FRASES) t = t.replace(re, por);
+    let ws = t.split(/[^a-z0-9]+/).filter(Boolean);
     if (!ws.length) return true;
     const { texto, pal } = palabrasDe(p);
     if (texto.includes(ws.join(""))) return true;
-    return ws.every((w) => {
+    // "auricular para cessna 152": el avión filtra por ficha y el número de modelo no se busca.
+    // Fuera de ese contexto ("llavero boeing") el avión se busca como palabra, si algún producto la tiene.
+    const ctx = ws.some((w) => ["auricular", "auriculares", "headset", "headsets", "casco", "adaptador", "adaptadores", "ficha"].includes(w));
+    const enCatalogo = (w) => PRODUCTS.some((x) => palabrasDe(x).texto.includes(w));
+    const fichas = ctx ? ws.filter((w) => AVIONES[w]).map((w) => AVIONES[w]) : [];
+    if (fichas.length) ws = ws.filter((w) => !AVIONES[w] && !/^\d+$/.test(w));
+    else ws = ws.filter((w) => !AVIONES[w] || enCatalogo(w));
+    ws = ws.filter((w) => !VACIAS.has(w) || ws.length === 1);
+    if (!ws.length) return true;
+    if (fichas.length) {
+      // con avión, "auricular" se refiere al auricular en sí (no a sus repuestos)
+      if (ws.some((w) => /^auricular|^headset|^casco/.test(w)) && p.icon !== "headset") return false;
+      if (ws.some((w) => /^adaptador/.test(w)) && p.icon !== "plug") return false;
+      const conFicha = /dual|lemo|xlr|u-?174/.test(texto);
+      const sirve = fichas.some((f) => (f === "u174" ? /u-?174|helicoptero/.test(texto) : texto.includes(f)) || (f === "dual" && !conFicha));
+      if (!sirve) return false;
+      if (!ws.length) return /auricular|adaptador|transceptor/.test(texto);
+    }
+    const palabra = (w) => {
       if (texto.includes(w)) return true;
       if (w.length < 4) return false;
+      if (w.length === 4) { for (const x of pal) if (x.length === 4 && distancia(w, x) <= 1) return true; return false; }
       const tol = w.length >= 7 ? 2 : 1;
       for (const x of pal) if (Math.abs(x.length - w.length) <= tol && distancia(w, x) <= tol) return true;
       for (const x of pal) if (x.length > w.length && distancia(w, x.slice(0, w.length)) <= tol) return true; // palabra a medio escribir
       return false;
-    });
+    };
+    return ws.every((w) => palabra(w) || (SINONIMOS[w] || []).some(palabra));
   }
   const enComparar = (id) => comparar.includes(id);
   function toggleComparar(id) {
@@ -181,6 +216,24 @@
   // Qué es el producto, para los que no tienen marca (en lugar de la categoría)
   const TIPOS = { keychain: "Llavero", plug: "Adaptador", case: "Repuesto", badge: "Accesorio", wings: "Pin", headset: "Auricular", radio: "Radio" };
   const tipoDe = (p) => p.tipo || TIPOS[p.icon] || p.cat;
+  // Miniatura para los menús desplegables (foto chica del producto o un ícono)
+  const fotoMenu = (p, emoji) => p && p.fotos && /^\/img\/productos\/.+\.jpg$/.test(p.fotos[0])
+    ? `<img class="mega-foto" src="${esc(p.fotos[0].replace(/\.jpg$/, "-t.webp"))}" alt="" width="40" height="40" loading="lazy">`
+    : `<span class="mega-ico">${emoji || "✈"}</span>`;
+  // Qué completa a qué: primero lo que el dueño cargó como complemento, después por tipo de producto
+  const COMPLEMENTA = { headset: ["case", "plug", "radio", "watch"], plug: ["headset"], case: ["headset"], radio: ["headset", "watch"], plotter: ["calc", "plotter", "watch"], calc: ["plotter", "watch"], watch: ["calc", "plotter"], keychain: ["keychain", "badge", "wings"], badge: ["keychain", "wings"], wings: ["keychain", "badge"], tablet: ["gps"], gps: ["tablet"] };
+  function puntosComplemento(base) {
+    const puntos = {};
+    for (const p of base) {
+      (p.complementos || []).forEach((id, i) => { puntos[id] = (puntos[id] || 0) + 10 - i; });
+      for (const q of PRODUCTS) if ((COMPLEMENTA[p.icon] || []).includes(q.icon)) puntos[q.id] = (puntos[q.id] || 0) + 3 - COMPLEMENTA[p.icon].indexOf(q.icon);
+    }
+    return puntos;
+  }
+  const complementosDe = (p, n = 4) => {
+    const pts = puntosComplemento([p]);
+    return PRODUCTS.filter((q) => q.id !== p.id && !q.agotado && pts[q.id] > 0).sort((a, b) => pts[b.id] - pts[a.id]).slice(0, n);
+  };
   const card = (p, i = 0) => `
     <article class="card" style="--i:${i}">
       <div class="badges">${badges(p)}</div>
@@ -287,9 +340,14 @@
       <nav class="wrap links" aria-label="Secciones">
         <div class="menu-cat">
           <a href="${h("#catalogo")}" aria-haspopup="true">Catálogo ▾</a>
-          <div class="mega" role="menu">${CATEGORIES.filter((c) => PRODUCTS.some((p) => p.cat === c && !p.agotado)).map((c) => `<a role="menuitem" href="/categoria/${slug(c)}"><span>${catEmoji[c] || "✈"}</span>${esc(c)}</a>`).join("")}
-            <a role="menuitem" href="/usados"><span>♻️</span>Usados y reacondicionados</a><a role="menuitem" href="/novedades"><span>✨</span>Novedades del mes</a></div>
+          <div class="mega mega-fotos" role="menu">${CATEGORIES.filter((c) => PRODUCTS.some((p) => p.cat === c && !p.agotado)).map((c) => `<a role="menuitem" href="/categoria/${slug(c)}">${fotoMenu(PRODUCTS.find((p) => p.cat === c && !p.agotado && p.fotos), catEmoji[c])}${esc(c)}</a>`).join("")}
+            <a role="menuitem" href="/usados"><span class="mega-ico">♻️</span>Usados y reacondicionados</a><a role="menuitem" href="/novedades"><span class="mega-ico">✨</span>Novedades del mes</a></div>
         </div>
+        ${PRODUCTS.some((p) => !p.agotado && (p.cat === "Aviónica" || p.cat === "Seguridad y emergencia")) ? `<div class="menu-cat">
+          <a href="/avionica" aria-haspopup="true"${page === "avionica" ? ' aria-current="page"' : ""}>Aviónica ▾</a>
+          <div class="mega mega-fotos" role="menu">${PRODUCTS.filter((p) => !p.agotado && (p.cat === "Aviónica" || p.cat === "Seguridad y emergencia") && p.icon !== "watch").sort((a, b) => (a.brand === "Garmin" ? 0 : a.cat === "Seguridad y emergencia" ? 1 : 2) - (b.brand === "Garmin" ? 0 : b.cat === "Seguridad y emergencia" ? 1 : 2)).slice(0, 6).map((p) => `<a role="menuitem" href="/producto/${p.id}">${fotoMenu(p, "🛰️")}${esc(p.name)}</a>`).join("")}
+            <a role="menuitem" href="/avionica"><span class="mega-ico">📘</span>Centro de aviónica y guías</a><a role="menuitem" href="/avionica#presupuesto"><span class="mega-ico">🛠️</span>Presupuesto con instalación</a></div>
+        </div>` : ""}
         ${PRODUCTS.some(enOferta) ? '<a href="/ofertas" class="link-sale">Ofertas</a>' : ""}${PRODUCTS.some((p) => p.liquidacion && !p.agotado) ? '<a href="/liquidacion" class="link-sale">Liquidación</a>' : ""}
         ${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}
         ${PRODUCTS.some((p) => p.tcp && !p.agotado) ? `<a href="${h("#tripulantes")}">Tripulantes</a>` : ""}
@@ -508,7 +566,15 @@
     const p = conOpcion(byId[l.id], l.variante);
     return { name: p.name, sub: l.variante || "", unit: pesos(p) || 0, p, label: p.usd ? `${usd(p.usd)} (≈ ${ars(pesos(p))})` : ars(p.ars) };
   };
-  const total = () => cart.reduce((s, l) => s + lineInfo(l).unit * l.qty, 0);
+  // Descuento por cantidad en llaveros y regalos (CONFIG.porCantidad)
+  const regaloQty = () => cart.reduce((s, l) => s + (!l.kit && byId[l.id]?.regalo ? l.qty : 0), 0);
+  const descCantidad = () => {
+    const c = CONFIG.porCantidad;
+    if (!c || regaloQty() < c.min) return 0;
+    return Math.round(cart.reduce((s, l) => s + (!l.kit && byId[l.id]?.regalo ? lineInfo(l).unit * l.qty : 0), 0) * c.off);
+  };
+  const subtotal = () => cart.reduce((s, l) => s + lineInfo(l).unit * l.qty, 0);
+  const total = () => subtotal() - descCantidad();
   const hasUsd = () => cart.some((l) => !l.kit && byId[l.id].usd);
   const usdDe = (l) => (!l.kit && byId[l.id].usd ? conOpcion(byId[l.id], l.variante).usd : null);
 
@@ -549,8 +615,10 @@
       foot.innerHTML = "";
       return;
     }
-    const t = total();
-    const totalBlock = `<div class="total-row"><span>Total${hasUsd() ? " aprox." : ""}</span><b>${ars(t)}</b></div>
+    const t = total(), dc = descCantidad(), c = CONFIG.porCantidad, faltan = c ? c.min - regaloQty() : 0;
+    const totalBlock = (dc ? `<div class="total-row small"><span>Descuento por cantidad (${Math.round(c.off * 100)}%)</span><b>−${ars(dc)}</b></div>` : "") +
+      (c && faltan > 0 && faltan < c.min ? `<p class="small ok-txt">Sumá ${faltan} ${faltan === 1 ? "llavero o regalo más" : "llaveros o regalos más"} y tenés ${Math.round(c.off * 100)}% de descuento en ellos.</p>` : "") +
+      `<div class="total-row"><span>Total${hasUsd() ? " aprox." : ""}</span><b>${ars(t)}</b></div>
       <p class="muted small">${hasUsd() ? "Productos en dólares convertidos al dólar del día. " : ""}${soloDigital() ? "Producto digital: sin envío." : "El envío se cotiza aparte según destino."}</p>`;
 
     if (step === "items") {
@@ -575,12 +643,7 @@
       // Antes de seguir: lo que completa la compra (primero lo que el dueño cargó como complemento, después por tipo de producto)
       const enCarrito = new Set(cart.flatMap((l) => (l.kit ? l.items : [l.id])));
       const deCarrito = cart.flatMap((l) => (l.kit ? l.items : [l.id])).map((id) => byId[id]).filter(Boolean);
-      const COMPLEMENTA = { headset: ["case", "plug", "radio", "watch"], plug: ["headset"], case: ["headset"], radio: ["headset", "watch"], plotter: ["calc", "plotter", "watch"], calc: ["plotter", "watch"], watch: ["calc", "plotter"], keychain: ["keychain"] };
-      const puntos = {};
-      for (const p of deCarrito) {
-        (p.complementos || []).forEach((id, i) => { puntos[id] = (puntos[id] || 0) + 10 - i; });
-        for (const q of PRODUCTS) if ((COMPLEMENTA[p.icon] || []).includes(q.icon)) puntos[q.id] = (puntos[q.id] || 0) + 3 - (COMPLEMENTA[p.icon].indexOf(q.icon));
-      }
+      const puntos = puntosComplemento(deCarrito);
       const extra = PRODUCTS.filter((p) => !enCarrito.has(p.id) && !p.agotado && puntos[p.id] > 0)
         .sort((a, b) => puntos[b.id] - puntos[a.id] || (pesos(a) ?? 1e12) - (pesos(b) ?? 1e12)).slice(0, 3);
       if (extra.length) body.innerHTML += `<div class="upsell"><h4>Completá tu equipo</h4>${extra.map((p) => `
@@ -687,6 +750,7 @@
     const descRef = refValido.valido ? Math.round(total() * refValido.pct / 100) : 0;
     if (descRef) d.ref = refValido.codigo;
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\n` +
+      (descCantidad() ? `Descuento por cantidad en llaveros y regalos: −${ars(descCantidad())}\n` : "") +
       (descRef ? `Descuento por recomendación (${refValido.codigo}, ${refValido.pct}%): −${ars(descRef)}\n` : "") +
       `Total${hasUsd() ? " aprox." : ""}: ${ars(total() - descRef)}${soloDigital() ? "" : " + envío"}\n\n` +
       `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.aerodromo ? ` · ${d.aerodromo}` : "") +
@@ -810,7 +874,7 @@
   };
   const pintarGoogle = () => document.querySelectorAll("[data-google]").forEach((el) => { el.innerHTML = googleHTML(el.dataset.google); el.hidden = !CONFIG.google; });
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, tipoDe, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, tipoDe, complementosDe, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };

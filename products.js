@@ -1,5 +1,6 @@
 // Datos de la tienda: cambiá esto y se actualiza todo el sitio.
 const CONFIG = {
+  porCantidad: { min: 3, off: 0.10 },   // llaveros y regalos: desde 3 unidades, 10% de descuento
   whatsapp: "5491133586360",            // número con código de país, sin + ni espacios
   whatsappVisible: "11 3358-6360",      // cómo se muestra escrito
   email: "info@tiendadevuelo.com.ar",
@@ -272,6 +273,7 @@ const MARCAS = {
 const KITS = [
   { id: "kit-navegacion", name: "Kit Navegación", emoji: "🧭", tagline: "Computadora, plotter y cronómetro para tus primeras navegaciones.", items: ["jeppesen-cr-3", "jeppesen-pj-1", "asa-flight-timer-3"], off: 0.10, highlight: true },
   { id: "kit-recibido", name: "Regalo para recibidos", emoji: "🎓", tagline: "Para festejar la licencia: cronómetro y llaveros de piloto.", items: ["asa-flight-timer-3", "llavero-remove-before-flight", "llavero-pilot-amarillo"], off: 0.10 },
+  { id: "kit-bose-a30", name: "Bose A30 + almohadillas de repuesto", emoji: "🎧", tagline: "El auricular y sus almohadillas originales para el recambio de los 6 meses.", items: ["bose-a30", "almohadillas-bose-a20-a30"], off: 0.05 },
   { id: "kit-tripulante", name: "Kit Tripulante", emoji: "🧳", tagline: "Los llaveros que más eligen los tripulantes de cabina.", items: ["llavero-crew-rojo", "llavero-seat-belt-negro", "llavero-boeing-egpws"], off: 0.10 },
 ];
 
