@@ -114,6 +114,10 @@
     {
       "path": "/api/resumen",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/instagram",
+      "schedule": "0 22 * * *"
     }
   ],
   "headers": [

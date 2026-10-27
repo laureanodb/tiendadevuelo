@@ -119,13 +119,18 @@ export function ensureSchema() {
       monto numeric not null, moneda text not null default 'ARS', creado timestamptz not null default now()
     )`);
     await q(`create table if not exists tdv_suscriptores (email text primary key, nombre text not null default '', origen text not null default '', creado timestamptz not null default now())`);
+    await q(`create table if not exists tdv_posts (
+      id bigserial primary key, creado timestamptz not null default now(), programado date, producto text not null default '',
+      texto text not null default '', fotos text[] not null default '{}', estado text not null default 'borrador',
+      ig_id text not null default '', permalink text not null default '', error text not null default '', publicado timestamptz
+    )`);
     await q(`create table if not exists tdv_consultas (
       id bigserial primary key, creado timestamptz not null default now(), producto text not null, producto_nombre text not null default '',
       opcion text not null default '', cliente text not null default '', tel text not null default '', estado text not null default 'nueva'
     )`);
     await q(`create table if not exists tdv_limites (id bigserial primary key, clave text not null, creado timestamptz not null default now())`);
     await q(`create index if not exists tdv_limites_clave on tdv_limites (clave, creado)`);
-    for (const t of ["tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios", "tdv_gastos", "tdv_suscriptores", "tdv_consultas"]) await q(`alter table ${t} enable row level security`).catch(() => {});
+    for (const t of ["tdv_posts", "tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios", "tdv_gastos", "tdv_suscriptores", "tdv_consultas"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       for (const [id, pub] of [["productos", true], ["comprobantes", false]]) {
         await fetch(`${SUPA_URL}/storage/v1/bucket`, {

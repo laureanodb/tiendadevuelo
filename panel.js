@@ -871,6 +871,74 @@
     { t: "Anuncio B · Alumnos", id: "jeppesen-cr-3", texto: (u) => `Título: Todo para tu curso de piloto\nTexto principal: Computadora Jeppesen CR-3, plotters PJ-1 y PN-1, timer y radio VHF. Originales, con asesoramiento técnico y envío a todo el país.\nDescripción: Kit de navegación con descuento\nBotón: Comprar\nLink: ${u}\nPúblico sugerido: Argentina, 17 a 35 años, intereses: escuela de vuelo, piloto privado, aviación.` },
     { t: "Anuncio C · Retargeting", id: "", texto: (u) => `Título: ¿Te quedó alguna duda?\nTexto principal: Te asesoramos para elegir la ficha correcta para tu avión y te pasamos el precio al dólar del día. Respondemos por WhatsApp.\nDescripción: Equipos originales para pilotos\nBotón: Enviar mensaje de WhatsApp\nLink: ${u}\nPúblico sugerido: personas que visitaron la web en los últimos 30 días (necesita el píxel de Meta activo en Ajustes).` },
   ];
+  // ---------- Agenda de Instagram: el agente arma las publicaciones, vos las revisás y se publican solas ----------
+  const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const ESTADOS_POST = { borrador: ["Para revisar", "p-st-rev"], aprobado: ["Aprobada", "p-st-ok"], publicado: ["Publicada", "p-st-pub"], error: ["No se pudo publicar", "p-st-err"] };
+  async function verAgenda() {
+    const box = document.getElementById("agenda");
+    if (!box) return;
+    let d;
+    try { d = await api("posts"); } catch (x) { box.querySelector(".p-loading").textContent = x.message; return; }
+    const fechaLarga = (f) => f ? new Date(f + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : "Sin fecha";
+    const prox = d.posts.filter((p) => p.estado !== "publicado"), hechas = d.posts.filter((p) => p.estado === "publicado").slice(-6).reverse();
+    const conexion = d.conectado
+      ? (d.cuenta ? `<p class="p-ok small">✔ Conectado a Instagram${d.cuenta.usuario ? ` como <b>@${esc(d.cuenta.usuario)}</b>` : ""}. Se publica alrededor de las 19 h de cada día de la agenda.</p>` : `<p class="p-error small">Hay un token cargado pero no pude encontrar la cuenta: ${esc(d.errorCuenta || "")}</p>`)
+      : `<details class="p-guia"><summary><b>Falta conectar Instagram</b> (una sola vez). Mientras tanto, la agenda se arma igual y podés copiar los textos.</summary>
+          <ol class="small">
+            <li>En Instagram: <b>Configuración → Tipo de cuenta</b> → pasá a <b>cuenta profesional (Empresa)</b> y conectala a la <b>página de Facebook</b> de la tienda.</li>
+            <li>Entrá a <b>developers.facebook.com → Mis apps → Crear app</b>, tipo <b>Empresa</b>, y vinculala a tu portfolio comercial.</li>
+            <li>Entrá a <b>business.facebook.com → Configuración → Usuarios → Usuarios del sistema</b> y creá uno con rol <b>Administrador</b>. En <b>Asignar activos</b>, dale la página de Facebook y la cuenta de Instagram con control total.</li>
+            <li>Tocá <b>Generar token</b>, elegí la app y marcá estos permisos: <b>instagram_basic</b>, <b>instagram_content_publish</b>, <b>pages_show_list</b>, <b>pages_read_engagement</b> y <b>business_management</b>. El token de un usuario del sistema no vence.</li>
+            <li>En <b>Vercel → Settings → Environment Variables</b>, agregá <b>IG_TOKEN</b> con ese token y volvé a publicar. No lo mandes por chat ni por mail.</li>
+          </ol></details>`;
+    box.innerHTML = `<h2>📅 Agenda de Instagram</h2>${conexion}
+      <form class="p-agenda-cfg" id="agCfg">
+        <fieldset><legend>Días de publicación</legend>${DIAS.map((n, i) => `<label class="p-chk"><input type="checkbox" name="agDia" value="${i}"${d.config.dias.includes(i) ? " checked" : ""}> ${n}</label>`).join("")}</fieldset>
+        <label class="p-chk"><input type="checkbox" id="agAuto"${d.config.auto ? " checked" : ""}> Publicar sin que las revise (modo automático)</label>
+        ${d.ia ? `<label class="p-chk"><input type="checkbox" id="agIa"${d.config.ia ? " checked" : ""}> Que la IA mejore los textos</label>` : ""}
+        <div class="p-head-btns">${esDueno() ? '<button class="btn btn-ghost btn-sm" type="submit">Guardar configuración</button>' : ""}<button class="btn btn-primary btn-sm" type="button" id="agGen">Armar publicaciones nuevas</button></div>
+      </form>
+      ${prox.length ? `<div class="p-list">${prox.map((p) => `
+        <article class="p-card p-post" data-ag="${p.id}">
+          <div class="p-post-head"><b>${esc(fechaLarga(p.programado))}</b><span class="p-st ${ESTADOS_POST[p.estado]?.[1] || ""}">${ESTADOS_POST[p.estado]?.[0] || esc(p.estado)}</span></div>
+          ${p.error ? `<p class="p-error small">${esc(p.error)}</p>` : ""}
+          <div class="p-post-body"><div class="p-ag-fotos">${p.fotos.map((f) => `<img src="${esc(f.replace(/\.jpg$/, "-t.webp").replace(/^https:\/\/www\.tiendadevuelo\.com\.ar/, ""))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${esc(f)}'">`).join("")}${p.fotos.length > 1 ? `<span class="small muted">Carrusel de ${p.fotos.length} fotos</span>` : ""}</div>
+            <textarea rows="9" data-agtxt aria-label="Texto de la publicación">${esc(p.texto)}</textarea></div>
+          <div class="p-head-btns">
+            <label class="small">Fecha <input type="date" data-agfecha value="${esc(p.programado || "")}"></label>
+            <button class="btn btn-ghost btn-sm" data-agac="guardar">Guardar cambios</button>
+            ${p.estado === "aprobado" ? '<button class="btn btn-ghost btn-sm" data-agac="borrador">Volver a revisar</button>' : '<button class="btn btn-primary btn-sm" data-agac="aprobar">Aprobar</button>'}
+            ${esDueno() && d.conectado ? '<button class="btn btn-ghost btn-sm" data-agac="publicar">Publicar ahora</button>' : ""}
+            <button class="btn btn-ghost btn-sm" data-agac="copiar">Copiar texto</button>
+            <button class="btn btn-ghost btn-sm" data-agac="descartar">Descartar</button>
+          </div>
+        </article>`).join("")}</div>` : '<p class="muted">No hay publicaciones en la agenda. Tocá «Armar publicaciones nuevas».</p>'}
+      ${hechas.length ? `<h3 class="small">Publicadas</h3><ul class="small">${hechas.map((p) => `<li>${esc(fechaLarga(p.programado))} · ${p.permalink ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a>` : "publicada"}</li>`).join("")}</ul>` : ""}`;
+    const cfg = document.getElementById("agCfg");
+    cfg.onsubmit = async (e) => {
+      e.preventDefault();
+      const dias = [...cfg.querySelectorAll('input[name="agDia"]:checked')].map((x) => +x.value);
+      if (!dias.length) return toast("Elegí al menos un día.");
+      try { await api("posts", { method: "POST", body: { accion: "config", config: { dias, auto: document.getElementById("agAuto").checked, ia: document.getElementById("agIa") ? document.getElementById("agIa").checked : true } } }); toast("Configuración guardada."); } catch (x) { toast(x.message); }
+    };
+    document.getElementById("agGen").onclick = async (e) => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "Armando…";
+      try { const r = await api("posts", { method: "POST", body: { accion: "generar", cuantos: 2 } }); toast(r.nuevos ? `Listo: ${r.nuevos} ${r.nuevos === 1 ? "publicación nueva" : "publicaciones nuevas"}.` : r.mensaje); verAgenda(); }
+      catch (x) { toast(x.message); b.disabled = false; b.textContent = "Armar publicaciones nuevas"; }
+    };
+    box.querySelectorAll("[data-agac]").forEach((b) => (b.onclick = async () => {
+      const art = b.closest("[data-ag]"), id = +art.dataset.ag, accion = b.dataset.agac, texto = art.querySelector("[data-agtxt]").value;
+      if (accion === "copiar") { try { await navigator.clipboard.writeText(texto); toast("Copiado."); } catch { art.querySelector("[data-agtxt]").select(); } return; }
+      if ((accion === "publicar" || accion === "descartar") && b.dataset.ok !== "1") { b.dataset.ok = "1"; b.textContent = "¿Seguro? Tocá de nuevo"; return; }
+      b.disabled = true;
+      try {
+        if (accion !== "descartar") await api("posts", { method: "POST", body: { accion: "guardar", id, texto, programado: art.querySelector("[data-agfecha]").value } });
+        if (accion !== "guardar") await api("posts", { method: "POST", body: { accion, id } });
+        toast({ guardar: "Guardado.", aprobar: "Aprobada: se publica el día programado.", borrador: "Vuelve a revisión.", descartar: "Descartada.", publicar: "¡Publicada en Instagram!" }[accion]);
+        verAgenda();
+      } catch (x) { toast(x.message); b.disabled = false; }
+    }));
+  }
   function verRedes() {
     const sem = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1)) / 6048e5);
     const vis = productos.filter((p) => p.visible && (p.usd !== null || p.ars !== null));
@@ -912,6 +980,7 @@
         </section>`;
     const n1 = posts.length, n2 = n1 + camp.length;
     app.innerHTML = tabsHTML("redes") + `
+      <section class="p-card" id="agenda"><h2>📅 Agenda de Instagram</h2><p class="p-loading">Cargando…</p></section>
       <div class="p-head"><div><h1>Ideas para publicar</h1><p class="muted">Textos listos para Instagram (@${esc(CONFIG.instagram || "tiendadevueloar")}) armados con tus productos. Cambian cada semana. Editalos, copialos y publicá con la foto.</p></div></div>
       <details class="p-card"><summary><b>🚀 Campaña de lanzamiento</b> · 10 publicaciones y 3 anuncios listos</summary>
         <p class="muted small">Publicá una cada dos o tres días, en este orden. Los anuncios se cargan en el Administrador de anuncios de Meta; el C necesita el píxel activo (Ajustes).</p>
@@ -924,6 +993,7 @@
           <textarea rows="9" data-post="${i}" aria-label="Texto de la publicación">${esc(x.texto.replace(/\n{3,}/g, "\n\n"))}</textarea></div>
           <div class="p-head-btns"><button class="btn btn-primary btn-sm" data-pcopy="${i}">Copiar texto</button>${estado.ia ? `<button class="btn btn-ghost btn-sm" data-pia="${i}">✨ Mejorar con IA</button>` : ""}</div>
         </section>`).join("")}</div>` : '<p class="muted">Cargá productos con precio para que aparezcan ideas.</p>'}`;
+    verAgenda();
     app.querySelectorAll("[data-pcopy]").forEach((b) => (b.onclick = async () => { const t = app.querySelector(`[data-post="${b.dataset.pcopy}"]`); try { await navigator.clipboard.writeText(t.value); toast("Copiado. Pegalo en Instagram."); } catch { t.select(); } }));
     app.querySelectorAll("[data-pia]").forEach((b) => (b.onclick = async () => {
       const t = app.querySelector(`[data-post="${b.dataset.pia}"]`); b.disabled = true; b.textContent = "Escribiendo…";
