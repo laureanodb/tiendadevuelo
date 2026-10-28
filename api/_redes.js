@@ -5,6 +5,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import Anthropic from "@anthropic-ai/sdk";
 import { DB_URL, ajuste, fromRow, guardarAjuste, q } from "./_lib.js";
+import { IG_FOTOS } from "./_igfotos.js";
 
 const SITIO = "https://www.tiendadevuelo.com.ar";
 const VERSION = process.env.IG_API_VERSION || "v23.0";
@@ -39,7 +40,9 @@ async function productos() {
 }
 const abs = (u) => (String(u).startsWith("/") ? SITIO + u : String(u));
 // Instagram solo acepta JPEG con dirección pública
-const fotosDe = (p) => (p.fotos || []).map(abs).filter((u) => /^https:\/\/.+\.jpe?g(\?.*)?$/i.test(u)).slice(0, 4);
+// Si el producto tiene imagen propia para Instagram (estilo de la web, 4:5), se publica esa; si no, sus fotos.
+const fotosDe = (p) => IG_FOTOS.has(p.id) ? [`${SITIO}/img/ig/producto-${p.id}.jpg`]
+  : (p.fotos || []).map(abs).filter((u) => /^https:\/\/.+\.jpe?g(\?.*)?$/i.test(u)).slice(0, 4);
 
 // ---------- Textos ----------
 const CONSEJOS = {

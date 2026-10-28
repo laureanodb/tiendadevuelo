@@ -981,6 +981,13 @@
     const n1 = posts.length, n2 = n1 + camp.length;
     app.innerHTML = tabsHTML("redes") + `
       <section class="p-card" id="agenda"><h2>📅 Agenda de Instagram</h2><p class="p-loading">Cargando…</p></section>
+      <details class="p-card p-igimg"><summary><b>🖼️ Imágenes para Instagram</b> · con el estilo de la web, listas para descargar</summary>
+        <p class="muted small">Serie de lanzamiento para el perfil (publicalas en este orden, de la 9 a la 1, para que queden ordenadas en la grilla), y un post y una historia por producto. El agente de la agenda ya usa estas imágenes.</p>
+        <h3 class="small">Serie de lanzamiento</h3>
+        <div class="p-ig-grid">${[...Array(9).keys()].map((i) => { const f = `/img/ig/lanzamiento-${String(i + 1).padStart(2, "0")}.jpg`; return `<a href="${f}" download target="_blank" rel="noopener"><img src="${f}" alt="Lanzamiento ${i + 1}" loading="lazy"><span>${i + 1}</span></a>`; }).join("")}</div>
+        <h3 class="small">Por producto</h3>
+        <div class="p-ig-grid">${productos.filter((p) => p.visible).map((p) => `<div><img src="/img/ig/producto-${esc(p.id)}.jpg" alt="${esc(p.name)}" loading="lazy" onerror="this.parentNode.remove()"><span class="small">${esc(p.name)}</span><span class="small"><a href="/img/ig/producto-${esc(p.id)}.jpg" download>Post</a> · <a href="/img/ig/historia-${esc(p.id)}.jpg" download>Historia</a></span></div>`).join("")}</div>
+      </details>
       <div class="p-head"><div><h1>Ideas para publicar</h1><p class="muted">Textos listos para Instagram (@${esc(CONFIG.instagram || "tiendadevueloar")}) armados con tus productos. Cambian cada semana. Editalos, copialos y publicá con la foto.</p></div></div>
       <details class="p-card"><summary><b>🚀 Campaña de lanzamiento</b> · 10 publicaciones y 3 anuncios listos</summary>
         <p class="muted small">Publicá una cada dos o tres días, en este orden. Los anuncios se cargan en el Administrador de anuncios de Meta; el C necesita el píxel activo (Ajustes).</p>

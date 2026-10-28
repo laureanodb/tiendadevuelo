@@ -212,3 +212,8 @@ details summary { cursor: pointer; }
 [data-ag] .p-head-btns { align-items: center; flex-wrap: wrap; }
 [data-ag] .p-head-btns label { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; margin: 0; }
 [data-ag] .p-head-btns input[type="date"] { width: auto !important; padding: 6px 10px; }
+.p-igimg summary { cursor: pointer; }
+.p-ig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+.p-ig-grid > a, .p-ig-grid > div { display: grid; gap: 4px; text-decoration: none; color: inherit; position: relative; }
+.p-ig-grid img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; border: 1px solid var(--line, #e3edf6); }
+.p-ig-grid > a span { position: absolute; top: 6px; left: 6px; background: #0c2340; color: #fff; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 2px 8px; }
