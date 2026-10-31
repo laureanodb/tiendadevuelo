@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Ficha LEMO de 6 pines, redonda">
+  <rect width="120" height="120" rx="20" fill="#f2f8fe"/>
+  <circle cx="60" cy="58" r="40" fill="#c9ced6" stroke="#0c2340" stroke-width="2.4"/>
+  <circle cx="60" cy="58" r="30" fill="#1e3654" stroke="#0c2340" stroke-width="2"/>
+  <rect x="56" y="24" width="8" height="7" rx="2" fill="#e5484d"/>
+  <g fill="#f6b40e" stroke="#0c2340" stroke-width="1.2">
+    <circle cx="60" cy="40" r="4.2"/><circle cx="76" cy="50" r="4.2"/><circle cx="76" cy="68" r="4.2"/><circle cx="60" cy="77" r="4.2"/><circle cx="44" cy="68" r="4.2"/><circle cx="44" cy="50" r="4.2"/>
+  </g>
+  <text x="60" y="112" font-family="Inter,Arial" font-size="10" text-anchor="middle" fill="#5a6b82">6 PINES</text>
+</svg>

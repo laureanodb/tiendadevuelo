@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Ficha U-174/U de helicóptero: una sola ficha">
+  <rect width="120" height="120" rx="20" fill="#f2f8fe"/>
+  <g stroke="#0c2340" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M60 12v8" stroke-width="7" stroke-linecap="round"/>
+    <rect x="54" y="18" width="12" height="7" fill="#c9ced6"/><rect x="54" y="25" width="12" height="3" fill="#0c2340"/>
+    <rect x="54" y="28" width="12" height="7" fill="#c9ced6"/><rect x="54" y="35" width="12" height="3" fill="#0c2340"/>
+    <rect x="54" y="38" width="12" height="10" fill="#c9ced6"/>
+    <rect x="47" y="48" width="26" height="40" rx="6" fill="#1e3654"/>
+    <path d="M60 88v24" stroke-width="3"/>
+  </g>
+  <text x="88" y="70" font-family="Inter,Arial" font-size="9" fill="#5a6b82">1 FICHA</text>
+</svg>

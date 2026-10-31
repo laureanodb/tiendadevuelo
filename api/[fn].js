@@ -19,6 +19,7 @@ const RUTAS = {
   ficha: () => import("./_web/ficha.js"),
   codigo: () => import("./_web/codigo.js"),
   instagram: () => import("./_web/instagram.js"),
+  turno: () => import("./_web/turno.js"),
 };
 
 export default async function handler(req, res) {

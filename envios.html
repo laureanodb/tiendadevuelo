@@ -33,6 +33,8 @@
         <div class="feature"><span>🤝</span><h2>Retiro en CABA</h2><p>Sin costo. Coordinamos día y horario por WhatsApp.</p></div>
       </div>
 
+      <div id="asiEnviamos" hidden><h2>Así enviamos</h2><p>Cada equipo sale protegido y revisado. Estas son fotos reales de nuestros envíos.</p><div class="asi-fotos" id="asiFotos"></div></div>
+
       <h2>Tiempos estimados</h2>
       <p>Desde que despachamos. Son aproximados y dependen del transporte.</p>
       <div class="table-wrap"><table>
@@ -68,6 +70,13 @@
   <script src="/catalogo.js" data-load="/site.js"></script>
   <script src="/mapa-ar.js"></script>
   <script>
+    // Así enviamos: fotos reales cargadas en el panel
+    window.addEventListener("tdv:listo", () => {
+      if (!(CONFIG.envioFotos && CONFIG.envioFotos.length)) return;
+      const e = window.TDV.esc;
+      document.getElementById("asiEnviamos").hidden = false;
+      document.getElementById("asiFotos").innerHTML = CONFIG.envioFotos.map((f) => `<figure><img src="${e(f.url)}" alt="${e(f.texto || "Envío de Tienda de Vuelo")}" loading="lazy">${f.texto ? `<figcaption>${e(f.texto)}</figcaption>` : ""}</figure>`).join("");
+    });
     // Mapa de envíos: un punto por provincia, más grande cuantos más pedidos. Aparece cuando hay datos suficientes.
     fetch("/api/envios").then((r) => r.json()).then(({ provincias }) => {
       const M = window.MAPA_AR, e = Object.entries(provincias || {}).filter(([k]) => M.provincias[k]).sort((a, b) => b[1] - a[1]);

@@ -1,7 +1,12 @@
 // Panel: copias de seguridad. GET lista las guardadas; ?descargar=ahora arma una al momento; ?descargar=<archivo> baja una guardada.
-import { armarRespaldo, bajarPrivado, fotosListas, listarPrivado, panel, send } from "../_lib.js";
+import { armarRespaldo, bajarPrivado, enviarADrive, fotosListas, listarPrivado, panel, send } from "../_lib.js";
 
 export default panel(async (req, res) => {
+  // Probar la copia a Google Drive ahora
+  if (req.method === "POST") {
+    try { const r = await enviarADrive(await armarRespaldo()); return r.enviado ? send(res, 200, r) : send(res, 400, { mensaje: "Primero guardá la dirección del script y la clave." }); }
+    catch (e) { return send(res, 502, { mensaje: e.message }); }
+  }
   if (req.method !== "GET") return send(res, 405, { error: "metodo" });
   const d = String(req.query.descargar || "");
   if (!d) return send(res, 200, { guardadas: fotosListas() ? await listarPrivado("respaldos/") : [], almacenamiento: fotosListas() });

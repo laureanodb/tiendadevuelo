@@ -32,6 +32,8 @@
           <a class="contact-item" id="cWa" target="_blank" rel="noopener"><span class="muted small">WhatsApp</span><b id="cWaNum"></b></a>
           <a class="contact-item" id="cMail"><span class="muted small">Email</span><b id="cMailTxt"></b></a>
           <div class="contact-item"><span class="muted small">Dónde estamos</span><b id="cCity"></b><span class="muted small">Retiro coordinado por WhatsApp.</span></div>
+          <a class="contact-item" id="cIg" target="_blank" rel="noopener" hidden><span class="muted small">Instagram</span><b id="cIgTxt"></b></a>
+          <a class="contact-item" href="/asesoramiento"><span class="muted small">Asesoramiento</span><b>Reservá 10 minutos</b><span class="muted small">Llamada o videollamada para elegir tu equipo.</span></a>
         </div>
         <form class="form-card" id="contactForm">
           <h2 style="margin:0;font-size:24px">Escribinos</h2>
@@ -39,6 +41,14 @@
           <label>Tu consulta<textarea id="ctMsg" rows="4" required></textarea></label>
           <button class="btn btn-primary" type="submit">Enviar por WhatsApp</button>
         </form>
+      </div>
+
+      <h2>Datos de la tienda</h2>
+      <div class="datos-tienda">
+        <div><h3>🕘 Horario de atención</h3><p id="dHorario"></p><p class="small muted">Fuera de ese horario podés escribirnos igual: te respondemos apenas abrimos.</p></div>
+        <div><h3>📦 Envíos y retiro</h3><p>Envío en el día en CABA, despacho en 48 h hábiles a todo el país y entrega en aeródromos. Retiro sin costo en CABA, coordinado por WhatsApp.</p><p class="small"><a href="/envios">Ver envíos</a></p></div>
+        <div><h3>💳 Medios de pago</h3><p>Transferencia en pesos o en dólares, efectivo, dólares billete y USDT. Podés reservar con una seña.</p></div>
+        <div><h3>✔ Garantía</h3><p>Productos originales con la garantía oficial de cada fabricante. Distribuidor oficial Bose. Usados revisados con 3 meses de garantía.</p><p class="small"><a href="/legales#arrepentimiento">Botón de arrepentimiento</a></p></div>
       </div>
 
       <h2 id="pedido">Pedí un producto que no está</h2>
@@ -63,6 +73,8 @@
       document.getElementById("cMail").href = "mailto:" + CONFIG.email;
       document.getElementById("cMailTxt").textContent = CONFIG.email;
       document.getElementById("cCity").textContent = CONFIG.ciudad;
+      document.getElementById("dHorario").textContent = `Respondemos por WhatsApp de ${CONFIG.horario.desde} a ${CONFIG.horario.hasta} h.`;
+      if (CONFIG.instagram) { const ig = document.getElementById("cIg"); ig.hidden = false; ig.href = `https://www.instagram.com/${CONFIG.instagram}/`; document.getElementById("cIgTxt").textContent = "@" + CONFIG.instagram; }
       const v = (id) => document.getElementById(id).value.trim();
       document.getElementById("contactForm").onsubmit = (e) => {
         e.preventDefault();

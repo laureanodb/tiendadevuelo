@@ -10,7 +10,8 @@
     CONFIG.metaPixel = d.metaPixel || "";
     CONFIG.referidos = d.referidos || 0;
     CONFIG.google = d.google || null;
-    if (d.dolar) { CONFIG.dolarTipo = d.dolar.tipo; CONFIG.dolarManual = d.dolar.manual; }
+    CONFIG.envioFotos = d.envioFotos || [];
+    if (d.dolar) { CONFIG.dolarTipo = d.dolar.tipo; CONFIG.dolarManual = d.dolar.manual; CONFIG.medios = d.dolar.medios || null; }
     if (d.ventas) CONFIG.ventas = "+" + Number(d.ventas).toLocaleString("es-AR");
     if (d.configurado && d.productos.length) {
       PRODUCTS.splice(0, PRODUCTS.length, ...d.productos.map((p) => ({

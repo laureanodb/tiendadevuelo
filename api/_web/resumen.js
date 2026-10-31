@@ -1,5 +1,5 @@
 // Resumen del día a tu WhatsApp (lo dispara Vercel todos los días a las 20 h; ver "crons" en vercel.json).
-import { DB_URL, armarRespaldo, avisar, avisosListos, borrarPrivado, ensureSchema, fotosListas, listarPrivado, q, send, subirPrivado } from "../_lib.js";
+import { DB_URL, ajuste, armarRespaldo, guardarAjuste, limpiarViejos, usoPlan, avisar, avisosListos, borrarPrivado, enviarADrive, ensureSchema, fotosListas, listarPrivado, q, send, subirPrivado } from "../_lib.js";
 
 const TZ = "America/Argentina/Buenos_Aires";
 const pesos = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("es-AR");
@@ -17,15 +17,31 @@ export default async function handler(req, res) {
   const fallas = await controlarWeb();
   if (fallas.length) await avisar(`⚠ Revisá la web: algo no anda\n${fallas.map((f) => "· " + f).join("\n")}`);
   // 2) Copia de seguridad semanal (domingos): se guardan las últimas 8
-  let respaldo = false;
-  if (domingo && fotosListas()) {
-    try {
-      await subirPrivado(`respaldos/${new Date().toISOString().slice(0, 10)}.json`, Buffer.from(JSON.stringify(await armarRespaldo())), "application/json");
-      respaldo = true;
-      const viejas = (await listarPrivado("respaldos/")).slice(8);
-      if (viejas.length) await borrarPrivado(viejas.map((x) => `respaldos/${x.nombre}`));
-    } catch (e) { console.error(e); await avisar("⚠ No se pudo guardar la copia de seguridad semanal."); }
+  let respaldo = false, drive = false;
+  if (domingo) {
+    const datos = await armarRespaldo();
+    if (fotosListas()) {
+      try {
+        await subirPrivado(`respaldos/${new Date().toISOString().slice(0, 10)}.json`, Buffer.from(JSON.stringify(datos)), "application/json");
+        respaldo = true;
+        const viejas = (await listarPrivado("respaldos/")).slice(8);
+        if (viejas.length) await borrarPrivado(viejas.map((x) => `respaldos/${x.nombre}`));
+      } catch (e) { console.error(e); await avisar("⚠ No se pudo guardar la copia de seguridad semanal."); }
+    }
+    // Además, una copia en tu Google Drive (si está configurado en Ajustes)
+    try { drive = (await enviarADrive(datos)).enviado; } catch (e) { console.error(e); await avisar("⚠ No se pudo guardar la copia en Google Drive: " + e.message); }
   }
+  // 3) Uso del plan gratis: aviso si pasa el 80% (como mucho una vez por semana)
+  try {
+    const u = await usoPlan(), alto = [u.pctBase >= 80 && `base de datos al ${u.pctBase}%`, u.pctArchivos >= 80 && `fotos y archivos al ${u.pctArchivos}%`].filter(Boolean);
+    const ult = await ajuste("uso_aviso", {});
+    if (alto.length && (!ult.at || Date.now() - new Date(ult.at).getTime() > 7 * 864e5)) {
+      await avisar(`⚠ El plan gratis se está llenando: ${alto.join(" y ")}. Revisalo en Panel → Actividad.`);
+      await guardarAjuste("uso_aviso", { at: new Date().toISOString() });
+    }
+  } catch (e) { console.error(e); }
+  // 4) El día 1 de cada mes, limpieza de datos viejos
+  if (dia === 1) { try { console.log("limpieza", await limpiarViejos()); } catch (e) { console.error(e); } }
   if (!avisosListos()) return send(res, 200, { enviado: false, fallas, respaldo });
   const hoy = `(creado at time zone '${TZ}')::date = (now() at time zone '${TZ}')::date`;
   const [{ rows: [p] }, { rows: [v] }, { rows: [c] }, { rows: [k] }, { rows: [o] }] = await Promise.all([
@@ -46,7 +62,7 @@ export default async function handler(req, res) {
     k.n ? `Carritos sin terminar hoy: ${k.n}` : "",
     Number(o.n) ? `Opiniones y preguntas por responder: ${o.n}` : "",
   ];
-  if (respaldo) lineas.push("💾 Copia de seguridad semanal guardada");
+  if (respaldo || drive) lineas.push(`💾 Copia de seguridad semanal guardada${drive ? " (también en Google Drive)" : ""}`);
   // El día 1 de cada mes, además, el control de calidad del catálogo.
   if (dia === 1) {
     const { rows: [k2] } = await q(`select count(*)::int as total,
@@ -77,10 +93,11 @@ async function controlarWeb() {
     } catch { fallas.push(`${nombre}: no responde`); }
   };
   await probar("Portada", SITIO + "/", (t) => t.includes("Tienda de Vuelo"));
-  const cat = await probar("Catálogo", SITIO + "/api/productos", (t) => { try { return JSON.parse(t).productos.length > 0; } catch { return false; } });
+  // Si la base todavía no tiene productos, la web usa los de products.js: eso no es una falla
+  const cat = await probar("Catálogo", SITIO + "/api/productos", (t) => { try { return Array.isArray(JSON.parse(t).productos); } catch { return false; } });
   let foto = "";
   try { foto = (JSON.parse(cat || "{}").productos || []).flatMap((p) => p.fotos || [])[0] || ""; } catch {}
-  if (foto) await probar("Fotos de productos", foto.startsWith("http") ? foto : SITIO + foto);
+  await probar("Fotos de productos", foto ? (foto.startsWith("http") ? foto : SITIO + foto) : SITIO + "/img/productos/bose-a30-1.jpg");
   await probar("Página de producto", SITIO + "/producto/bose-a30", (t) => t.includes("og:image"));
   await probar("Feed de Google Shopping", SITIO + "/google-shopping.tsv", (t) => t.startsWith("id\t"));
   await probar("Panel", SITIO + "/panel");

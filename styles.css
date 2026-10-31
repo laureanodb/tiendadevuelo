@@ -782,3 +782,32 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
 .avn-guias .form-card > * + * { margin-top: 10px; }
 p a.btn, .page-hero a.btn { text-decoration: none; }
 @media (max-width: 760px) { .avn-grid { grid-template-columns: repeat(2, 1fr); } .avn-guias { grid-template-columns: 1fr; } }
+/* Migas de pan, búsquedas populares, "En la caja" y medios de pago */
+.migas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); margin: 0 0 10px; }
+.migas a { color: var(--accent); text-decoration: none; }
+.migas a:hover { text-decoration: underline; }
+.migas [aria-current] { color: var(--text); font-weight: 600; }
+.pview .migas { margin: 4px 0 14px; }
+.busq-pop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 18px; }
+.chip.chip-sm { padding: 5px 12px; font-size: 13px; }
+.pv-incluye ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.pv-medios { list-style: none; padding: 0; margin: 4px 0 12px; display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.pv-medios b { color: var(--text); }
+#pvVarAyuda:not([hidden]) { display: flex; gap: 12px; align-items: center; }
+.ficha-img { width: 72px; height: 72px; flex: none; border-radius: 14px; }
+.ficha-av .ficha-img { float: right; margin: 0 0 6px 10px; }
+.turno-form fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.turno-form legend { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.turno-opciones, .turno-dias, .turno-horas { display: flex; flex-wrap: wrap; gap: 8px; }
+.turno-form .chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.datos-tienda { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.datos-tienda > div { border: 1.5px solid var(--line); border-radius: 16px; padding: 16px 18px; background: #fff; }
+.datos-tienda h3 { margin: 0 0 6px; font-size: 18px; }
+.datos-tienda p { margin: 4px 0; }
+.asi-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.asi-fotos figure { margin: 0; }
+.asi-fotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; border: 1px solid var(--line); }
+.asi-fotos figcaption { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.cookie-bar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 80; max-width: 720px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); font-size: 14px; }
+.cookie-bar p { margin: 0; flex: 1 1 320px; }
+.cookie-bar div { display: flex; gap: 8px; }

@@ -21,7 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"Store","name":"Tienda de Vuelo","description":"Pilot shop en Argentina","url":"https://www.tiendadevuelo.com.ar/","areaServed":"AR","address":{"@type":"PostalAddress","addressLocality":"Ciudad Autónoma de Buenos Aires","addressCountry":"AR"}}
+  {"@context": "https://schema.org", "@type": "Store", "@id": "https://www.tiendadevuelo.com.ar/#tienda", "name": "Tienda de Vuelo", "alternateName": "Tienda de Vuelo Pilot Shop", "description": "Pilot shop en Argentina: auriculares Bose y David Clark, radios, aviónica Garmin, ELT y accesorios para pilotos. Distribuidor oficial Bose.", "url": "https://www.tiendadevuelo.com.ar/", "logo": "https://www.tiendadevuelo.com.ar/img/logo-512.png", "image": "https://www.tiendadevuelo.com.ar/og.png", "telephone": "+54 9 11 3358-6360", "email": "info@tiendadevuelo.com.ar", "priceRange": "$$", "currenciesAccepted": "ARS, USD", "paymentAccepted": "Transferencia bancaria, efectivo, dólares, USDT", "areaServed": {"@type": "Country", "name": "Argentina"}, "address": {"@type": "PostalAddress", "addressLocality": "Ciudad Autónoma de Buenos Aires", "addressRegion": "CABA", "addressCountry": "AR"}, "sameAs": ["https://www.instagram.com/tiendadevueloar/"], "contactPoint": {"@type": "ContactPoint", "contactType": "customer service", "telephone": "+54 9 11 3358-6360", "email": "info@tiendadevuelo.com.ar", "availableLanguage": "es", "areaServed": "AR"}}
   </script>
 </head>
 <body data-page="inicio">
@@ -59,6 +59,12 @@
       <div class="grid grid-4" id="destacados"></div>
     </section>
 
+    <!-- Vistos recientemente -->
+    <section class="wrap section-tight" id="vistosSec" aria-labelledby="vistosT" hidden>
+      <div class="row-head"><h2 id="vistosT">Vistos recientemente</h2><button type="button" class="more link-btn" id="vistosBorrar">Borrar</button></div>
+      <div class="grid grid-4" id="vistos"></div>
+    </section>
+
     <!-- Banners -->
     <section class="wrap section-tight" aria-label="Novedades de la tienda">
       <div class="banners" id="banners"></div>
@@ -79,6 +85,7 @@
     <section class="section" id="catalogo">
       <div class="wrap">
         <div class="section-head" id="catHead">
+          <nav class="migas" id="catMigas" aria-label="Ubicación" hidden></nav>
           <span class="kicker" id="catKicker">Catálogo</span>
           <h2 id="catTitle">Equipate como un profesional</h2>
           <p class="sub" id="catText" hidden></p>
@@ -108,6 +115,7 @@
             </div>
           </div>
         </div>
+        <div class="busq-pop" id="busqPop" aria-label="Búsquedas populares"></div>
         <div class="fav-share" id="favShare" hidden></div>
         <div class="grid" id="grid"></div>
         <p class="ver-todos"><button type="button" class="btn btn-ghost" id="verTodos" hidden>Ver todos los productos</button></p>
@@ -228,6 +236,7 @@
   <div class="pview" id="pview" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
     <div class="pview-inner wrap">
       <button class="back-btn" id="pvBack">← Volver</button>
+      <nav class="migas" id="pvMigas" aria-label="Ubicación"></nav>
       <div class="pv-grid">
         <div class="pv-gallery" id="pvGallery"></div>
         <div class="pv-info">
@@ -237,6 +246,7 @@
           <div data-google="ficha" hidden></div>
           <div class="pv-tags" id="pvTags"></div>
           <div class="pv-price" id="pvPrice"></div>
+          <ul class="pv-medios" id="pvMedios" hidden></ul>
           <p class="pv-desc" id="pvDesc"></p>
           <div class="pv-variant" id="pvVariantWrap" hidden>
             <label for="pvVariant" id="pvVariantLbl">Opción</label>
@@ -259,6 +269,7 @@
           <a class="pv-instala" id="pvInstala" href="/avionica#presupuesto" hidden>🛠️ <span><b>¿Lo querés instalado?</b> Pedí presupuesto con instalación en un taller habilitado.</span></a>
           <h2 class="pv-sub">Características</h2>
           <div id="pvSpecs"></div>
+          <div class="pv-incluye" id="pvIncluye" hidden><h2 class="pv-sub">En la caja</h2><ul id="pvIncluyeLista"></ul></div>
           <div class="pv-faqs" id="pvFaqsWrap" hidden><h2 class="pv-sub">Preguntas frecuentes</h2><div class="faq" id="pvFaqs"></div></div>
           <div class="pv-etapas" id="pvEtapas"></div>
           <div class="pv-video" id="pvVideo" hidden></div>

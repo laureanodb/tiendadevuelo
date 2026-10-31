@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asesoramiento personalizado · Tienda de Vuelo</title>
+  <meta name="description" content="Reservá 10 minutos por llamada o videollamada de WhatsApp para elegir tu auricular, tu equipo para el curso o tu aviónica. Sin costo.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/asesoramiento">
+  <meta property="og:title" content="Asesoramiento personalizado · Tienda de Vuelo">
+  <meta property="og:description" content="Reservá 10 minutos por llamada o videollamada de WhatsApp para elegir tu auricular, tu equipo para el curso o tu aviónica. Sin costo.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="asesoramiento" data-wa="¡Hola! Quería que me asesoren para elegir un equipo.">
+  <div id="siteHeader"></div>
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Asesoramiento</span>
+      <h1>Elegí con alguien que vuela</h1>
+      <p>Reservá 10 minutos por llamada o videollamada de WhatsApp. Te ayudamos a elegir el auricular y la ficha para tu avión, el equipo para el curso o la aviónica para tu panel. Sin costo y sin compromiso.</p>
+    </div></section>
+    <section class="wrap prose">
+      <form class="form-card turno-form" id="tuF" style="max-width:720px">
+        <fieldset><legend>¿Cómo preferís?</legend><div class="turno-opciones" id="tuModo"></div></fieldset>
+        <label>¿Sobre qué querés hablar?<select id="tuTema"></select></label>
+        <fieldset><legend>Elegí el día</legend><div class="turno-dias" id="tuDias"><p class="muted small">Cargando horarios…</p></div></fieldset>
+        <fieldset><legend>Elegí el horario</legend><div class="turno-horas" id="tuHoras"><p class="muted small">Primero elegí el día.</p></div></fieldset>
+        <label><span>Contanos algo más <span class="muted">(opcional)</span></span><input id="tuDet" maxlength="200" placeholder="Ej.: vuelo un Cessna 152 y uso anteojos"></label>
+        <div class="p-grid2-mini"><label>Tu nombre<input id="tuNom" required maxlength="80" autocomplete="name"></label><label>Tu WhatsApp<input id="tuTel" required type="tel" autocomplete="tel"></label></div>
+        <input name="web" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true" id="tuWeb">
+        <button class="btn btn-primary" type="submit">Reservar turno</button>
+        <p class="small" id="tuMsg" role="status"></p>
+      </form>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  <script>
+    window.addEventListener("tdv:listo", async () => {
+      const { esc, waLink, $ } = window.TDV;
+      let d, dia = "", hora = "";
+      const fallback = () => { $("#tuF").innerHTML = `<p>Escribinos y coordinamos un horario.</p><p><a class="btn btn-wa" target="_blank" rel="noopener" href="${waLink("¡Hola! Quería coordinar un horario para que me asesoren.")}">Coordinar por WhatsApp</a></p>`; };
+      try { d = await (await fetch("/api/turno")).json(); if (!d.dias) throw 0; } catch { return fallback(); }
+      if (!d.activo || !d.dias.length) return fallback();
+      $("#tuModo").innerHTML = d.modos.map((m, i) => `<label class="exp-check"><input type="radio" name="tuModo" value="${esc(m)}"${i ? "" : " checked"}> ${esc(m)}</label>`).join("");
+      $("#tuTema").innerHTML = d.temas.map((t) => `<option>${esc(t)}</option>`).join("");
+      const nombreDia = (f) => new Date(f + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "numeric" });
+      const pintarHoras = () => {
+        const x = d.dias.find((y) => y.fecha === dia);
+        $("#tuHoras").innerHTML = x ? x.horas.map((h) => `<button type="button" class="chip" data-hora="${h}" aria-pressed="${h === hora}">${h}</button>`).join("") : '<p class="muted small">Primero elegí el día.</p>';
+      };
+      $("#tuDias").innerHTML = d.dias.map((x) => `<button type="button" class="chip" data-dia="${x.fecha}">${esc(nombreDia(x.fecha))}</button>`).join("");
+      $("#tuDias").onclick = (e) => { const b = e.target.closest("[data-dia]"); if (!b) return; dia = b.dataset.dia; hora = ""; $("#tuDias").querySelectorAll("[data-dia]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pintarHoras(); };
+      $("#tuHoras").onclick = (e) => { const b = e.target.closest("[data-hora]"); if (!b) return; hora = b.dataset.hora; pintarHoras(); };
+      $("#tuF").onsubmit = async (e) => {
+        e.preventDefault();
+        if (!dia || !hora) { $("#tuMsg").textContent = "Elegí el día y el horario."; return; }
+        $("#tuMsg").textContent = "Reservando…";
+        const datos = { fecha: dia, hora, modo: document.querySelector('input[name="tuModo"]:checked').value, tema: $("#tuTema").value, detalle: $("#tuDet").value.trim(), nombre: $("#tuNom").value.trim(), tel: $("#tuTel").value.trim(), web: $("#tuWeb").value };
+        try {
+          const r = await fetch("/api/turno", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(datos) });
+          const x = await r.json();
+          if (!r.ok) throw new Error(x.mensaje || "No se pudo reservar.");
+          TDV.medir("Schedule");
+          $("#tuF").innerHTML = `<h2>¡Listo, ${esc(datos.nombre.split(" ")[0])}!</h2><p>Tu turno es el <b>${esc(x.cuando)}</b> (${esc(datos.modo.toLowerCase())}). Te escribimos por WhatsApp para confirmarlo.</p>`;
+        } catch (err) { $("#tuMsg").textContent = err.message; }
+      };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

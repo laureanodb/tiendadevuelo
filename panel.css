@@ -217,3 +217,15 @@ details summary { cursor: pointer; }
 .p-ig-grid > a, .p-ig-grid > div { display: grid; gap: 4px; text-decoration: none; color: inherit; position: relative; }
 .p-ig-grid img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; border: 1px solid var(--line, #e3edf6); }
 .p-ig-grid > a span { position: absolute; top: 6px; left: 6px; background: #0c2340; color: #fff; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 2px 8px; }
+.p-uso { margin: 10px 0; }
+.p-uso-t { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.p-uso-b { height: 10px; border-radius: 99px; background: #eef4fb; overflow: hidden; margin-top: 6px; }
+.p-uso-b i { display: block; height: 100%; background: #0a74c2; border-radius: 99px; }
+.p-uso-b i.alto { background: #c2410c; }
+.p-dns { border: 1.5px solid var(--line, #e3edf6); border-radius: 12px; padding: 10px 12px; margin: 8px 0; display: grid; gap: 4px; }
+.p-dns.ok b { color: #0b6b49; }
+.p-dns.mal b { color: #9b1c1c; }
+.p-dns code { font-size: 12px; word-break: break-all; color: #5a6b82; }
+.p-dns p { margin: 0; }
+.p-code-wrap { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
+.p-code-wrap textarea, .p-code-wrap input { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; }

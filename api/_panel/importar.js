@@ -10,7 +10,8 @@ export default panel(async (req, res) => {
   for (const [i, p] of lista.entries()) {
     // Las fotos que vienen con la web (/img/productos/…) se guardan con la dirección completa
     const fotos = (Array.isArray(p.fotos) ? p.fotos : []).map((f) => (String(f).startsWith("/") ? "https://www.tiendadevuelo.com.ar" + f : f));
-    const row = { ...toRow({ ...p, fotos }), orden: i };
+    // Se respeta la fecha de alta de la web, para que la etiqueta "Nuevo" no se ponga en todo el catálogo
+    const row = { ...toRow({ ...p, fotos }), orden: i, creado: /^\d{4}-\d{2}-\d{2}/.test(String(p.creado || "")) ? p.creado : "2026-09-01" };
     if (!row.name) continue;
     const cols = Object.keys(row);
     await q(`insert into tdv_productos (id, ${cols.join(", ")}) values ($1, ${cols.map((_, k) => "$" + (k + 2)).join(", ")}) on conflict (id) do nothing`,

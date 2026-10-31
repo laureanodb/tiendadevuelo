@@ -53,6 +53,7 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists alquiler numeric`);
     await q(`alter table tdv_productos add column if not exists faqs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists complementos text[] not null default '{}'`);
+    await q(`alter table tdv_productos add column if not exists incluye text[] not null default '{}'`);
     await q(`alter table tdv_productos add column if not exists descarga text not null default ''`);
     await q(`alter table tdv_productos add column if not exists nota text not null default ''`);
     await q(`alter table tdv_productos add column if not exists digital boolean not null default false`);
@@ -119,6 +120,10 @@ export function ensureSchema() {
       monto numeric not null, moneda text not null default 'ARS', creado timestamptz not null default now()
     )`);
     await q(`create table if not exists tdv_suscriptores (email text primary key, nombre text not null default '', origen text not null default '', creado timestamptz not null default now())`);
+    await q(`create table if not exists tdv_turnos (
+      id bigserial primary key, creado timestamptz not null default now(), fecha date not null, hora text not null,
+      modo text not null default '', tema text not null default '', nombre text not null default '', tel text not null default '', estado text not null default 'reservado'
+    )`);
     await q(`create table if not exists tdv_posts (
       id bigserial primary key, creado timestamptz not null default now(), programado date, producto text not null default '',
       texto text not null default '', fotos text[] not null default '{}', estado text not null default 'borrador',
@@ -130,7 +135,7 @@ export function ensureSchema() {
     )`);
     await q(`create table if not exists tdv_limites (id bigserial primary key, clave text not null, creado timestamptz not null default now())`);
     await q(`create index if not exists tdv_limites_clave on tdv_limites (clave, creado)`);
-    for (const t of ["tdv_posts", "tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios", "tdv_gastos", "tdv_suscriptores", "tdv_consultas"]) await q(`alter table ${t} enable row level security`).catch(() => {});
+    for (const t of ["tdv_turnos", "tdv_posts", "tdv_pedidos", "tdv_clientes", "tdv_eventos", "tdv_carritos", "tdv_limites", "tdv_cambios", "tdv_gastos", "tdv_suscriptores", "tdv_consultas"]) await q(`alter table ${t} enable row level security`).catch(() => {});
     if (SUPA_URL && SUPA_KEY) {
       for (const [id, pub] of [["productos", true], ["comprobantes", false]]) {
         await fetch(`${SUPA_URL}/storage/v1/bucket`, {
@@ -149,7 +154,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], complementos: r.complementos || [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], complementos: r.complementos || [], incluye: r.incluye || [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -182,6 +187,7 @@ export function toRow(p) {
     stock: int(p.stock), stock_min: int(p.stockMin),
     encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion, digital: !!p.digital, nota: str(p.nota, 60),
     faqs: JSON.stringify((Array.isArray(p.faqs) ? p.faqs : String(p.faqs || "").split("\n").map((l) => l.split("|"))).map((x) => [str(x[0], 200), str(x[1], 600)]).filter((x) => x[0] && x[1]).slice(0, 10)),
+    incluye: list(p.incluye, 12),
     complementos: list(p.complementos, 6).map((x) => x.replace(/[^\w-]/g, "")).filter(Boolean),
     descarga: /^https:\/\//.test(str(p.descarga, 400)) ? str(p.descarga, 400) : "",
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
@@ -231,6 +237,36 @@ export async function armarRespaldo() {
     datos.tablas[t] = rows;
   }
   return datos;
+}
+// Uso del plan gratis de Supabase: base de datos (500 MB) y archivos (1 GB)
+export const LIMITES = { base: 500 * 1024 * 1024, archivos: 1024 * 1024 * 1024 };
+export async function usoPlan() {
+  const { rows: [b] } = await q("select pg_database_size(current_database())::bigint as n");
+  let archivos = null;
+  try { const { rows: [a] } = await q("select coalesce(sum((metadata->>'size')::bigint), 0)::bigint as n from storage.objects"); archivos = Number(a.n); } catch {}
+  const base = Number(b.n);
+  return { base, archivos, limites: LIMITES, pctBase: Math.round((base / LIMITES.base) * 100), pctArchivos: archivos === null ? null : Math.round((archivos / LIMITES.archivos) * 100) };
+}
+// Limpieza de datos viejos (privacidad y espacio): carritos abandonados, eventos y registros que ya no sirven
+export async function limpiarViejos() {
+  const borrar = async (sql) => (await q(sql)).rowCount || 0;
+  return {
+    carritos: await borrar("delete from tdv_carritos where estado <> 'convertido' and actualizado < now() - interval '180 days'"),
+    eventos: await borrar("delete from tdv_eventos where creado < now() - interval '400 days'"),
+    limites: await borrar("delete from tdv_limites where creado < now() - interval '2 days'"),
+    turnos: await borrar("delete from tdv_turnos where fecha < current_date - 180"),
+    posts: await borrar("delete from tdv_posts where estado = 'descartado' and creado < now() - interval '90 days'"),
+  };
+}
+// Copia a Google Drive: se manda a un script de Google (Apps Script) que el dueño publicó en su cuenta
+export async function enviarADrive(datos) {
+  const d = await ajuste("drive", {});
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(d.url || "")) || !d.clave) return { enviado: false, motivo: "sin_configurar" };
+  const nombre = `tienda-de-vuelo-${new Date().toISOString().slice(0, 10)}.json`;
+  const r = await fetch(d.url, { method: "POST", headers: { "content-type": "text/plain;charset=utf-8" }, body: JSON.stringify({ clave: d.clave, nombre, contenido: JSON.stringify(datos) }), redirect: "follow" });
+  const t = await r.text().catch(() => "");
+  if (!r.ok || /"ok"\s*:\s*false/.test(t)) throw new Error("Google Drive no aceptó la copia. Revisá el script y la clave.");
+  return { enviado: true, nombre };
 }
 export async function listarPrivado(prefix) {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/list/comprobantes`, {
@@ -368,7 +404,11 @@ export async function ajusteDolar() {
   const v = await ajuste("precios", {});
   const tipo = ["oficial", "bolsa", "blue", "manual"].includes(v.dolar) ? v.dolar : "oficial";
   const manual = Number(v.manual) > 0 ? Number(v.manual) : null;
-  return tipo === "manual" && !manual ? { tipo: "oficial" } : { tipo, ...(tipo === "manual" ? { manual } : {}) };
+  // Recargos (o descuentos, en negativo) según cómo paga el cliente un producto en dólares
+  const pct = (x) => Math.max(-30, Math.min(50, Math.round((Number(x) || 0) * 10) / 10));
+  const medios = { usdTransf: pct(v.recUsdTransf), arsTransf: pct(v.recArsTransf), arsEfectivo: pct(v.recArsEfectivo) };
+  const base = tipo === "manual" && !manual ? { tipo: "oficial" } : { tipo, ...(tipo === "manual" ? { manual } : {}) };
+  return Object.values(medios).some(Boolean) ? { ...base, medios } : base;
 }
 export async function valorDolar() {
   const d = await ajusteDolar();
@@ -387,12 +427,14 @@ export async function extrasPublicos() {
   const b = await ajuste("beneficio", {});
   const m = await ajuste("marketing", {});
   const rf = await ajuste("referidos", {});
+  const ef = await ajuste("envios_fotos", []);
   const g = await ajuste("google", {});
   const gProm = Math.round(Number(g && g.promedio) * 10) / 10, gCant = Math.round(Number(g && g.cantidad));
   const px = String((m && m.metaPixel) || "").replace(/\D/g, "").slice(0, 20);
   return {
     metaPixel: px.length >= 10 ? px : "",
     referidos: pctReferidos(rf),
+    envioFotos: (Array.isArray(ef) ? ef : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), texto: String(x.texto || "").slice(0, 80) })),
     google: g && /^https:\/\//.test(String(g.link)) && gProm >= 1 && gProm <= 5 && gCant > 0 ? { link: String(g.link).slice(0, 300), promedio: gProm, cantidad: gCant } : null,
     testimonios: (Array.isArray(t) ? t : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), nombre: String(x.nombre || "").slice(0, 40) })),
     beneficio: b && String(b.texto || "").trim() ? String(b.texto).trim().slice(0, 300) : "",
@@ -411,6 +453,14 @@ export async function codigoCliente(tel, nombre) {
     if (rowCount) return cod;
   }
   return "";
+}
+// Turnos de asesoramiento: qué días y horarios se ofrecen (configurable en el panel)
+export const TURNOS_INICIAL = { dias: [1, 2, 3, 4, 5], horas: ["10:00", "11:00", "12:00", "16:00", "17:00", "18:00"] };
+export async function configTurnos() {
+  const c = await ajuste("turnos", {});
+  const dias = Array.isArray(c.dias) && c.dias.length ? c.dias.map(Number).filter((d) => d >= 0 && d <= 6) : TURNOS_INICIAL.dias;
+  const horas = Array.isArray(c.horas) && c.horas.length ? c.horas.map(String).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 16) : TURNOS_INICIAL.horas;
+  return { dias, horas, activo: c.activo !== false };
 }
 export async function pagoPublico() {
   const v = await ajuste("pago", {});

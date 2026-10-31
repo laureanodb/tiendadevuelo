@@ -65,7 +65,7 @@
   const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados", brand: "", min: "", max: "", vista: "grid" };
   try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
   const hace30 = Date.now() - 30 * 864e5;
-  const esNovedad = (p) => p.nuevo || (p.creado && new Date(p.creado).getTime() > hace30);
+  const esNovedad = (p) => TDV.esNuevo(p) || (p.creado && new Date(p.creado).getTime() > hace30);
   const FILTROS = ["Todos", ...(visibles.some(enOferta) ? ["Ofertas"] : []), ...(visibles.some(esNovedad) ? ["Novedades del mes"] : []), ...(visibles.some((p) => p.top) ? ["Más vendidos"] : []), ...(visibles.some((p) => p.reacond) ? ["Usados y reacondicionados"] : []), ...(visibles.some((p) => p.liquidacion) ? ["Liquidación"] : []), ...(visibles.some((p) => p.encargo) ? ["Por encargo"] : []), "Favoritos", ...CATEGORIES.filter((c) => visibles.some((p) => p.cat === c))];
   const marcasTodas = [...new Set(visibles.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   // Franja de marcas: primero las que somos distribuidor oficial
@@ -155,6 +155,8 @@
     Object.assign(state, { f, brand, q: "", min: "", max: "" });
     $("#search").value = ""; $("#brand").value = brand; $("#pMin").value = ""; $("#pMax").value = "";
     $("#catKicker").textContent = kicker; $("#catTitle").textContent = title;
+    $("#catMigas").hidden = false;
+    $("#catMigas").innerHTML = `<a href="/">Inicio</a><span aria-hidden="true">›</span><a href="/#catalogo">Catálogo</a><span aria-hidden="true">›</span><span aria-current="page">${esc(title)}</span>`;
     $("#catText").textContent = text; $("#catText").hidden = !text;
     // Página de marca: sello oficial y preguntas frecuentes
     const info = brand && MARCAS[brand];
@@ -167,7 +169,7 @@
     $("#catalogo").scrollIntoView({ behavior: push && !reduceMotion ? "smooth" : "auto" });
     return true;
   }
-  const rutaBase = () => { $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; $("#catMarca").hidden = true; metaDesc.content = baseDesc; };
+  const rutaBase = () => { $("#catMigas").hidden = true; $("#catKicker").textContent = baseHead.kicker; $("#catTitle").textContent = baseHead.title; $("#catText").hidden = true; $("#catMarca").hidden = true; metaDesc.content = baseDesc; };
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a[href^='/categoria/'], a[href^='/marca/'], a[href='/ofertas'], a[href='/usados'], a[href='/novedades'], a[href='/liquidacion']");
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -208,6 +210,21 @@
   });
 
 
+  // ---------- Vistos recientemente (se guardan en este navegador) ----------
+  const vistosDe = () => (TDV.store.get("tdv-vistos", []) || []).filter((id) => byId[id] && !byId[id].agotado);
+  function recordarVisto(id) { TDV.store.set("tdv-vistos", [id, ...vistosDe().filter((x) => x !== id)].slice(0, 12)); }
+  function renderVistos() {
+    const ids = vistosDe().slice(0, 4);
+    $("#vistosSec").hidden = ids.length < 2;
+    $("#vistos").innerHTML = ids.map((id) => card(byId[id])).join("");
+  }
+  $("#vistosBorrar").onclick = () => { TDV.store.set("tdv-vistos", []); renderVistos(); };
+
+  // ---------- Búsquedas populares bajo el buscador ----------
+  const POPULARES = (CONFIG.busquedasPopulares || ["Bose A30", "Garmin G5", "ELT", "Almohadillas", "Radio VHF", "Llaveros"]).filter((t) => visibles.some((p) => TDV.coincide(p, t)));
+  $("#busqPop").innerHTML = POPULARES.length ? `<span class="muted small">Más buscado:</span>${POPULARES.map((t) => `<button type="button" class="chip chip-sm" data-busq="${esc(t)}">${esc(t)}</button>`).join("")}` : "";
+  $("#busqPop").addEventListener("click", (e) => { const b = e.target.closest("[data-busq]"); if (!b) return; state.q = b.dataset.busq; state.f = "Todos"; $("#search").value = state.q; render(); });
+
   // ---------- Ficha de producto (/producto/id) ----------
   const view = $("#pview");
   let current = null, lastScroll = 0;
@@ -225,11 +242,15 @@
       : art(p, true);
     $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
     $("#pvTitle").textContent = p.name;
+    $("#pvMigas").innerHTML = `<a href="/">Inicio</a><span aria-hidden="true">›</span><a href="/categoria/${slug(p.cat)}" data-ruta>${esc(p.cat)}</a><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span>`;
+    $("#pvIncluye").hidden = !(p.incluye && p.incluye.length);
+    $("#pvIncluyeLista").innerHTML = (p.incluye || []).map((x) => `<li>${esc(x)}</li>`).join("");
+    recordarVisto(p.id);
     $("#pvTags").innerHTML = [
       !p.oficial && '<span class="seal seal-sm">✈ Recomendado por pilotos</span>',
       p.encargo && '<span class="tag tag-order">Por encargo · 15 a 30 días</span>',
       p.reacond && '<span class="tag">Reacondicionado</span>',
-      p.nuevo && '<span class="tag tag-new">Nuevo ingreso</span>',
+      TDV.esNuevo(p) && '<span class="tag tag-new">Nuevo</span>',
       p.ultimas && '<span class="tag tag-order">Últimas unidades</span>',
       p.oficial && '<span class="tag tag-oficial">✔ Distribuidor oficial</span>',
       p.llega && `<span class="tag tag-order">Preventa · llega el ${fechaCorta(p.llega)}</span>`,
@@ -249,6 +270,19 @@
     const precioOpcion = () => {
       const pp = p.variantes ? conOpcion(p, $("#pvVariant").value) : p;
       $("#pvPrice").hidden = !(pp.usd || pp.ars);
+      // Precio según el medio de pago (solo si el dueño cargó recargos)
+      const md = CONFIG.medios;
+      $("#pvMedios").hidden = !(pp.usd && md);
+      if (pp.usd && md) {
+        const usdCon = (r) => Math.ceil(pp.usd * (1 + r / 100));
+        const arsCon = (r) => TDV.redondear ? TDV.redondear(pp.usd * TDV.dolar * (1 + r / 100)) : Math.ceil(pp.usd * TDV.dolar * (1 + r / 100));
+        $("#pvMedios").innerHTML = [
+          `<li>Dólares billete: <b>US$ ${pp.usd.toLocaleString("es-AR")}</b></li>`,
+          `<li>Transferencia en dólares: <b>US$ ${usdCon(md.usdTransf).toLocaleString("es-AR")}</b></li>`,
+          `<li>Transferencia en pesos: <b>${ars(arsCon(md.arsTransf))}</b></li>`,
+          `<li>Efectivo en pesos: <b>${ars(arsCon(md.arsEfectivo))}</b></li>`,
+        ].join("");
+      }
       $("#pvPrice").innerHTML = priceHTML(pp, true) + (p.usd ? `<p class="muted small">Precio en dólares. El equivalente en pesos es al dólar del día: ${ars(TDV.dolar)}.</p>` : "");
       $("#pvStickPrice").innerHTML = pp.usd ? `US$ ${pp.usd.toLocaleString("es-AR")}` : pp.ars ? ars(pp.ars) : "Consultar precio";
       const o = ops.find((x) => x.nombre === $("#pvVariant").value);
@@ -267,7 +301,7 @@
     const ayudaFicha = () => {
       const k = sonFichas && claveFicha($("#pvVariant").value);
       $("#pvVarAyuda").hidden = !sonFichas;
-      if (sonFichas) $("#pvVarAyuda").innerHTML = `${k ? esc(FICHAS[k]) + " " : ""}<a href="/aviones">¿Qué ficha usa tu avión?</a>`;
+      if (sonFichas) $("#pvVarAyuda").innerHTML = `${k ? `<img class="ficha-img" src="/img/fichas/${k.replace("-", "")}.svg" alt="" width="72" height="72">` : ""}<span>${k ? esc(FICHAS[k]) + " " : ""}<a href="/aviones">¿Qué ficha usa tu avión?</a></span>`;
     };
     const consulta = `¡Hola! Quiero consultar por ${p.name}${p.brand ? ` (${p.brand})` : ""}: ${CONFIG.sitio}/producto/${p.id}`;
     $("#pvAsk").href = waLink(consulta);
@@ -291,6 +325,7 @@
       p.digital && "📩 <b>Producto digital:</b> lo recibís por WhatsApp o mail cuando se acredita el pago. No lleva envío.",
       !p.digital && "🎁 Cada pedido va con un regalito de la tienda.",
       p.regalo && CONFIG.porCantidad && `🔑 <b>Llevá ${CONFIG.porCantidad.min} o más</b> llaveros o regalos y tenés ${Math.round(CONFIG.porCantidad.off * 100)}% de descuento en ellos.`,
+      `📞 ¿Dudas para elegir? <a href="/asesoramiento">Reservá 10 minutos con un asesor</a>.`,
       `💬 ¿Lo viste más barato en otra tienda? <a href="${waLink(`¡Hola! Vi el ${p.name} más barato en otro lado. ¿Lo pueden revisar?`)}" target="_blank" rel="noopener">Escribinos y lo revisamos</a>.`,
     ].filter(Boolean).map((x) => `<li>${x}</li>`).join("");
     if (p.alquiler) $("#pvAlq").innerHTML = `También lo alquilamos: <b>${p.alquilerMoneda === "USD" ? "US$ " + p.alquiler : ars(p.alquiler)} por semana</b>, con depósito en garantía. <a href="/alquiler">Ver alquileres</a>`;
@@ -327,7 +362,7 @@
     if (push) history.pushState({ id }, "", `/producto/${id}`);
     view.scrollTop = 0; window.scrollTo(0, 0);
   }
-  function closeView(push = true) { $("#pvStick").hidden = true;
+  function closeView(push = true) { $("#pvStick").hidden = true; renderVistos();
     if (view.hidden) return;
     view.hidden = true; current = null;
     document.body.classList.remove("viewing");
@@ -469,7 +504,7 @@
   const renderShowcaseTimer = () => { clearInterval(vTimer); const n = document.querySelectorAll(".sc-slide").length; if (!reduceMotion && n > 1) vTimer = setInterval(() => showSlide((vi + 1) % n), 4500); };
 
   // ---------- Arranque ----------
-  const rerender = () => { renderShowcase(); renderRows(); render(); renderKits(); if (current) openView(current.id, false); };
+  const rerender = () => { renderShowcase(); renderRows(); renderVistos(); render(); renderKits(); if (current) openView(current.id, false); };
   document.addEventListener("tdv:precios", rerender);
   document.addEventListener("tdv:favs", () => { if (state.f === "Favoritos") render(); syncFav(); });
   rerender();

@@ -257,6 +257,7 @@
           <label><span>Características <span class="muted">(una por renglón; para la ficha técnica usá “Atenuación: 24 dB”)</span></span><textarea id="specs" rows="4">${esc((p.specs || []).join("\n"))}</textarea></label>
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Preguntas frecuentes <span class="muted">(una por renglón: «¿Pregunta? | Respuesta»)</span></span><textarea id="faqs" rows="3">${esc((p.faqs || []).map((f) => f[0] + " | " + f[1]).join("\n"))}</textarea></label>
+          <label><span>En la caja <span class="muted">(una cosa por renglón; se muestra en la ficha)</span></span><textarea id="incluye" rows="3" placeholder="Auricular&#10;Bolso de transporte&#10;Manual">${esc((p.incluye || []).join("\n"))}</textarea></label>
           <fieldset class="p-compl"><legend>Sugerir en el carrito junto a este producto <span class="muted">(hasta 6)</span></legend>
             <div class="p-compl-lista">${productos.filter((o) => o.id !== p.id).map((o) => `<label class="p-chk"><input type="checkbox" name="compl" value="${esc(o.id)}"${(p.complementos || []).includes(o.id) ? " checked" : ""}> ${esc(o.name)}</label>`).join("")}</div>
           </fieldset>
@@ -471,7 +472,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, complementos: [...document.querySelectorAll('input[name="compl"]:checked')].map((x) => x.value).slice(0, 6), descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, incluye: $("incluye").value.split("\n").map((x) => x.trim()).filter(Boolean), complementos: [...document.querySelectorAll('input[name="compl"]:checked')].map((x) => x.value).slice(0, 6), descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
@@ -1141,9 +1142,10 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {}, vp = {}, vb = {}, caps = [], vm = {}, vr = {}, vg = {};
-    try { [v, vp, vb, caps, vm, vr, vg] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing"), api("ajustes?clave=referidos"), api("ajustes?clave=google")])).map((x) => x.valor || {}); } catch {}
+    let v = {}, vp = {}, vb = {}, caps = [], vm = {}, vr = {}, vg = {}, envf = [], vt = {}, vd = {};
+    try { [v, vp, vb, caps, vm, vr, vg, envf, vt, vd] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing"), api("ajustes?clave=referidos"), api("ajustes?clave=google"), api("ajustes?clave=envios_fotos"), api("ajustes?clave=turnos"), api("ajustes?clave=drive")])).map((x) => x.valor || {}); } catch {}
     if (!Array.isArray(caps)) caps = [];
+    if (!Array.isArray(envf)) envf = [];
     const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
     app.innerHTML = tabsHTML("ajustes") + `
       <div class="p-head"><div><h1>Ajustes</h1><p class="muted">Lo que cargues acá aparece al cliente cuando hace un pedido y en la página de seguimiento, con botón para copiar.</p></div></div>
@@ -1151,6 +1153,11 @@
         <div class="p-grid2"><label>Cuál usar<select id="dlTipo">${[["oficial", "Oficial"], ["bolsa", "MEP"], ["blue", "Blue"], ["manual", "Un valor fijo que pongo yo"]].map(([k, t]) => `<option value="${k}"${(vp.dolar || "oficial") === k ? " selected" : ""}>${t}</option>`).join("")}</select></label>
         <label id="dlManWrap">Valor fijo ($ por dólar)<input id="dlMan" type="number" min="1" step="1" inputmode="numeric" value="${esc(vp.manual || "")}"></label></div>
         <p class="muted small">La web toma el valor de venta del día y redondea siempre para arriba (a la centena, o al millar en precios grandes).</p>
+        <h3 class="small">Precio según cómo paga (productos en dólares)</h3>
+        <p class="muted small">El precio cargado es el de dólares billete. Si cobrás distinto por otro medio, poné el recargo en % (o un descuento con signo menos). Con todo en 0, la ficha muestra un solo precio.</p>
+        <div class="p-grid2"><label>Transferencia en dólares (%)<input id="rcUsdT" type="number" step="0.5" min="-30" max="50" value="${esc(vp.recUsdTransf ?? 0)}"></label>
+          <label>Transferencia en pesos (%)<input id="rcArsT" type="number" step="0.5" min="-30" max="50" value="${esc(vp.recArsTransf ?? 0)}"></label>
+          <label>Efectivo en pesos (%)<input id="rcArsE" type="number" step="0.5" min="-30" max="50" value="${esc(vp.recArsEfectivo ?? 0)}"></label></div>
         <button class="btn btn-primary" type="submit">Guardar</button></form>
       <form class="p-card p-form" id="pagoForm"><h2>Datos de pago</h2>
         <div class="p-grid2">${C.map(([k, t, ph]) => `<label>${t}<input id="pg_${k}" value="${esc(v[k] || "")}" placeholder="${esc(ph)}" maxlength="120"></label>`).join("")}</div>
@@ -1161,6 +1168,17 @@
         <div class="p-fotos" id="capLista"></div>
         ${estado.fotos ? '<label class="btn btn-ghost p-upload">📷 Subir captura<input type="file" id="capIn" accept="image/*" hidden></label>' : ""}
       </section>
+      <section class="p-card p-form" id="envfBox"><h2>Así enviamos</h2>
+        <p class="muted small">Fotos reales de tus envíos (paquetes listos, entregas en aeródromo). Se muestran en la página de Envíos. Que no se vean datos de los clientes en las etiquetas.</p>
+        <div class="p-fotos" id="envfLista"></div>
+        ${estado.fotos ? '<label class="btn btn-ghost p-upload">📷 Subir foto<input type="file" id="envfIn" accept="image/*" hidden></label>' : ""}
+      </section>
+      <form class="p-card p-form" id="turnosForm"><h2>Turnos de asesoramiento</h2>
+        <p class="muted small">Los clientes reservan 10 minutos de llamada o videollamada desde <b>tiendadevuelo.com.ar/asesoramiento</b>. Te llega el aviso por WhatsApp y aparece en Pedidos, junto a las consultas de precio.</p>
+        <label class="p-chk"><input type="checkbox" id="tuActivo"${vt.activo === false ? "" : " checked"}> Recibir turnos</label>
+        <fieldset class="p-compl"><legend>Días</legend><div class="p-compl-lista">${["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].map((n, i) => `<label class="p-chk"><input type="checkbox" name="tuDia" value="${i}"${(vt.dias || [1, 2, 3, 4, 5]).includes(i) ? " checked" : ""}> ${n}</label>`).join("")}</div></fieldset>
+        <label>Horarios (separados por coma)<input id="tuHoras" value="${esc((vt.horas || ["10:00", "11:00", "12:00", "16:00", "17:00", "18:00"]).join(", "))}"></label>
+        <button class="btn btn-primary" type="submit">Guardar</button></form>
       <form class="p-card p-form" id="benefForm"><h2>Beneficio para recibidos</h2>
         <p class="muted small">Lo que le das a quien se recibe (por ejemplo: “10% de descuento en tu próxima compra”). Si lo dejás vacío, no se muestra.</p>
         <label>Beneficio<input id="benefTxt" maxlength="300" value="${esc(vb.texto || "")}" placeholder="Ej.: 10% de descuento en tu primer auricular"></label>
@@ -1190,6 +1208,19 @@
         <p class="muted small">Con el píxel, Instagram y Facebook saben qué anuncio trajo a cada persona que mira un producto, pide precio o manda un pedido. Lo encontrás en <b>business.facebook.com/events_manager</b> → <b>Conectar orígenes de datos</b> → <b>Web</b>: es un número de 15 o 16 cifras.</p>
         <label>Identificador del píxel<input id="pixelId" inputmode="numeric" maxlength="20" value="${esc(vm.metaPixel || "")}" placeholder="Ej.: 123456789012345"></label>
         <button class="btn btn-primary" type="submit">Guardar</button></form>
+      <section class="p-card" id="correoBox"><h2>Mail de la tienda</h2>
+        <p class="muted small">Revisa en vivo que los mails de @tiendadevuelo.com.ar estén bien configurados, para que no caigan en spam. Los cambios se hacen en el panel de tu hosting (cPanel → Zone Editor).</p>
+        <div id="correoRes"><p class="p-loading">Revisando…</p></div></section>
+      <section class="p-card p-form" id="driveBox"><h2>Copia en Google Drive</h2>
+        <p class="muted small">Además de la copia de los domingos, se guarda una en tu Google Drive (carpeta «Tienda de Vuelo - Copias», quedan las últimas 12). Se configura una sola vez:</p>
+        <ol class="small">
+          <li>Entrá a <b>script.google.com</b> con tu cuenta de Google y tocá <b>Nuevo proyecto</b>.</li>
+          <li>Borrá lo que aparece y pegá este código (ya tiene tu clave):<div class="p-code-wrap"><textarea id="driveCode" rows="8" readonly></textarea><button type="button" class="btn btn-ghost btn-sm" id="driveCopy">Copiar código</button></div></li>
+          <li>Tocá <b>Implementar → Nueva implementación</b>, tipo <b>Aplicación web</b>. En «Ejecutar como» elegí <b>Yo</b> y en «Quién tiene acceso», <b>Cualquier usuario</b>. Autorizá los permisos que pide Google.</li>
+          <li>Copiá la <b>URL de la aplicación web</b> (termina en /exec), pegala abajo y tocá <b>Guardar y probar</b>.</li>
+        </ol>
+        <label>URL de la aplicación web<input id="driveUrl" value="${esc(vd.url || "")}" placeholder="https://script.google.com/macros/s/…/exec"></label>
+        <div class="p-head-btns"><button class="btn btn-primary btn-sm" type="button" id="driveGuardar">Guardar y probar</button></div></section>
       <section class="p-card" id="respaldos"><h2>Copias de seguridad</h2>
         <p class="muted small">Todos los domingos a la noche se guarda una copia de tus productos, pedidos, clientes y ajustes (se conservan las últimas 8). Si algo se borra por error, con la copia se recupera.</p>
         <p><a class="btn btn-primary btn-sm" href="/api/panel/respaldo?descargar=ahora" download>Descargar una copia ahora</a></p>
@@ -1232,6 +1263,28 @@
         : r.guardadas.length ? `<ul class="small">${r.guardadas.map((g) => `<li><a href="/api/panel/respaldo?descargar=${encodeURIComponent(g.nombre)}" download>${esc(g.nombre.replace(".json", "").split("-").reverse().join("/"))}</a> · ${Math.max(1, Math.round(g.bytes / 1024))} KB</li>`).join("")}</ul>`
         : '<p class="muted small">La primera copia automática se guarda este domingo.</p>';
     }).catch(() => {});
+    // Mail del dominio: chequeo en vivo
+    api("correo").then((r) => {
+      const el = document.getElementById("correoRes"); if (!el) return;
+      el.innerHTML = r.items.map((x) => `<div class="p-dns ${x.ok ? "ok" : "mal"}"><b>${x.ok ? "✔" : "✗"} ${esc(x.nombre)}</b><code>${esc(x.valor)}</code>${x.ayuda ? `<p class="small">${esc(x.ayuda)}</p>` : ""}${x.sugerido ? `<p class="small">Cargá este registro <b>${esc(x.tipo)}</b> en <b>${esc(x.host)}</b>${x.clave === "spf" ? " (reemplazando el actual)" : ""}:</p><div class="p-code-wrap"><input readonly value="${esc(x.sugerido)}"><button type="button" class="btn btn-ghost btn-sm" data-copiar="${esc(x.sugerido)}">Copiar</button></div>` : ""}</div>`).join("") +
+        (r.todoOk ? '<p class="p-ok small">Todo en orden.</p>' : '<p class="muted small">Después de cambiar los registros, Internet tarda entre unos minutos y unas horas en tomarlos. Volvé a esta pantalla para comprobarlo.</p>');
+      el.querySelectorAll("[data-copiar]").forEach((b) => (b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copiar); toast("Copiado."); } catch { b.previousElementSibling.select(); } }));
+    }).catch((x) => { const el = document.getElementById("correoRes"); if (el) el.innerHTML = `<p class="p-error small">${esc(x.message)}</p>`; });
+    // Copia en Google Drive: la clave se genera una vez y queda guardada
+    const claveDrive = vd.clave || Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+    document.getElementById("driveCode").value = "function doPost(e) {\n  var CLAVE = \"CLAVE_AQUI\";\n  var datos = JSON.parse(e.postData.contents);\n  if (datos.clave !== CLAVE) return ContentService.createTextOutput('{\"ok\":false}');\n  var it = DriveApp.getFoldersByName(\"Tienda de Vuelo - Copias\");\n  var carpeta = it.hasNext() ? it.next() : DriveApp.createFolder(\"Tienda de Vuelo - Copias\");\n  carpeta.createFile(datos.nombre, datos.contenido, \"application/json\");\n  var archivos = [], f = carpeta.getFiles();\n  while (f.hasNext()) archivos.push(f.next());\n  archivos.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });\n  archivos.slice(12).forEach(function (x) { x.setTrashed(true); });\n  return ContentService.createTextOutput('{\"ok\":true}').setMimeType(ContentService.MimeType.JSON);\n}".replace("CLAVE_AQUI", claveDrive);
+    document.getElementById("driveCopy").onclick = async () => { try { await navigator.clipboard.writeText(document.getElementById("driveCode").value); toast("Código copiado."); } catch { document.getElementById("driveCode").select(); } };
+    document.getElementById("driveGuardar").onclick = async (e) => {
+      const url = document.getElementById("driveUrl").value.trim();
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) return toast("La URL tiene que ser la de la aplicación web y terminar en /exec.");
+      const b = e.currentTarget; b.disabled = true; b.textContent = "Probando…";
+      try {
+        await api("ajustes", { method: "POST", body: { clave: "drive", valor: { url, clave: claveDrive } } });
+        const r = await api("respaldo", { method: "POST", body: {} });
+        toast(`Listo: se guardó ${r.nombre} en tu Drive.`);
+      } catch (x) { toast(x.message); }
+      b.disabled = false; b.textContent = "Guardar y probar";
+    };
     document.getElementById("refForm").onsubmit = async (e) => {
       e.preventDefault();
       const pct = Math.min(30, Math.max(0, Math.round(+document.getElementById("refPct").value || 0)));
@@ -1261,6 +1314,31 @@
         caps.push({ url: d.url, nombre: "" }); await guardarCaps(); pintarCaps(); toast("Captura agregada. Ya se ve en la portada.");
       } catch (x) { toast(x.message); }
     };
+    const guardarEnvf = () => api("ajustes", { method: "POST", body: { clave: "envios_fotos", valor: envf } });
+    const pintarEnvf = () => {
+      document.getElementById("envfLista").innerHTML = envf.length ? envf.map((x, i) => `<figure class="p-foto"><img src="${esc(x.url)}" alt=""><figcaption><input data-envft="${i}" value="${esc(x.texto || "")}" placeholder="Texto (opcional)" aria-label="Texto de la foto" class="p-cap-nom"><button type="button" data-envfx="${i}" aria-label="Quitar">✕</button></figcaption></figure>`).join("") : '<p class="muted small">Todavía no subiste fotos.</p>';
+      document.querySelectorAll("[data-envfx]").forEach((b) => (b.onclick = async () => { envf.splice(+b.dataset.envfx, 1); pintarEnvf(); await guardarEnvf().catch((x) => toast(x.message)); }));
+      document.querySelectorAll("[data-envft]").forEach((x) => (x.onchange = async () => { envf[+x.dataset.envft].texto = x.value.trim(); await guardarEnvf().catch((e) => toast(e.message)); toast("Guardado."); }));
+    };
+    pintarEnvf();
+    if (document.getElementById("envfIn")) document.getElementById("envfIn").onchange = async (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      if (envf.length >= 12) return toast("Ya hay 12 fotos. Quitá alguna.");
+      toast("Subiendo…");
+      try {
+        const data = await achicar(f, 1400, 0.85);
+        const d = await api("foto", { method: "POST", body: { data, tipo: "image/jpeg", producto: "envios" } });
+        envf.push({ url: d.url, texto: "" }); await guardarEnvf(); pintarEnvf(); toast("Foto agregada. Ya se ve en Envíos.");
+      } catch (x) { toast(x.message); }
+    };
+    document.getElementById("turnosForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const dias = [...document.querySelectorAll('input[name="tuDia"]:checked')].map((x) => +x.value);
+      const horas = document.getElementById("tuHoras").value.split(",").map((h) => h.trim().replace(/^(\d):/, "0$1:")).filter((h) => /^\d{2}:\d{2}$/.test(h));
+      if (!dias.length || !horas.length) return toast("Elegí al menos un día y un horario (por ejemplo 10:00).");
+      try { await api("ajustes", { method: "POST", body: { clave: "turnos", valor: { activo: document.getElementById("tuActivo").checked, dias, horas } } }); toast("Turnos guardados."); } catch (x) { toast(x.message); }
+    };
     document.getElementById("benefForm").onsubmit = async (e) => {
       e.preventDefault();
       try { await api("ajustes", { method: "POST", body: { clave: "beneficio", valor: { texto: document.getElementById("benefTxt").value.trim() } } }); toast("Guardado."); } catch (x) { toast(x.message); }
@@ -1286,7 +1364,8 @@
     document.getElementById("dlTipo").onchange = syncDl; syncDl();
     document.getElementById("dolarForm").onsubmit = async (e) => {
       e.preventDefault();
-      const valor = { dolar: document.getElementById("dlTipo").value, manual: Number(document.getElementById("dlMan").value) || null };
+      const valor = { dolar: document.getElementById("dlTipo").value, manual: Number(document.getElementById("dlMan").value) || null,
+        recUsdTransf: Number(document.getElementById("rcUsdT").value) || 0, recArsTransf: Number(document.getElementById("rcArsT").value) || 0, recArsEfectivo: Number(document.getElementById("rcArsE").value) || 0 };
       if (valor.dolar === "manual" && !valor.manual) return toast("Poné el valor del dólar.");
       try { await api("ajustes", { method: "POST", body: { clave: "precios", valor } }); toast("Listo. La web ya usa ese dólar."); cargarDolar(); } catch (x) { toast(x.message); }
     };
@@ -1311,10 +1390,21 @@
         <section class="p-card"><h2>Productos más consultados</h2><p class="muted small">Toques en “Lo quiero”, “Consultar” y “Hacer una pregunta”.</p>
           ${d.consultas.length ? `<ol class="p-rank">${d.consultas.map((c) => `<li><span>${esc(c.name)}</span><b>${c.n}</b>${c.quiero ? `<small>${c.quiero} “Lo quiero”</small>` : ""}</li>`).join("")}</ol>` : '<p class="muted">Todavía nada.</p>'}</section>
       </div>
+      <section class="p-card" id="usoPlan"><h2>Uso del plan gratis</h2><p class="p-loading">Midiendo…</p></section>
       <section class="p-card" id="gsc"><h2>Cómo te encuentran en Google</h2><p class="p-loading">Cargando…</p></section>
       <section class="p-card" id="calidad"><h2>Control de calidad</h2><p class="muted small">Lo que le falta a cada producto para vender mejor y salir bien en Google. Se revisa cada vez que entrás.</p><p class="p-loading">Revisando…</p></section>
       <section class="p-card p-hist" id="historial"><h2>Historial de cambios</h2><p class="muted small">Precios, stock, productos y pedidos. Si te equivocaste, tocá “Deshacer”.</p><p class="p-loading">Cargando…</p></section>`;
-    verHistorial(); verCalidad(); verBusquedas();
+    verHistorial(); verCalidad(); verBusquedas(); verUso();
+  }
+  async function verUso() {
+    const box = document.getElementById("usoPlan");
+    if (!box) return;
+    let u;
+    try { u = await api("uso"); } catch (x) { box.querySelector(".p-loading").textContent = x.message; return; }
+    const mb = (n) => (n / 1048576).toLocaleString("es-AR", { maximumFractionDigits: n < 10485760 ? 1 : 0 }) + " MB";
+    const barra = (t, n, lim, pct) => `<div class="p-uso"><div class="p-uso-t"><b>${t}</b><span>${mb(n)} de ${mb(lim)} (${pct}%)</span></div><div class="p-uso-b"><i style="width:${Math.min(100, Math.max(1, pct))}%" class="${pct >= 80 ? "alto" : ""}"></i></div></div>`;
+    box.querySelector(".p-loading").outerHTML = barra("Base de datos", u.base, u.limites.base, u.pctBase) + (u.archivos !== null ? barra("Fotos y archivos", u.archivos, u.limites.archivos, u.pctArchivos) : "") +
+      '<p class="muted small">Si alguno pasa el 80%, te llega un aviso por WhatsApp. Vercel (la web) mide aparte: lo ves en vercel.com → Usage.</p>';
   }
   async function verBusquedas() {
     const box = document.getElementById("gsc");

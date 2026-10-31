@@ -124,8 +124,8 @@ for (const av of AVIONES) {
     </div></section>
     <section class="wrap prose">
       <div class="ficha-av">
-        <div><b>Ficha principal</b><span>${esc(f.nombre)}</span><p class="small">Son ${esc(f.texto)}</p></div>
-        ${x ? `<div><b>También puede tener</b><span>${esc(x.nombre)}</span><p class="small">Es ${esc(x.texto)}</p></div>` : ""}
+        <div><img class="ficha-img" src="/img/fichas/${av.ficha}.svg" alt="" width="72" height="72"><b>Ficha principal</b><span>${esc(f.nombre)}</span><p class="small">Son ${esc(f.texto)}</p></div>
+        ${x ? `<div><img class="ficha-img" src="/img/fichas/${av.extra}.svg" alt="" width="72" height="72"><b>También puede tener</b><span>${esc(x.nombre)}</span><p class="small">Es ${esc(x.texto)}</p></div>` : ""}
       </div>
       <h2>Auriculares que le sirven</h2>
       <div class="grid grid-4" id="avAuris"></div>

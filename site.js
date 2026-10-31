@@ -62,12 +62,14 @@
     </div>`;
   };
 
+  // "Nuevo": marcado a mano o cargado hace menos de 30 días
+  const esNuevo = (p) => !!p.nuevo || (!!p.creado && Date.now() - new Date(p.creado).getTime() < 30 * 864e5);
   const badges = (p) => [
     enOferta(p) && `<span class="badge badge-sale">-${Math.round((1 - (p.usd || p.ars) / p.antes) * 100)}%</span>`,
     p.ultimas && '<span class="badge badge-last">Últimas unidades</span>',
     p.llega && '<span class="badge badge-order">Preventa</span>',
     p.top && '<span class="badge">Más vendido</span>',
-    p.nuevo && '<span class="badge badge-new">Nuevo ingreso</span>',
+    esNuevo(p) && '<span class="badge badge-new">Nuevo</span>',
     p.encargo && '<span class="badge badge-order">Por encargo</span>',
     p.reacond && '<span class="badge badge-re">Reacondicionado</span>',
     p.liquidacion && '<span class="badge badge-sale">Liquidación</span>',
@@ -370,7 +372,7 @@
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/asesoramiento">Asesoramiento personalizado</a><a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h2 class="foot-h">Guías</h2>
@@ -389,6 +391,7 @@
           <a href="/legales#terminos">Términos y condiciones</a>
           <a href="/legales#privacidad">Privacidad</a>
           <a href="/legales#arrepentimiento" class="strong">Botón de arrepentimiento</a>
+          ${CONFIG.metaPixel ? '<a href="#" data-prefcookies>Preferencias de cookies</a>' : ""}
           <a href="https://www.argentina.gob.ar/produccion/defensadelconsumidor/formulario" target="_blank" rel="noopener">Defensa del Consumidor</a>
         </div>
       </div>
@@ -852,9 +855,25 @@
   }
 
   // Píxel de Meta: solo se carga si el dueño puso su identificador en el panel.
+  // Aviso de cookies: el píxel de Meta solo se carga si el visitante acepta
+  const consentimiento = () => { try { return localStorage.getItem("tdv-cookies") || ""; } catch { return ""; } };
+  function avisoCookies(forzar) {
+    if (!CONFIG.metaPixel || (consentimiento() && !forzar) || document.getElementById("cookieBar")) return;
+    const bar = document.createElement("div");
+    bar.id = "cookieBar"; bar.className = "cookie-bar"; bar.setAttribute("role", "dialog"); bar.setAttribute("aria-label", "Aviso de cookies");
+    bar.innerHTML = `<p>Usamos cookies de Meta (Facebook e Instagram) para medir qué anuncios funcionan. La tienda funciona igual si las rechazás. <a href="/legales#privacidad">Más información</a></p>
+      <div><button type="button" class="btn btn-ghost btn-sm" data-cookie="no">Rechazar</button><button type="button" class="btn btn-primary btn-sm" data-cookie="si">Aceptar</button></div>`;
+    document.body.appendChild(bar);
+    bar.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-cookie]"); if (!b) return;
+      try { localStorage.setItem("tdv-cookies", b.dataset.cookie); } catch {}
+      bar.remove();
+      if (b.dataset.cookie === "si") pixel();
+    });
+  }
   const pixel = () => {
     const id = CONFIG.metaPixel;
-    if (!id || window.fbq) return;
+    if (!id || window.fbq || consentimiento() !== "si") return;
     const f = window.fbq = function () { f.callMethod ? f.callMethod.apply(f, arguments) : f.queue.push(arguments); };
     window._fbq = f; f.push = f; f.loaded = true; f.version = "2.0"; f.queue = [];
     const s = document.createElement("script"); s.async = true; s.src = "https://connect.facebook.net/en_US/fbevents.js";
@@ -862,8 +881,8 @@
     f("init", id); f("track", "PageView");
   };
   const medir = (ev, datos) => { try { if (window.fbq) window.fbq("track", ev, datos || {}); } catch {} };
-  pixel();
-  document.addEventListener("click", (e) => { if (e.target.closest("a[href*='wa.me/']")) medir("Contact"); });
+  pixel(); avisoCookies();
+  document.addEventListener("click", (e) => { if (e.target.closest("a[href*='wa.me/']")) medir("Contact"); if (e.target.closest("[data-prefcookies]")) { e.preventDefault(); avisoCookies(true); } });
   // Link de recomendación (?ref=CODIGO): se guarda para precargarlo en el carrito
   try { const r = new URLSearchParams(location.search).get("ref"); if (r) store.set("tdv-ref", r.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20)); } catch {}
   // Reseñas de Google (cargadas en el panel): sello con estrellas y link a la ficha
@@ -874,7 +893,7 @@
   };
   const pintarGoogle = () => document.querySelectorAll("[data-google]").forEach((el) => { el.innerHTML = googleHTML(el.dataset.google); el.hidden = !CONFIG.google; });
   const setWa = (text) => { const a = $("#waFloat"); if (a) a.href = waLink(text || document.body.dataset.wa || "¡Hola Tienda de Vuelo! Quería hacerles una consulta."); };
-  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, tipoDe, complementosDe, get dolar() { return dolar; }, get favs() { return favs; } };
+  window.TDV = { opciones, conOpcion, estrellas, fechaCorta, toggleComparar, barraComparar, evento, $, esc, ars, usd, byId, store, pesos, priceHTML, art, card, badges, waLink, add, openCart, toast, isFav, toggleFav, enOferta, slug, catEmoji, setWa, avisoHorario, pagoHTML, b64, deB64, fichaTecnica, coincide, pedirPrecio, resumenCarrito, medir, googleHTML, pintarGoogle, tipoDe, complementosDe, esNuevo, redondear, get dolar() { return dolar; }, get favs() { return favs; } };
   renderCart();
   barraComparar();
   const pintarDolar = () => { const d = $("#dolarHoy"); if (d) d.textContent = `Dólar del día: ${ars(dolar)}`; };
