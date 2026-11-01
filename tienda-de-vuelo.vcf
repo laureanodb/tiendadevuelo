@@ -1,0 +1,13 @@
+BEGIN:VCARD
+VERSION:3.0
+N:;Tienda de Vuelo;;;
+FN:Tienda de Vuelo
+ORG:Tienda de Vuelo
+TITLE:Pilot shop · Distribuidor oficial Bose
+TEL;TYPE=CELL,VOICE:+5491133586360
+EMAIL;TYPE=INTERNET:info@tiendadevuelo.com.ar
+URL:https://www.tiendadevuelo.com.ar
+X-SOCIALPROFILE;TYPE=instagram:https://www.instagram.com/tiendadevueloar
+ADR;TYPE=WORK:;;;CABA;Buenos Aires;;Argentina
+NOTE:Auriculares\, radios y aviónica originales para pilotos. Envíos a todo el país.
+END:VCARD

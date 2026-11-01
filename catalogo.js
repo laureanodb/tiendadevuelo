@@ -11,6 +11,8 @@
     CONFIG.referidos = d.referidos || 0;
     CONFIG.google = d.google || null;
     CONFIG.envioFotos = d.envioFotos || [];
+    CONFIG.hayRevendedores = !!d.hayRevendedores;
+    CONFIG.aviso = d.aviso || null;
     if (d.dolar) { CONFIG.dolarTipo = d.dolar.tipo; CONFIG.dolarManual = d.dolar.manual; CONFIG.medios = d.dolar.medios || null; }
     if (d.ventas) CONFIG.ventas = "+" + Number(d.ventas).toLocaleString("es-AR");
     if (d.configurado && d.productos.length) {

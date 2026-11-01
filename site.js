@@ -319,6 +319,7 @@
   const metar = ["METAR SABE", "CAVOK", "ENVÍOS A TODO EL PAÍS", "DESPACHO EN 48 H", "ENVÍO EN EL DÍA EN CABA", `${CONFIG.ventas} VENTAS`, "PRODUCTOS ORIGINALES", "ROGER, TE ESPERAMOS"];
   $("#siteHeader").outerHTML = `
     <div role="region" aria-label="Avisos de la tienda">
+    ${CONFIG.aviso ? (CONFIG.aviso.link ? `<a class="notice notice-tienda" href="${esc(CONFIG.aviso.link)}">📣 ${esc(CONFIG.aviso.texto)} →</a>` : `<div class="notice notice-tienda">📣 ${esc(CONFIG.aviso.texto)}</div>`) : ""}
     ${evento_ ? `<a class="notice notice-sale" href="/ofertas">🔥 ${esc(evento_.nombre)}: ofertas hasta el ${fechaCorta(evento_.hasta)} → Ver ofertas</a>` : ""}
     ${despacho || patria ? `<div class="notice${patria ? " notice-ar" : ""}">${esc(patria ? patria + (despacho ? " · " + despacho : "") : despacho)}</div>` : ""}
     <div class="metar" aria-hidden="true"><div class="metar-track">${[...metar, ...metar].map((t) => `<span>${t}</span>`).join("")}</div></div>
@@ -372,7 +373,7 @@
         </div>
         <div>
           <h2 class="foot-h">Tienda</h2>
-          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/asesoramiento">Asesoramiento personalizado</a><a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
+          <a href="${h("#catalogo")}">Catálogo</a>${KITS.length ? `<a href="${h("#kits")}">Kits</a>` : ""}<a href="/envios">Envíos</a><a href="/seguimiento">Seguí tu pedido</a>${CONFIG.beneficio ? '<a href="/recibidos">¿Te recibiste? 🎓</a>' : ""}<a href="/asesoramiento">Asesoramiento personalizado</a><a href="/kit-escuelas">Para escuelas y aeroclubes</a><a href="/revendedores">Revendedores</a><a href="/alquiler">Alquiler de equipos</a><a href="/experiencias">Bautismo y simulador</a><a href="${h("#preguntas")}">Preguntas frecuentes</a>
         </div>
         <div>
           <h2 class="foot-h">Guías</h2>
@@ -541,6 +542,21 @@
 
   // ---------- Carrito ----------
   let cart = store.get("tdv-cart", []).filter((l) => (l.kit ? KITS.some((k) => k.id === l.kit) : byId[l.id]));
+  // Link de compra directa: /c/bose-a30 (o /c/bose-a30?v=Ficha LEMO) deja el producto en el carrito y lo abre
+  { const m = location.pathname.match(/^\/c\/([\w-]+)\/?$/);
+    if (m) {
+      const p = byId[m[1]];
+      if (!p) history.replaceState(null, "", "/");
+      else if (!(p.usd || p.ars)) { location.replace("/producto/" + p.id); }
+      else {
+        const v = new URLSearchParams(location.search).get("v") || "", ops = p.variantes ? opciones(p).map((o) => o.nombre) : [];
+        const variante = ops.length ? (ops.find((o) => o.toLowerCase() === v.toLowerCase()) || ops[0]) : "";
+        const ya = cart.find((l) => !l.kit && l.id === p.id && (l.variante || "") === variante);
+        if (!ya) { cart.push({ id: p.id, variante, qty: 1 }); store.set("tdv-cart", cart); }
+        history.replaceState(null, "", "/");
+        setTimeout(() => { openCart(); toast(`✈ ${p.name} ya está en tu carrito`); evento("link_compra", "", p.id); }, 300);
+      }
+    } }
   // Carrito compartido: /carrito#datos arma el mismo carrito en otro teléfono
   if (location.pathname === "/carrito" && location.hash.length > 1) {
     try {
@@ -685,12 +701,18 @@
         <label id="fFranjaWrap">Franja horaria<select id="fFranja"><option>Mañana (9 a 13 h)</option><option>Tarde (14 a 19 h)</option></select></label>
         <label id="fProvWrap">Provincia<select id="fProv"><option value="">Elegí la provincia</option>${PROVINCIAS.map((x) => `<option${x === datos.provincia ? " selected" : ""}>${x}</option>`).join("")}</select></label>
         <label id="fDirWrap">Dirección, ciudad y código postal<input id="fDir" autocomplete="street-address" value="${esc(datos.dir || "")}"></label>
+        <div id="fRetiraWrap"><label class="exp-check"><input type="checkbox" id="fRetiraOtro"> Retira otra persona</label>
+          <div class="p-grid2-mini" id="fRetiraDatos" hidden><label>Nombre de quien retira<input id="fRetNom" maxlength="80"></label><label>Su DNI<input id="fRetDni" inputmode="numeric" maxlength="20"></label></div></div>
         <label><span>DNI o CUIT <span class="muted">(opcional, si necesitás factura)</span></span><input id="fDni" inputmode="numeric" value="${esc(datos.dni || "")}"></label>
+        <div class="p-grid2-mini">
+          <label><span>¿Para cuándo lo necesitás? <span class="muted">(opcional)</span></span><input id="fFechaEnt" type="date" min="${new Date(Date.now() + 864e5).toISOString().slice(0, 10)}"></label>
+          <label><span>Tu mail <span class="muted">(opcional, te mandamos el resumen)</span></span><input id="fMail" type="email" autocomplete="email" maxlength="120" value="${esc(datos.email || "")}"></label>
+        </div>
         <div class="p-grid2-mini">
           <label><span>Tu cumpleaños <span class="muted">(opcional)</span></span><input id="fCumple" type="date" value="${esc(datos.cumple || "")}"></label>
           <label><span>Escuela o aeroclub <span class="muted">(opcional)</span></span><input id="fEscuela" maxlength="80" value="${esc(datos.escuela || "")}"></label>
         </div>
-        ${CONFIG.referidos ? `<label><span>Código de recomendación <span class="muted">(opcional)</span></span><input id="fRef" maxlength="20" autocapitalize="characters" autocomplete="off" value="${esc(refValido.codigo || store.get("tdv-ref", ""))}"></label><p class="small" id="fRefTxt" role="status"></p>` : ""}
+        ${CONFIG.referidos || CONFIG.hayRevendedores ? `<label><span>Código de descuento <span class="muted">(recomendación o revendedor, opcional)</span></span><input id="fRef" maxlength="20" autocapitalize="characters" autocomplete="off" value="${esc(refValido.codigo || store.get("tdv-ref", ""))}"></label><p class="small" id="fRefTxt" role="status"></p>` : ""}
         <label><span>Notas <span class="muted">(opcional)</span></span><textarea id="fNotas" rows="2">${esc(regaloPara())}</textarea></label>
         <p class="muted small">Usamos tus datos solo para tu pedido. Si no llegás a terminarlo, puede que te escribamos para ayudarte.</p>
       </form>`;
@@ -699,9 +721,11 @@
       const v = document.querySelector('input[name="entrega"]:checked').value, correo = v === "Envío a domicilio", sinDir = v === "Retiro en CABA" || v === "Entrega en aeródromo" || v === "Digital";
       $("#fDirWrap").hidden = sinDir; $("#fDir").required = !sinDir; $("#fProvWrap").hidden = !correo; $("#fProv").required = correo; $("#fCorreoWrap").hidden = !correo;
       $("#fAeroWrap").hidden = v !== "Entrega en aeródromo"; $("#fFranjaWrap").hidden = v !== "Envío en el día (CABA)"; $("#fTurnoWrap").hidden = v !== "Retiro en CABA";
+      $("#fRetiraWrap").hidden = !(v === "Retiro en CABA" || v === "Entrega en aeródromo");
       $("#fDir").previousSibling.textContent = correo && $("#fModo").value === "A sucursal del correo" ? "Ciudad y código postal (buscamos la sucursal más cercana)" : "Dirección, ciudad y código postal";
     };
     $("#fModo").onchange = syncDir;
+    $("#fRetiraOtro").onchange = () => { $("#fRetiraDatos").hidden = !$("#fRetiraOtro").checked; $("#fRetNom").required = $("#fRetiraOtro").checked; };
     document.querySelectorAll('input[name="entrega"]').forEach((r) => (r.onchange = syncDir)); syncDir();
     $("#toItems").onclick = () => { step = "items"; renderCart(); };
     $("#orderForm").onsubmit = (e) => { e.preventDefault(); sendOrder(); };
@@ -712,7 +736,7 @@
         if (!c) { t.textContent = ""; return; }
         try {
           const d = await (await fetch("/api/codigo?c=" + encodeURIComponent(c))).json();
-          if (d.valido) { refValido = d; t.textContent = `✔ Código de ${d.de || "un cliente"}: ${d.pct}% de descuento (−${ars(Math.round(total() * d.pct / 100))}).`; t.className = "small ok-txt"; }
+          if (d.valido) { refValido = d; t.textContent = `✔ ${d.revendedor ? "Revendedor" : "Código de"} ${d.de || "un cliente"}: ${d.pct}% de descuento (−${ars(Math.round(total() * d.pct / 100))}).`; t.className = "small ok-txt"; }
           else { t.textContent = d.mensaje || "Ese código no existe. Revisalo o dejalo vacío."; t.className = "small muted"; }
         } catch { t.textContent = ""; }
       };
@@ -738,8 +762,10 @@
     if (correo) { d.empresa = $("#fEmpresa").value; d.modo = $("#fModo").value; }
     if (d.entrega === "Entrega en aeródromo") d.aerodromo = $("#fAero").value;
     d.cumple = $("#fCumple").value; d.escuela = $("#fEscuela").value.trim();
+    d.email = $("#fMail").value.trim(); d.fechaEntrega = $("#fFechaEnt").value;
+    if (!$("#fRetiraWrap").hidden && $("#fRetiraOtro").checked && $("#fRetNom").value.trim()) d.retira = { nombre: $("#fRetNom").value.trim(), dni: $("#fRetDni").value.trim() };
     d.franja = d.entrega === "Envío en el día (CABA)" ? $("#fFranja").value : d.entrega === "Retiro en CABA" ? `${$("#fDia").value}, ${$("#fHora").value}` : "";
-    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir, provincia: correo ? d.provincia : datos.provincia, empresa: d.empresa || datos.empresa, modo: d.modo || datos.modo, cumple: d.cumple, escuela: d.escuela });
+    Object.assign(datos, { nombre: d.nombre, tel: d.tel, dni: d.dni, entrega: d.entrega, dir: d.dir, provincia: correo ? d.provincia : datos.provincia, empresa: d.empresa || datos.empresa, modo: d.modo || datos.modo, cumple: d.cumple, escuela: d.escuela, email: d.email });
     store.set("tdv-datos", datos);
     const now = new Date();
     const num = `TDV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
@@ -754,10 +780,11 @@
     if (descRef) d.ref = refValido.codigo;
     const msg = `¡Hola Tienda de Vuelo! Quiero hacer este pedido (${num}):\n\n${lines.join("\n")}\n\n` +
       (descCantidad() ? `Descuento por cantidad en llaveros y regalos: −${ars(descCantidad())}\n` : "") +
-      (descRef ? `Descuento por recomendación (${refValido.codigo}, ${refValido.pct}%): −${ars(descRef)}\n` : "") +
+      (descRef ? `${refValido.revendedor ? "Descuento de revendedor" : "Descuento por recomendación"} (${refValido.codigo}, ${refValido.pct}%): −${ars(descRef)}\n` : "") +
       `Total${hasUsd() ? " aprox." : ""}: ${ars(total() - descRef)}${soloDigital() ? "" : " + envío"}\n\n` +
       `Nombre: ${d.nombre}\nTeléfono: ${d.tel}\nEntrega: ${d.entrega}` + (d.franja ? ` · ${d.franja}` : "") + (d.aerodromo ? ` · ${d.aerodromo}` : "") +
       (correo ? `\nCorreo: ${d.empresa} · ${d.modo}` : "") + (!["Retiro en CABA", "Entrega en aeródromo", "Digital"].includes(d.entrega) ? `\nDirección: ${d.dir}${correo ? ", " + d.provincia : ""}` : "") +
+      (d.fechaEntrega ? `\nLo necesito para el: ${d.fechaEntrega.split("-").reverse().join("/")}` : "") + (d.retira ? `\nRetira: ${d.retira.nombre}${d.retira.dni ? " (DNI " + d.retira.dni + ")" : ""}` : "") +
       (d.dni ? `\nDNI/CUIT: ${d.dni}` : "") + (d.notas ? `\nNotas: ${d.notas}` : "") + `\n\nSeguimiento del pedido: ${seguir}`;
     // Se guarda en el panel (sin esperar: WhatsApp se abre igual aunque falle)
     try {

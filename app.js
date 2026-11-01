@@ -62,7 +62,7 @@
   }
 
   // ---------- Catálogo ----------
-  const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados", brand: "", min: "", max: "", vista: "grid" };
+  const state = { f: "Todos", q: new URLSearchParams(location.search).get("q") || "", sort: "destacados", brand: "", uso: "", min: "", max: "", vista: "grid" };
   try { state.vista = localStorage.getItem("tdv-vista") || "grid"; } catch {}
   const hace30 = Date.now() - 30 * 864e5;
   const esNovedad = (p) => TDV.esNuevo(p) || (p.creado && new Date(p.creado).getTime() > hace30);
@@ -90,6 +90,7 @@
     const min = Number(state.min) || 0, max = Number(state.max) || Infinity;
     let list = visibles.filter((p) => (pass[state.f] ? pass[state.f](p) : p.cat === state.f) &&
       (!state.brand || p.brand === state.brand) &&
+      (!state.uso || (p.usos || []).includes(state.uso)) &&
       (!state.min && !state.max || (pesos(p) !== null && pesos(p) >= min && pesos(p) <= max)) &&
       (!q || TDV.coincide(p, state.q)));
     const precio = (p) => pesos(p) ?? Infinity;
@@ -101,7 +102,7 @@
     };
     list.sort(sorters[state.sort]);
     // En la portada sin filtros se muestran 8 (sin repetir los destacados) y un botón para ver todos
-    const portada = !state.todos && state.f === "Todos" && !state.brand && !q && !state.min && !state.max;
+    const portada = !state.todos && state.f === "Todos" && !state.brand && !state.uso && !q && !state.min && !state.max;
     let mostrar = list;
     if (portada) {
       const dest = new Set(visibles.filter((p) => p.destacado).sort((a, b) => a.destacado - b.destacado).slice(0, 4).map((p) => p.id));
@@ -134,6 +135,11 @@
   $("#verTodos").onclick = () => { state.todos = true; render(); };
   $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
   $("#brand").addEventListener("change", (e) => { state.brand = e.target.value; render(); });
+  // "Ideal para": solo los usos que tienen algún producto
+  const usosHay = (typeof USOS !== "undefined" ? USOS : []).filter((u) => visibles.some((p) => (p.usos || []).includes(u)));
+  $("#uso").innerHTML = '<option value="">Ideal para…</option>' + usosHay.map((u) => `<option>${esc(u)}</option>`).join("");
+  $("#uso").hidden = !usosHay.length;
+  $("#uso").addEventListener("change", (e) => { state.uso = e.target.value; render(); });
   $("#pMin").addEventListener("input", (e) => { state.min = e.target.value; render(); });
   $("#pMax").addEventListener("input", (e) => { state.max = e.target.value; render(); });
   const setVista = (v) => { state.vista = v; try { localStorage.setItem("tdv-vista", v); } catch {} render(); };
@@ -152,7 +158,7 @@
     else if (path === "/usados") { f = "Usados y reacondicionados"; kicker = "Usados"; title = "Usados y reacondicionados"; text = "Equipos revisados y probados, a mejor precio."; pageTitle = "Usados y reacondicionados"; }
     else if (path === "/novedades") { f = "Novedades del mes"; kicker = "Novedades"; title = "Novedades del mes"; text = "Lo último que llegó a la tienda."; pageTitle = "Novedades"; }
     else return false;
-    Object.assign(state, { f, brand, q: "", min: "", max: "" });
+    Object.assign(state, { f, brand, uso: "", q: "", min: "", max: "" }); $("#uso").value = "";
     $("#search").value = ""; $("#brand").value = brand; $("#pMin").value = ""; $("#pMax").value = "";
     $("#catKicker").textContent = kicker; $("#catTitle").textContent = title;
     $("#catMigas").hidden = false;
@@ -210,6 +216,13 @@
   });
 
 
+  // Etiqueta de uso en la ficha: lleva al catálogo filtrado
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-uso]"); if (!b) return;
+    closeView(); rutaBase(); Object.assign(state, { f: "Todos", brand: "", uso: b.dataset.uso, q: "" }); $("#search").value = ""; $("#brand").value = ""; $("#uso").value = b.dataset.uso; render();
+    $("#catalogo").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+  });
+
   // ---------- Vistos recientemente (se guardan en este navegador) ----------
   const vistosDe = () => (TDV.store.get("tdv-vistos", []) || []).filter((id) => byId[id] && !byId[id].agotado);
   function recordarVisto(id) { TDV.store.set("tdv-vistos", [id, ...vistosDe().filter((x) => x !== id)].slice(0, 12)); }
@@ -243,6 +256,10 @@
     $("#pvBrand").textContent = [p.brand, p.model].filter(Boolean).join(" · ") || p.cat;
     $("#pvTitle").textContent = p.name;
     $("#pvMigas").innerHTML = `<a href="/">Inicio</a><span aria-hidden="true">›</span><a href="/categoria/${slug(p.cat)}" data-ruta>${esc(p.cat)}</a><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span>`;
+    $("#pvFunciona").hidden = !(p.funcionaCon && p.funcionaCon.length);
+    $("#pvFuncionaLista").innerHTML = (p.funcionaCon || []).map((x) => `<li>${esc(x)}</li>`).join("");
+    $("#pvUsos").hidden = !(p.usos && p.usos.length);
+    $("#pvUsos").innerHTML = (p.usos || []).length ? `<span class="muted small">Ideal para:</span> ${p.usos.map((u) => `<button type="button" class="tag tag-uso" data-uso="${esc(u)}">${esc(u)}</button>`).join("")}` : "";
     $("#pvIncluye").hidden = !(p.incluye && p.incluye.length);
     $("#pvIncluyeLista").innerHTML = (p.incluye || []).map((x) => `<li>${esc(x)}</li>`).join("");
     recordarVisto(p.id);
@@ -444,7 +461,7 @@
       const [r, q] = await Promise.all([fetch(`/api/resenas?producto=${p.id}`).then((x) => x.json()), fetch(`/api/preguntas?producto=${p.id}`).then((x) => x.json())]);
       if (current !== p) return;
       $("#pvResenas").innerHTML = r.resenas?.length
-        ? `<div class="reviews">${r.resenas.map((x) => `<figure class="review"><div class="stars">${estrellas(x.estrellas)}</div>${x.texto ? `<blockquote>${esc(x.texto)}</blockquote>` : ""}<figcaption>${esc(x.nombre)} · <span class="verif">✔ Compra verificada</span> · ${fechaLarga(x.fecha)}</figcaption></figure>`).join("")}</div>`
+        ? `<div class="reviews">${r.resenas.map((x) => `<figure class="review"><div class="stars">${estrellas(x.estrellas)}</div>${x.texto ? `<blockquote>${esc(x.texto)}</blockquote>` : ""}<figcaption>${esc(x.nombre)} · <span class="verif">✔ Compra verificada</span> · ${fechaLarga(x.fecha)}</figcaption>${x.respuesta ? `<p class="review-resp"><b>Respuesta de Tienda de Vuelo:</b> ${esc(x.respuesta)}</p>` : ""}</figure>`).join("")}</div>`
         : '<p class="muted">Todavía no hay opiniones. Las dejan clientes que compraron este producto.</p>';
       $("#pvPreguntas").innerHTML = q.preguntas?.length
         ? `<dl class="qa">${q.preguntas.map((x) => `<dt>${esc(x.pregunta)}</dt><dd>${esc(x.respuesta)}</dd>`).join("")}</dl>` : "";
@@ -502,6 +519,27 @@
     showSlide(+t.dataset.sc); renderShowcaseTimer();
   });
   const renderShowcaseTimer = () => { clearInterval(vTimer); const n = document.querySelectorAll(".sc-slide").length; if (!reduceMotion && n > 1) vTimer = setInterval(() => showSlide((vi + 1) % n), 4500); };
+
+  // ---------- Buscar en las preguntas frecuentes ----------
+  // Filtra las preguntas generales y suma las de cada producto que coinciden, con link a la ficha.
+  if ($("#faqBuscar")) {
+    const generales = [...document.querySelectorAll("#faqHome details")];
+    const deProductos = PRODUCTS.flatMap((p) => (p.faqs || []).map(([q, a]) => ({ p, q, a, t: norm(`${q} ${a} ${p.name} ${p.brand || ""} ${p.model || ""}`) })));
+    let tFaq;
+    $("#faqBuscar").addEventListener("input", () => {
+      clearTimeout(tFaq);
+      tFaq = setTimeout(() => {
+        const palabras = norm($("#faqBuscar").value.trim()).split(/\s+/).filter((w) => w.length > 1);
+        const ok = (t) => palabras.every((w) => t.includes(w));
+        let n = 0;
+        generales.forEach((d) => { const v = !palabras.length || ok(norm(d.textContent)); d.hidden = !v; d.open = v && palabras.length > 0 && n < 2; if (v) n++; });
+        const prods = palabras.length ? deProductos.filter((x) => ok(x.t)).slice(0, 8) : [];
+        $("#faqProd").hidden = !prods.length;
+        $("#faqProd").innerHTML = prods.length ? `<p class="small muted">En las fichas de los productos:</p>` + prods.map((x) => `<details><summary>${esc(x.q)} <span class="faq-de">${esc(x.p.name)}</span></summary><p>${esc(x.a)} <a href="/producto/${x.p.id}">Ver producto →</a></p></details>`).join("") : "";
+        $("#faqNada").textContent = palabras.length && !n && !prods.length ? "No encontramos esa pregunta. Escribinos por WhatsApp y te respondemos." : "";
+      }, 200);
+    });
+  }
 
   // ---------- Arranque ----------
   const rerender = () => { renderShowcase(); renderRows(); renderVistos(); render(); renderKits(); if (current) openView(current.id, false); };

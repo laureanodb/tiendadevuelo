@@ -229,3 +229,16 @@ details summary { cursor: pointer; }
 .p-dns p { margin: 0; }
 .p-code-wrap { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
 .p-code-wrap textarea, .p-code-wrap input { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; }
+/* Hoy */
+.p-hoy-tareas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.p-hoy-t { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 10px; text-align: left; padding: 12px 14px; border: 1.5px solid var(--line, #e3edf6); border-radius: 14px; background: #fff; font: inherit; cursor: pointer; }
+.p-hoy-t:hover { border-color: var(--accent, #0a74c2); }
+.p-hoy-t span:first-child { font-size: 22px; }
+.p-hoy-t b { font-size: 24px; }
+.p-hoy-t span:last-child { font-size: 14px; color: var(--muted, #5a6b82); }
+.p-ag-dia { margin: 14px 0 6px; }
+.p-agenda { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.p-agenda li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #e3edf6); border-radius: 12px; }
+.p-etq { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.e-urgente { background: #dc2626; } .e-regalo { background: #9333ea; } .e-aerodromo { background: #0a74c2; } .e-revendedor { background: #0a7d55; } .e-revisar { background: #eab308; }
+.p-etqs { display: flex; flex-wrap: wrap; gap: 8px 18px; }

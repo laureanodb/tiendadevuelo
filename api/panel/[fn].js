@@ -22,6 +22,7 @@ const RUTAS = {
   posts: () => import("../_panel/posts.js"),
   correo: () => import("../_panel/correo.js"),
   uso: () => import("../_panel/uso.js"),
+  hoy: () => import("../_panel/hoy.js"),
   busquedas: () => import("../_panel/busquedas.js"),
   ia: () => import("../_panel/ia.js"),
 };

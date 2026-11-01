@@ -54,6 +54,8 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists faqs jsonb not null default '[]'`);
     await q(`alter table tdv_productos add column if not exists complementos text[] not null default '{}'`);
     await q(`alter table tdv_productos add column if not exists incluye text[] not null default '{}'`);
+    await q(`alter table tdv_productos add column if not exists usos text[] not null default '{}'`);
+    await q(`alter table tdv_productos add column if not exists funciona_con text[] not null default '{}'`);
     await q(`alter table tdv_productos add column if not exists descarga text not null default ''`);
     await q(`alter table tdv_productos add column if not exists nota text not null default ''`);
     await q(`alter table tdv_productos add column if not exists digital boolean not null default false`);
@@ -103,6 +105,11 @@ export function ensureSchema() {
     await q(`alter table tdv_pedidos add column if not exists nps_coment text not null default ''`);
     await q(`alter table tdv_pedidos add column if not exists carrito text not null default ''`);
     await q(`alter table tdv_pedidos add column if not exists ref text not null default ''`);
+    await q(`alter table tdv_pedidos add column if not exists etiquetas text[] not null default '{}'`);
+    await q(`alter table tdv_pedidos add column if not exists costo_envio numeric`);
+    await q(`alter table tdv_pedidos add column if not exists devolucion jsonb`);
+    await q(`alter table tdv_pedidos add column if not exists seguimiento jsonb not null default '{}'`);
+    await q(`alter table tdv_resenas add column if not exists respuesta text not null default ''`);
     await q(`alter table tdv_clientes add column if not exists codigo text`);
     await q(`alter table tdv_clientes add column if not exists recordado timestamptz`);
     await q(`create unique index if not exists tdv_clientes_codigo on tdv_clientes (codigo)`);
@@ -154,7 +161,7 @@ export function fromRow(r, admin = false) {
   const p = {
     id: r.id, name: r.name, brand: r.brand, model: r.model, cat: r.cat, icon: r.icon,
     usd: num(r.usd), ars: num(r.ars), encargo: r.encargo, nuevo: r.nuevo, top: r.top, reacond: r.reacond,
-    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], complementos: r.complementos || [], incluye: r.incluye || [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
+    regalo: r.regalo, tcp: r.tcp, liquidacion: !!r.liquidacion, digital: !!r.digital, nota: r.nota || "", faqs: Array.isArray(r.faqs) ? r.faqs : [], complementos: r.complementos || [], incluye: r.incluye || [], usos: r.usos || [], funcionaCon: r.funciona_con || [], destacado: r.destacado, etapas: r.etapas, variantes: r.variantes.length ? r.variantes : undefined,
     specs: r.specs, desc: r.descr, fotos: r.fotos, video: r.video || "", creado: r.creado,
     oficial: !!r.oficial, docs: r.docs || [], alquiler: num(r.alquiler), alquilerMoneda: r.alquiler_moneda || "ARS",
   };
@@ -188,6 +195,8 @@ export function toRow(p) {
     encargo: !!p.encargo, nuevo: !!p.nuevo, top: !!p.top, reacond: !!p.reacond, regalo: !!p.regalo, tcp: !!p.tcp, liquidacion: !!p.liquidacion, digital: !!p.digital, nota: str(p.nota, 60),
     faqs: JSON.stringify((Array.isArray(p.faqs) ? p.faqs : String(p.faqs || "").split("\n").map((l) => l.split("|"))).map((x) => [str(x[0], 200), str(x[1], 600)]).filter((x) => x[0] && x[1]).slice(0, 10)),
     incluye: list(p.incluye, 12),
+    usos: list(p.usos, 9),
+    funciona_con: list(p.funcionaCon, 8),
     complementos: list(p.complementos, 6).map((x) => x.replace(/[^\w-]/g, "")).filter(Boolean),
     descarga: /^https:\/\//.test(str(p.descarga, 400)) ? str(p.descarga, 400) : "",
     destacado: int(p.destacado), etapas: list(p.etapas, 6), variantes: list(p.variantes), specs: list(p.specs),
@@ -238,6 +247,20 @@ export async function armarRespaldo() {
   }
   return datos;
 }
+// ---------- Mails (Resend): solo si RESEND_API_KEY está cargada ----------
+export const mailListo = () => !!env.RESEND_API_KEY;
+export async function enviarMail(para, asunto, html) {
+  if (!mailListo() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(para))) return false;
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST", headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: env.MAIL_DESDE || "Tienda de Vuelo <info@tiendadevuelo.com.ar>", to: [para], reply_to: "info@tiendadevuelo.com.ar", subject: asunto, html }),
+    });
+    if (!r.ok) console.error("mail", r.status, await r.text().catch(() => ""));
+    return r.ok;
+  } catch (e) { console.error(e); return false; }
+}
+
 // Uso del plan gratis de Supabase: base de datos (500 MB) y archivos (1 GB)
 export const LIMITES = { base: 500 * 1024 * 1024, archivos: 1024 * 1024 * 1024 };
 export async function usoPlan() {
@@ -394,7 +417,8 @@ export function pedidoAdmin(r) {
   return { num: r.num, token: r.token, creado: r.creado, estado: r.estado, tel: r.cliente_tel, cliente: r.cliente, items: r.items,
     totalArs: num(r.total_ars), usdSub: num(r.usd_sub), cobradoArs: num(r.cobrado_ars), cobradoUsd: num(r.cobrado_usd), pagadoEn: r.pagado_en,
     envioEmpresa: r.envio_empresa, envioCodigo: r.envio_codigo, enviadoEn: r.enviado_en, notas: r.notas, stockDescontado: r.stock_descontado, historial: r.historial,
-    comprobantes: r.comprobantes || [], nps: r.nps, npsComent: r.nps_coment || "" };
+    comprobantes: r.comprobantes || [], nps: r.nps, npsComent: r.nps_coment || "",
+    etiquetas: r.etiquetas || [], costoEnvio: num(r.costo_envio), devolucion: r.devolucion || null, seguimiento: r.seguimiento || {} };
 }
 
 // Datos de pago que se muestran al cliente (los cargás en el panel → Ajustes).
@@ -428,12 +452,17 @@ export async function extrasPublicos() {
   const m = await ajuste("marketing", {});
   const rf = await ajuste("referidos", {});
   const ef = await ajuste("envios_fotos", []);
+  const av = await ajuste("aviso", {});
+  const revs = await ajuste("revendedores", []);
+  const avisoVigente = av && String(av.texto || "").trim() && (!av.hasta || new Date(av.hasta + "T23:59:59-03:00") >= new Date());
   const g = await ajuste("google", {});
   const gProm = Math.round(Number(g && g.promedio) * 10) / 10, gCant = Math.round(Number(g && g.cantidad));
   const px = String((m && m.metaPixel) || "").replace(/\D/g, "").slice(0, 20);
   return {
     metaPixel: px.length >= 10 ? px : "",
     referidos: pctReferidos(rf),
+    hayRevendedores: Array.isArray(revs) && revs.length > 0,
+    aviso: avisoVigente ? { texto: String(av.texto).trim().slice(0, 140), link: /^(https:\/\/|\/)/.test(String(av.link || "")) ? String(av.link).slice(0, 200) : "" } : null,
     envioFotos: (Array.isArray(ef) ? ef : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), texto: String(x.texto || "").slice(0, 80) })),
     google: g && /^https:\/\//.test(String(g.link)) && gProm >= 1 && gProm <= 5 && gCant > 0 ? { link: String(g.link).slice(0, 300), promedio: gProm, cantidad: gCant } : null,
     testimonios: (Array.isArray(t) ? t : []).filter((x) => /^https:\/\//.test(String(x.url)) || /^http:\/\/localhost[:/]/.test(String(x.url))).slice(0, 12).map((x) => ({ url: String(x.url).slice(0, 400), nombre: String(x.nombre || "").slice(0, 40) })),

@@ -3,6 +3,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/c/:id",
+      "destination": "/"
+    },
+    {
       "source": "/producto/:id",
       "destination": "/api/ficha?tipo=producto&id=:id"
     },
@@ -131,6 +135,19 @@
         {
           "key": "Service-Worker-Allowed",
           "value": "/panel"
+        }
+      ]
+    },
+    {
+      "source": "/tienda-de-vuelo.vcf",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/vcard; charset=utf-8"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Tienda de Vuelo.vcf\""
         }
       ]
     }

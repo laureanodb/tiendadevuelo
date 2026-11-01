@@ -89,17 +89,18 @@
     cargarDolar();
     const d = await api("productos");
     productos = d.productos;
-    ir(location.hash.slice(1) || "productos");
+    ir(location.hash.slice(1) || "hoy");
     // Cuenta los pedidos nuevos para mostrarlos en la pestaña
     Promise.all([api("resenas"), api("preguntas")]).then(([r, g]) => { porRevisar = r.resenas.filter((x) => x.estado === "pendiente").length + g.preguntas.filter((x) => x.estado === "pendiente").length; const nav = app.querySelector(".p-tabs"); if (nav) nav.outerHTML = tabsHTML(nav.querySelector("[aria-current]")?.dataset.tab || "productos"); }).catch(() => {});
     cargarPedidos().then(() => { const nav = app.querySelector(".p-tabs"); if (nav) nav.outerHTML = tabsHTML(nav.querySelector("[aria-current]")?.dataset.tab || "productos"); }).catch(() => {});
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["redes", "Redes"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
+  const TABS = [["hoy", "Hoy"], ["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["redes", "Redes"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
   const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.filter(([k]) => esDueno() || !["ventas", "ajustes"].includes(k)).map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
+    if (tab === "hoy") return verHoy();
     if (tab === "pedidos") return verPedidos();
     if (tab === "clientes") return verClientes();
     if (tab === "actividad") return verActividad();
@@ -110,7 +111,55 @@
     if (tab === "redes") return verRedes();
     lista();
   }
+  // Link de compra directa (tiendadevuelo.com.ar/c/<producto>): deja el producto en el carrito del cliente
+  app.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-linkcompra]"); if (!b) return;
+    const p = productos.find((x) => x.id === b.dataset.linkcompra);
+    const url = `${CONFIG.sitio}/c/${b.dataset.linkcompra}`;
+    try { await navigator.clipboard.writeText(url); toast(p && p.usd === null && p.ars === null ? "Link copiado. Como no tiene precio, abre la ficha con «Pedime el precio»." : "Link copiado: abre el carrito con el producto."); } catch { prompt("Copiá el link:", url); }
+  });
   app.addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { history.replaceState(null, "", "/panel#" + t.dataset.tab); ir(t.dataset.tab); window.scrollTo(0, 0); } });
+
+  // ---------- Hoy: todo lo pendiente en una pantalla, agenda de entregas y seguimiento después de la venta ----------
+  async function verHoy() {
+    app.innerHTML = tabsHTML("hoy") + '<p class="p-loading">Armando el día…</p>';
+    let d;
+    try { d = await api("hoy"); } catch (x) { app.innerHTML = tabsHTML("hoy") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    const nombre1 = (p) => (p.cliente.nombre || "").split(" ")[0];
+    const tareas = [
+      [d.nuevos.length, "pedidos nuevos para confirmar", "pedidos", "🆕"],
+      [d.comprobantes.length, "comprobantes para revisar", "pedidos", "💳"],
+      [d.despachar.length, "pedidos pagados para despachar", "pedidos", "📦"],
+      [d.pendientes.consultas, "pedidos de precio y turnos sin responder", "pedidos", "💬"],
+      [d.pendientes.resenas + d.pendientes.preguntas, "opiniones y preguntas para aprobar", "opiniones", "⭐"],
+      [d.pendientes.posts, "publicaciones de Instagram para hoy", "redes", "📸"],
+    ].filter((t) => t[0] > 0);
+    // Agenda de los próximos 14 días agrupada por día (entregas con fecha y turnos); retiros y motos sin fecha aparte
+    const conFecha = d.agenda.filter((a) => a.fecha).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
+    const sinFecha = d.agenda.filter((a) => !a.fecha);
+    const dias = [...new Set(conFecha.map((a) => a.fecha))];
+    const nombreDia = (f) => { const x = new Date(f + "T12:00:00"), h = new Date(d.hoy + "T12:00:00"), dif = Math.round((x - h) / 864e5); return dif === 0 ? "Hoy" : dif === 1 ? "Mañana" : dif < 0 ? "Atrasado · " + x.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" }).replace(/-/g, "/") : (x.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" }).replace(/-/g, "/")).replace(/^./, (c) => c.toUpperCase()); };
+    const ICO = { entrega: "🎁", retiro: "🤝", moto: "🛵", turno: "📞" };
+    const itemAg = (a) => `<li><span aria-hidden="true">${ICO[a.tipo] || "•"}</span><span>${a.hora ? `<b>${esc(a.hora)}</b> · ` : ""}${esc(a.nombre || "")}${a.num ? ` <span class="muted small">${esc(a.num)}</span>` : ""}<br><span class="small muted">${esc(a.tipo === "turno" ? "Turno: " + a.detalle : a.detalle || "")}${a.franja ? " · " + esc(a.franja) : ""}</span></span>${a.tel ? `<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(a.tel, `¡Hola ${esc((a.nombre || "").split(" ")[0])}! Te escribo de Tienda de Vuelo por tu turno de asesoramiento.`)}">WhatsApp</a>` : ""}</li>`;
+    // Seguimiento postventa con mensajes listos
+    const seg = (lista, tipo, titulo, ayuda, msg) => lista.length ? `<section class="p-card"><h2>${titulo}</h2><p class="muted small">${ayuda}</p><div class="p-list">${lista.map((p) => `
+      <div class="p-cart-row" data-segnum="${esc(p.num)}"><div><b>${esc(p.cliente.nombre || p.num)}</b> <span class="muted small">${esc(p.num)}</span><br><span class="muted small">${esc(p.items.map((i) => i.name).join(", "))}</span></div>
+      <div class="p-head-btns"><a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="${waCliente(p.tel, msg(p))}" data-seg="${tipo}">Escribir</a><button class="btn btn-ghost btn-sm" data-seg="${tipo}" data-solo>Listo</button></div></div>`).join("")}</div></section>` : "";
+    app.innerHTML = tabsHTML("hoy") + `
+      <div class="p-head"><div><h1>Hoy</h1><p class="muted">${new Date(d.hoy + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</p></div></div>
+      <section class="p-card"><h2>Para hacer</h2>${tareas.length ? `<div class="p-hoy-tareas">${tareas.map(([n, t, tab, ico]) => `<button type="button" class="p-hoy-t" data-tab="${tab}"><span aria-hidden="true">${ico}</span><b>${n}</b><span>${t}</span></button>`).join("")}</div>` : '<p class="muted">Nada pendiente por ahora. 👌</p>'}</section>
+      <section class="p-card"><h2>Agenda de entregas, retiros y turnos</h2>
+        ${dias.length ? dias.map((f) => `<h3 class="small p-ag-dia">${esc(nombreDia(f))}</h3><ul class="p-agenda">${conFecha.filter((a) => a.fecha === f).map(itemAg).join("")}</ul>`).join("") : '<p class="muted small">No hay entregas con fecha ni turnos en los próximos 14 días.</p>'}
+        ${sinFecha.length ? `<h3 class="small p-ag-dia">Retiros y entregas en moto a coordinar</h3><ul class="p-agenda">${sinFecha.map(itemAg).join("")}</ul>` : ""}
+      </section>
+      ${seg(d.gracias, "gracias", "🙏 Agradecer la compra", "Pedidos entregados esta semana.", (p) => `¡Hola ${nombre1(p)}! Gracias por comprar en Tienda de Vuelo ✈ Cualquier duda con el equipo, escribinos por acá. ¡Buenos vuelos!`)}
+      ${seg(d.googleResena, "google", "⭐ Pedir la reseña en Google", "Entregados hace 8 a 20 días: el mejor momento para pedir la reseña.", (p) => `¡Hola ${nombre1(p)}! ¿Cómo venís con tu compra? Si te gustó la atención, nos ayudaría mucho una reseña en Google: ${d.googleLink} ¡Gracias! ✈`)}
+      ${seg(d.comoTeFue, "como", "💬 ¿Cómo te fue?", "Entregados hace un mes: ya usaron el equipo.", (p) => `¡Hola ${nombre1(p)}! Te escribo de Tienda de Vuelo. Ya pasó un mes con tu ${p.items[0]?.name || "compra"}: ¿cómo te fue en vuelo? Si querés, contanos acá: ${sitio}/resena#${p.num}.${p.token}`)}`;
+    app.querySelectorAll("[data-seg]").forEach((b) => b.addEventListener("click", () => {
+      const row = b.closest("[data-segnum]");
+      api("pedidos", { method: "POST", body: { num: row.dataset.segnum, accion: "seguimiento", tipo: b.dataset.seg } }).then(() => row.remove()).catch((x) => toast(x.message));
+    }));
+  }
 
   // ---------- Lista ----------
   const stockBajo = (p) => p.stock !== null && p.stockMin !== null && p.stock <= p.stockMin;
@@ -258,6 +307,8 @@
           <label><span>Opciones para elegir <span class="muted">(una por renglón. Si una tiene otro precio o foto: «Ficha LEMO | 1350 | foto 2»)</span></span><textarea id="variantes" rows="3">${esc((p.variantes || []).join("\n"))}</textarea></label>
           <label><span>Preguntas frecuentes <span class="muted">(una por renglón: «¿Pregunta? | Respuesta»)</span></span><textarea id="faqs" rows="3">${esc((p.faqs || []).map((f) => f[0] + " | " + f[1]).join("\n"))}</textarea></label>
           <label><span>En la caja <span class="muted">(una cosa por renglón; se muestra en la ficha)</span></span><textarea id="incluye" rows="3" placeholder="Auricular&#10;Bolso de transporte&#10;Manual">${esc((p.incluye || []).join("\n"))}</textarea></label>
+          <label><span>Funciona con <span class="muted">(apps o equipos compatibles, uno por renglón)</span></span><textarea id="funcionaCon" rows="2" placeholder="App Garmin Pilot&#10;Bluetooth del celular">${esc((p.funcionaCon || []).join("\n"))}</textarea></label>
+          <fieldset class="p-compl"><legend>Ideal para</legend><div class="p-compl-lista">${(typeof USOS !== "undefined" ? USOS : []).map((u) => `<label class="p-chk"><input type="checkbox" name="usos" value="${esc(u)}"${(p.usos || []).includes(u) ? " checked" : ""}> ${esc(u)}</label>`).join("")}</div></fieldset>
           <fieldset class="p-compl"><legend>Sugerir en el carrito junto a este producto <span class="muted">(hasta 6)</span></legend>
             <div class="p-compl-lista">${productos.filter((o) => o.id !== p.id).map((o) => `<label class="p-chk"><input type="checkbox" name="compl" value="${esc(o.id)}"${(p.complementos || []).includes(o.id) ? " checked" : ""}> ${esc(o.name)}</label>`).join("")}</div>
           </fieldset>
@@ -327,7 +378,8 @@
         </section>
 
         ${nuevo ? "" : `<section class="p-card p-danger"><div id="delBox"><button type="button" class="btn btn-ghost" id="del">Borrar producto</button></div>
-          ${p.visible ? "" : ""}<a class="p-link" href="/producto/${esc(p.id)}" target="_blank" rel="noopener">Ver en la web ↗</a></section>`}
+          ${p.visible ? "" : ""}<a class="p-link" href="/producto/${esc(p.id)}" target="_blank" rel="noopener">Ver en la web ↗</a>
+          <button type="button" class="p-link link-btn" data-linkcompra="${esc(p.id)}">🔗 Copiar link de compra directa</button></section>`}
 
         <div class="p-save">
           <button type="button" class="btn btn-ghost" id="cancel">Cancelar</button>
@@ -472,7 +524,7 @@
         id: p.id, name: val("name"), brand: val("brand"), model: val("model"), cat: $("cat").value, icon: $("icon").value,
         usd: m === "USD" ? val("precio") : null, ars: m === "ARS" ? val("precio") : null,
         costo: val("costo"), costoMoneda: $("costoMoneda").value, antes: m === "consultar" ? null : val("antes"), ofertaHasta: val("ofertaHasta"), video: val("video"), stock: val("stock"), stockMin: val("stockMin"),
-        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, incluye: $("incluye").value.split("\n").map((x) => x.trim()).filter(Boolean), complementos: [...document.querySelectorAll('input[name="compl"]:checked')].map((x) => x.value).slice(0, 6), descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
+        codigo: val("codigo"), nota: val("nota"), faqs: $("faqs").value, incluye: $("incluye").value.split("\n").map((x) => x.trim()).filter(Boolean), funcionaCon: $("funcionaCon").value.split("\n").map((x) => x.trim()).filter(Boolean), usos: [...document.querySelectorAll('input[name="usos"]:checked')].map((x) => x.value), complementos: [...document.querySelectorAll('input[name="compl"]:checked')].map((x) => x.value).slice(0, 6), descarga: val("descarga"), desc: val("desc"), specs: $("specs").value, variantes: $("variantes").value, proveedor: val("proveedor"), notas: val("notas"),
         visible: $("visible").checked, destacado: $("destacado").value, fotos,
         etapas: [...document.querySelectorAll("[data-etapa]:checked")].map((c) => c.dataset.etapa),
         orden: p.orden ?? productos.length,
@@ -490,6 +542,8 @@
 
   // ---------- Pedidos ----------
   const ESTADOS = [["nuevo", "Nuevo"], ["señado", "Señado"], ["pagado", "Pagado"], ["enviado", "Enviado"], ["entregado", "Entregado"], ["cancelado", "Cancelado"]];
+  const ETIQUETAS = [["urgente", "Urgente"], ["regalo", "Regalo"], ["aerodromo", "Aeródromo"], ["revendedor", "Revendedor"], ["revisar", "Revisar"]];
+  const puntos = (p) => (p.etiquetas || []).map((e) => `<i class="p-etq e-${e}" title="${esc((ETIQUETAS.find((x) => x[0] === e) || [e, e])[1])}"></i>`).join("");
   const estadoTxt = (e) => (ESTADOS.find((x) => x[0] === e) || [e, e])[1];
   const fechaCorta = (d) => new Date(d).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
   const waCliente = (tel, msg) => `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
@@ -509,9 +563,10 @@
     try { d = await cargarPedidos(); } catch (x) { app.innerHTML = tabsHTML("pedidos") + `<p class="p-error">${esc(x.message)}</p>`; return; }
     const r = d.resumen;
     const monto = (o) => [o.ars ? ars(o.ars) : "", o.usd ? usd(o.usd) : ""].filter(Boolean).join(" + ") || "$0";
-    const FILT = ["Activos", "Todos", ...ESTADOS.map((x) => x[1])];
+    const FILT = ["Activos", "Todos", ...ESTADOS.map((x) => x[1]), ...ETIQUETAS.filter(([k]) => d.pedidos.some((p) => (p.etiquetas || []).includes(k))).map((x) => "● " + x[1])];
     const norm = (x) => String(x).toLowerCase();
-    const vis = d.pedidos.filter((p) => (filtroPed === "Todos" ? true : filtroPed === "Activos" ? !["entregado", "cancelado"].includes(p.estado) : estadoTxt(p.estado) === filtroPed) &&
+    const etqDe = (f) => (ETIQUETAS.find((x) => "● " + x[1] === f) || [])[0];
+    const vis = d.pedidos.filter((p) => (filtroPed === "Todos" ? true : filtroPed === "Activos" ? !["entregado", "cancelado"].includes(p.estado) : etqDe(filtroPed) ? (p.etiquetas || []).includes(etqDe(filtroPed)) : estadoTxt(p.estado) === filtroPed) &&
       (!buscaPed || norm(p.num + " " + p.cliente.nombre + " " + p.cliente.tel).includes(norm(buscaPed))));
     app.innerHTML = tabsHTML("pedidos") + `
       <div class="p-head"><div><h1>Pedidos</h1><p class="muted">${d.pedidos.length} en total${pendientes ? ` · <b>${pendientes} nuevos para atender</b>` : ""}</p></div></div>
@@ -536,7 +591,7 @@
       </div>
       <div class="p-list">${vis.map((p) => `
         <button class="p-row p-order" data-ped="${esc(p.num)}">
-          <span class="p-row-info"><b>${esc(p.cliente.nombre || "Sin nombre")}</b><span class="muted small">${esc(p.num)} · ${fechaCorta(p.creado)}</span>
+          <span class="p-row-info"><b>${puntos(p)}${esc(p.cliente.nombre || "Sin nombre")}</b><span class="muted small">${esc(p.num)} · ${fechaCorta(p.creado)}${p.cliente.fechaEntrega ? " · 📅 para el " + p.cliente.fechaEntrega.split("-").reverse().slice(0, 2).join("/") : ""}</span>
             <span class="muted small">${esc(p.items.map((i) => `${i.qty}× ${i.name}`).join(", "))}</span></span>
           <span class="p-row-num">${sinVer(p) ? '<i class="p-estado e-comp">💳 Comprobante</i>' : ""}<i class="p-estado e-${esc(p.estado)}">${estadoTxt(p.estado)}</i><b>${p.cobradoArs || p.cobradoUsd ? [p.cobradoArs ? ars(p.cobradoArs) : "", p.cobradoUsd ? usd(p.cobradoUsd) : ""].filter(Boolean).join(" + ") : p.totalArs ? "≈ " + ars(p.totalArs) : ""}</b></span>
         </button>`).join("") || '<p class="empty">No hay pedidos con ese filtro.</p>'}</div>
@@ -603,6 +658,7 @@
       <form class="p-form" id="pedForm">
         <h1>${esc(p.num)}</h1>
         <p class="muted">Hecho el ${fechaCorta(p.creado)}${p.historial.length > 1 ? " · " + p.historial.slice(1).map((h) => `${estadoTxt(h.estado)} ${fechaCorta(h.at)}`).join(" · ") : ""}</p>
+        <section class="p-card"><h2>Etiquetas</h2><div class="p-etqs">${ETIQUETAS.map(([k, t]) => `<label class="p-chk"><input type="checkbox" name="etq" value="${k}"${(p.etiquetas || []).includes(k) ? " checked" : ""}><i class="p-etq e-${k}"></i> ${t}</label>`).join("")}</div></section>
         <section class="p-card">
           <h2>Estado</h2>
           <div class="p-seg" role="radiogroup" aria-label="Estado del pedido">${ESTADOS.map(([k, t]) => `<label><input type="radio" name="estado" value="${k}"${k === p.estado ? " checked" : ""}> ${t}</label>`).join("")}</div>
@@ -611,7 +667,7 @@
           <h2>Cliente</h2>
           <p class="p-cli"><b>${esc(c.nombre)}</b><br>
             <a href="https://wa.me/${esc(p.tel)}" target="_blank" rel="noopener">${esc(c.tel)}</a>${c.dni ? ` · DNI/CUIT ${esc(c.dni)}` : ""}<br>
-            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.aerodromo ? " · " + esc(c.aerodromo) : ""}${c.empresa ? `<br>Correo: ${esc(c.empresa)} · ${esc(c.modo || "")}` : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}${c.escuela ? "<br>Escuela: " + esc(c.escuela) : ""}${c.ref ? `<br>🤝 Recomendado con el código <b>${esc(c.ref)}</b>` : ""}
+            ${esc(c.entrega || "")}${c.entrega && c.entrega.includes("día") && c.franja ? " · " + esc(c.franja) : ""}${c.aerodromo ? " · " + esc(c.aerodromo) : ""}${c.empresa ? `<br>Correo: ${esc(c.empresa)} · ${esc(c.modo || "")}` : ""}${c.dir ? "<br>" + esc(c.dir) + (c.provincia && c.provincia !== "CABA" ? ", " + esc(c.provincia) : "") : ""}${c.escuela ? "<br>Escuela: " + esc(c.escuela) : ""}${c.ref ? `<br>🤝 Recomendado con el código <b>${esc(c.ref)}</b>` : ""}${c.revendedor ? `<br>🏪 Revendedor: <b>${esc(c.revendedor.nombre || c.revendedor.codigo)}</b> (${esc(c.revendedor.pct)}%)` : ""}${c.fechaEntrega ? `<br>📅 Lo necesita para el <b>${esc(c.fechaEntrega.split("-").reverse().join("/"))}</b>` : ""}${c.retira ? `<br>🤝 Retira: <b>${esc(c.retira.nombre)}</b>${c.retira.dni ? " · DNI " + esc(c.retira.dni) : ""}` : ""}${c.email ? `<br>✉ <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}
             ${c.notas ? `<br><i>“${esc(c.notas)}”</i>` : ""}</p>
         </section>
         <section class="p-card">
@@ -635,8 +691,15 @@
           <div class="p-grid2">
             <label>Empresa<select id="envEmp">${["", "Andreani", "Correo Argentino", "Vía Cargo", "OCA", "Moto o cadete", "Retiro en persona", "Otra"].map((x) => `<option${x === p.envioEmpresa ? " selected" : ""} value="${x}">${x || "—"}</option>`).join("")}</select></label>
             <label>Código de seguimiento<input id="envCod" value="${esc(p.envioCodigo)}"></label>
+            <label><span>Costo real del envío ($) <span class="muted">(lo que pagaste vos)</span></span><input id="envCosto" type="number" min="0" step="1" inputmode="numeric" value="${esc(p.costoEnvio ?? "")}"></label>
           </div>
         </section>
+        <details class="p-card"${p.devolucion ? " open" : ""}><summary><b>Cambio o devolución</b>${p.devolucion ? ` · ${p.devolucion.tipo === "cambio" ? "Cambio" : "Devolución"}: ${esc(p.devolucion.motivo)}` : ""}</summary>
+          <div class="p-grid2"><label>Tipo<select id="devTipo"><option value="devolucion"${p.devolucion?.tipo === "devolucion" ? " selected" : ""}>Devolución</option><option value="cambio"${p.devolucion?.tipo === "cambio" ? " selected" : ""}>Cambio</option></select></label>
+            <label>Motivo<select id="devMot">${["Ficha equivocada", "Falla del producto", "No era lo que esperaba", "Llegó dañado", "Arrepentimiento", "Otro"].map((m) => `<option${p.devolucion?.motivo === m ? " selected" : ""}>${m}</option>`).join("")}</select></label>
+            <label>Monto devuelto ($)<input id="devMonto" type="number" min="0" step="1" value="${esc(p.devolucion?.monto ?? "")}"></label>
+            <label>Nota<input id="devNota" maxlength="300" value="${esc(p.devolucion?.nota || "")}"></label></div>
+          <div class="p-head-btns"><button type="button" class="btn btn-ghost btn-sm" id="devGuardar">Registrar</button>${p.devolucion ? '<button type="button" class="btn btn-ghost btn-sm" id="devQuitar">Quitar</button>' : ""}</div></details>
         <section class="p-card">
           <h2>Notas internas</h2>
           <textarea id="pedNotas" rows="3" placeholder="Solo las ves vos">${esc(p.notas)}</textarea>
@@ -657,6 +720,12 @@
       if (["pagado", "enviado", "entregado"].includes(r.value) && !$("cArs").value && !$("cUsd").value && p.totalArs) { $("cArs").value = p.totalArs; toast("Puse el total del pedido como cobrado. Corregilo si cobraste otro monto."); }
     }));
     $("volverPed").onclick = $("cancelPed").onclick = () => verPedidos();
+    document.querySelectorAll('input[name="etq"]').forEach((x) => (x.onchange = async () => {
+      try { const r = await api("pedidos", { method: "POST", body: { num: p.num, accion: "etiquetas", etiquetas: [...document.querySelectorAll('input[name="etq"]:checked')].map((y) => y.value) } }); p.etiquetas = r.pedido.etiquetas; toast("Etiquetas guardadas."); } catch (err) { toast(err.message); }
+    }));
+    const devolucion = async (dev) => { try { const r = await api("pedidos", { method: "POST", body: { num: p.num, accion: "devolucion", devolucion: dev } }); toast(dev ? "Registrado." : "Quitado."); verPedido(r.pedido); } catch (err) { toast(err.message); } };
+    $("devGuardar").onclick = () => devolucion({ tipo: $("devTipo").value, motivo: $("devMot").value, monto: $("devMonto").value, nota: $("devNota").value.trim() });
+    if ($("devQuitar")) $("devQuitar").onclick = () => devolucion(null);
     $("etiqueta").onclick = () => etiqueta(p);
     if ($("descontar")) $("descontar").onclick = async () => {
       try { const d = await api("pedidos", { method: "POST", body: { num: p.num, accion: "descontar" } }); toast("Listo, se descontó del stock."); const pr = await api("productos"); productos = pr.productos; verPedido(d.pedido); }
@@ -667,7 +736,7 @@
       $("guardarPed").disabled = true;
       try {
         const a = actual();
-        const d = await api("pedidos", { method: "POST", body: { num: p.num, estado: a.estado, cobradoArs: $("cArs").value, cobradoUsd: $("cUsd").value, envioEmpresa: a.envioEmpresa, envioCodigo: a.envioCodigo, notas: $("pedNotas").value } });
+        const d = await api("pedidos", { method: "POST", body: { num: p.num, estado: a.estado, cobradoArs: $("cArs").value, cobradoUsd: $("cUsd").value, envioEmpresa: a.envioEmpresa, envioCodigo: a.envioCodigo, notas: $("pedNotas").value, costoEnvio: $("envCosto").value } });
         toast(a.estado !== p.estado ? `Guardado como ${estadoTxt(a.estado).toLowerCase()}. Avisale al cliente con el botón verde.` : "Guardado.");
         verPedido(d.pedido);
       } catch (x) { toast(x.message); $("guardarPed").disabled = false; }
@@ -802,7 +871,8 @@
           <div class="p-op${x.estado === "pendiente" ? " nueva" : ""}">
             <span class="muted small">${esc(x.productoNombre)} · ${esc(x.nombre)} · ${esc(x.num)} · ${fechaCorta(x.creado)}</span>
             <b class="p-stars">${st(x.estrellas)}</b>${x.texto ? `<p>${esc(x.texto)}</p>` : ""}
-            <div class="p-head-btns"><span class="p-estado">${estR[x.estado]}</span>${x.estado !== "aprobada" ? `<button class="btn btn-primary btn-sm" data-rok="${x.id}">Publicar</button>` : ""}${x.estado !== "rechazada" ? `<button class="btn btn-ghost btn-sm" data-rno="${x.id}">Ocultar</button>` : ""}</div>
+            ${x.texto ? `<textarea rows="2" data-rresp="${x.id}" placeholder="Tu respuesta pública (opcional, se muestra debajo de la opinión)">${esc(x.respuesta || "")}</textarea>` : ""}
+            <div class="p-head-btns">${x.texto ? `<button class="btn btn-ghost btn-sm" data-rguardar="${x.id}">Guardar respuesta</button>${estado.ia ? `<button class="btn btn-ghost btn-sm" data-ria="${x.id}">✨ Sugerir respuesta</button>` : ""}` : ""}<span class="p-estado">${estR[x.estado]}</span>${x.estado !== "aprobada" ? `<button class="btn btn-primary btn-sm" data-rok="${x.id}">Publicar</button>` : ""}${x.estado !== "rechazada" ? `<button class="btn btn-ghost btn-sm" data-rno="${x.id}">Ocultar</button>` : ""}</div>
           </div>`).join("") : '<p class="muted">Todavía no hay reseñas. Llegan cuando mandás el aviso de "Entregado" con el link para opinar.</p>'}</section>
       </div>`;
     const act = async (fn, msg) => { try { await fn(); toast(msg); verOpiniones(); } catch (x) { toast(x.message); } };
@@ -810,6 +880,13 @@
     app.querySelectorAll("[data-qhide]").forEach((b) => (b.onclick = () => act(() => api("preguntas", { method: "POST", body: { id: b.dataset.qhide, estado: "oculta", respuesta: app.querySelector(`[data-resp="${b.dataset.qhide}"]`).value } }), "Pregunta oculta.")));
     app.querySelectorAll("[data-rok]").forEach((b) => (b.onclick = () => act(() => api("resenas", { method: "POST", body: { id: b.dataset.rok, estado: "aprobada" } }), "Reseña publicada.")));
     app.querySelectorAll("[data-rno]").forEach((b) => (b.onclick = () => act(() => api("resenas", { method: "POST", body: { id: b.dataset.rno, estado: "rechazada" } }), "Reseña oculta.")));
+    app.querySelectorAll("[data-rguardar]").forEach((b) => (b.onclick = () => act(() => api("resenas", { method: "POST", body: { id: b.dataset.rguardar, respuesta: app.querySelector(`[data-rresp="${b.dataset.rguardar}"]`).value } }), "Respuesta guardada.")));
+    app.querySelectorAll("[data-ria]").forEach((b) => (b.onclick = async () => {
+      const x = r.resenas.find((y) => String(y.id) === b.dataset.ria), t = app.querySelector(`[data-rresp="${b.dataset.ria}"]`);
+      b.disabled = true; b.textContent = "Escribiendo…";
+      try { const d = await api("ia", { method: "POST", body: { modo: "resena", texto: x.texto, estrellas: x.estrellas, nombre: x.nombre, producto: x.productoNombre } }); t.value = d.datos.texto; toast("Revisala y tocá «Guardar respuesta»."); } catch (err) { toast(err.message); }
+      b.disabled = false; b.textContent = "✨ Sugerir respuesta";
+    }));
   }
 
   // ---------- Respuestas rápidas ----------
@@ -828,7 +905,7 @@
     const pintar = () => {
       app.innerHTML = tabsHTML("respuestas") + `
         <div class="p-head"><div><h1>Respuestas rápidas</h1><p class="muted">Mensajes listos para copiar y pegar en WhatsApp. Editalos a tu gusto y completá lo que dice COMPLETAR.</p></div>
-          <div class="p-head-btns"><a class="btn btn-ghost" href="/folleto" target="_blank" rel="noopener">Folleto con QR ↗</a><button class="btn btn-ghost" id="plNueva">＋ Nueva</button><button class="btn btn-primary" id="plGuardar">Guardar cambios</button></div></div>
+          <div class="p-head-btns"><a class="btn btn-ghost" href="/folleto" target="_blank" rel="noopener">Folleto con QR ↗</a><a class="btn btn-ghost" href="/tarjeta" target="_blank" rel="noopener">Tarjeta digital ↗</a><button class="btn btn-ghost" id="plNueva">＋ Nueva</button><button class="btn btn-primary" id="plGuardar">Guardar cambios</button></div></div>
         <div class="p-list">${lista.map((x, i) => `
           <section class="p-card p-pl"><input class="p-pl-t" data-plt="${i}" value="${esc(x.titulo)}" aria-label="Título">
             <textarea rows="4" data-plx="${i}" aria-label="Mensaje">${esc(x.texto)}</textarea>
@@ -1022,9 +1099,13 @@
     const hoy = new Date(), ahora = hoy.getFullYear() * 12 + hoy.getMonth();
     const porMes = {}, ganMes = {}, cubierto = {};
     const cats = {}, marcas = {};
+    const envMes = {}, cantMes = {}, prodMes = {};
     for (const v of d.ventas) {
       const k = clave(v.fecha);
       porMes[k] = (porMes[k] || 0) + monto(v);
+      cantMes[k] = (cantMes[k] || 0) + 1;
+      if (v.costoEnvio) envMes[k] = (envMes[k] || 0) + v.costoEnvio;
+      for (const i of v.items) { const nm = i.name || i.id; (prodMes[k] ||= {})[nm] = (prodMes[k][nm] || 0) + (i.unitArs || 0) * i.qty; }
       if (k <= ahora - 12) continue;
       for (const i of v.items) {
         const p = porId[i.id], sub = (i.unitArs || 0) * i.qty;
@@ -1053,7 +1134,31 @@
     const barras = (o) => { const e = Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 8), m = Math.max(1, ...e.map((x) => x[1]));
       return e.length ? `<div class="p-hbars">${e.map(([k, v]) => `<div class="p-hbar"><span>${esc(k)}</span><div><i style="width:${Math.max(2, (v / m) * 100)}%"></i></div><b>${ars(v)}</b></div>`).join("")}</div>` : '<p class="muted">Todavía no hay ventas.</p>'; };
     const esteMes = porMes[ahora] || 0, anioAntes = porMes[ahora - 12] || 0;
-    const gan = ganMes[ahora] || 0, cub = cubierto[ahora] || 0;
+    const gan = (ganMes[ahora] || 0) - (envMes[ahora] || 0), cub = cubierto[ahora] || 0;
+    // Mes contra mes, explicado en palabras
+    const explicar = () => {
+      const a = porMes[ahora] || 0, b = porMes[ahora - 1] || 0, na = cantMes[ahora] || 0, nb = cantMes[ahora - 1] || 0;
+      if (!a && !b) return "Todavía no hay ventas cobradas este mes ni el anterior.";
+      const pct = (x, y) => (y ? Math.round((x / y - 1) * 100) : null);
+      const tA = na ? a / na : 0, tB = nb ? b / nb : 0;
+      const frases = [];
+      const dv = pct(a, b);
+      frases.push(b ? `Este mes llevás ${ars(a)}, ${dv >= 0 ? `un ${dv}% más` : `un ${Math.abs(dv)}% menos`} que todo el mes pasado (${ars(b)}).` : `Este mes llevás ${ars(a)}; el mes pasado no hubo ventas cobradas.`);
+      if (na && nb) {
+        const dn = pct(na, nb), dt = pct(tA, tB);
+        frases.push(`Fueron ${na} ${na === 1 ? "venta" : "ventas"} contra ${nb}${dn !== null && dn !== 0 ? ` (${dn > 0 ? "+" : ""}${dn}%)` : ""}, con un ticket promedio de ${ars(tA)}${dt !== null && Math.abs(dt) >= 5 ? ` (${dt > 0 ? "+" : ""}${dt}%)` : ""}.`);
+        frases.push(Math.abs(dn || 0) >= Math.abs(dt || 0) ? "La diferencia viene sobre todo de la cantidad de ventas." : "La diferencia viene sobre todo de cuánto gastó cada cliente.");
+      }
+      const pa = prodMes[ahora] || {}, pb = prodMes[ahora - 1] || {};
+      const cambios = [...new Set([...Object.keys(pa), ...Object.keys(pb)])].map((k) => [k, (pa[k] || 0) - (pb[k] || 0)]).filter((x) => x[1]).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 2);
+      if (cambios.length) frases.push(`Lo que más movió el resultado: ${cambios.map(([k, v]) => `${k} (${v > 0 ? "+" : "−"}${ars(Math.abs(v))})`).join(" y ")}.`);
+      const hoyD = new Date().getDate(), finMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+      if (a && hoyD < finMes) frases.push(`A este ritmo cerrarías el mes cerca de ${ars(Math.round((a / hoyD) * finMes))}.`);
+      return frases.join(" ");
+    };
+    // Cambios y devoluciones de los últimos 12 meses, por motivo
+    const devs = d.ventas.filter((v) => v.devolucion && clave(v.fecha) > ahora - 12);
+    const porMotivo = devs.reduce((o, v) => ((o[v.devolucion.motivo] = (o[v.devolucion.motivo] || 0) + 1), o), {});
     app.innerHTML = tabsHTML("ventas") + `
       <div class="p-head"><div><h1>Ventas</h1><p class="muted">Pesos y dólares sumados al dólar de hoy (${ars(dolar)}).</p></div>
         <div class="p-head-btns"><button class="btn btn-ghost" data-csv="pedidos">⬇ Pedidos</button><button class="btn btn-ghost" data-csv="productos">⬇ Productos y stock</button><button class="btn btn-ghost" data-csv="clientes">⬇ Clientes</button><button class="btn btn-ghost" data-csv="suscriptores">⬇ Suscriptores</button></div></div>
@@ -1062,12 +1167,14 @@
         <div class="p-stat"><span>Ganancia estimada del mes</span><b>${cub ? ars(gan) : "—"}</b><small>${cub ? `Margen ${Math.round((gan / cub) * 100)}% · ${Math.round((cub / Math.max(esteMes, cub)) * 100)}% con costo cargado` : "Cargá el costo de los productos"}</small></div>
         <div class="p-stat"><span>Últimos 12 meses</span><b>${ars(meses.reduce((s, k) => s + (porMes[k] || 0), 0))}</b><small>${d.ventas.filter((v) => clave(v.fecha) > ahora - 12).length} ventas</small></div>
       </div>
+      <section class="p-card"><h2>Este mes contra el anterior</h2><p>${esc(explicar())}</p>${envMes[ahora] ? `<p class="muted small">La ganancia estimada ya descuenta ${ars(envMes[ahora])} de costos de envío cargados en los pedidos.</p>` : ""}</section>
       <section class="p-card"><h2>Ventas por mes</h2><div class="p-legend"><span><i class="lg-col"></i>Este período</span><span><i class="lg-prev"></i>Mismo mes, un año antes</span></div><div class="p-chart-wrap">${svg}</div>
         <details><summary class="small">Ver como tabla</summary><div class="table-wrap"><table><thead><tr><th>Mes</th><th class="num">Ventas</th><th class="num">Un año antes</th><th class="num">Ganancia estimada</th></tr></thead><tbody>${meses.slice().reverse().map((k) => `<tr><td>${nombreMes(k)}</td><td class="num">${ars(porMes[k] || 0)}</td><td class="num">${porMes[k - 12] ? ars(porMes[k - 12]) : "—"}</td><td class="num">${cubierto[k] ? ars(ganMes[k]) : "—"}</td></tr>`).join("")}</tbody></table></div></details></section>
       <div class="p-grid2 p-act">
         <section class="p-card"><h2>Por categoría</h2><p class="muted small">Últimos 12 meses, al precio de cada pedido.</p>${barras(cats)}</section>
         <section class="p-card"><h2>Por marca</h2><p class="muted small">Las 8 que más venden.</p>${barras(marcas)}</section>
       </div>
+      <section class="p-card"><h2>Cambios y devoluciones</h2>${devs.length ? `<p class="muted small">Últimos 12 meses: ${devs.length} de ${d.ventas.filter((v) => clave(v.fecha) > ahora - 12).length} ventas (${Math.round((devs.length / Math.max(1, d.ventas.filter((v) => clave(v.fecha) > ahora - 12).length)) * 100)}%).</p><div class="p-hbars">${Object.entries(porMotivo).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<div class="p-hbar"><span>${esc(k)}</span><div><i style="width:${(v / devs.length) * 100}%"></i></div><b>${v}</b></div>`).join("")}</div>` : '<p class="muted">No hay cambios ni devoluciones registrados. 👌 Se cargan desde cada pedido.</p>'}</section>
       <section class="p-card" id="gastosBox"><h2>Gastos del negocio</h2><p class="p-loading">Cargando…</p></section>`;
     verGastos(cub ? gan : null);
     app.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => exportar(b.dataset.csv).catch((x) => toast(x.message))));
@@ -1142,8 +1249,9 @@
   // ---------- Ajustes: datos de pago que ve el cliente ----------
   async function verAjustes() {
     app.innerHTML = tabsHTML("ajustes") + '<p class="p-loading">Cargando…</p>';
-    let v = {}, vp = {}, vb = {}, caps = [], vm = {}, vr = {}, vg = {}, envf = [], vt = {}, vd = {};
-    try { [v, vp, vb, caps, vm, vr, vg, envf, vt, vd] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing"), api("ajustes?clave=referidos"), api("ajustes?clave=google"), api("ajustes?clave=envios_fotos"), api("ajustes?clave=turnos"), api("ajustes?clave=drive")])).map((x) => x.valor || {}); } catch {}
+    let v = {}, vp = {}, vb = {}, caps = [], vm = {}, vr = {}, vg = {}, envf = [], vt = {}, vd = {}, vav = {}, revs = [];
+    try { [v, vp, vb, caps, vm, vr, vg, envf, vt, vd, vav, revs] = (await Promise.all([api("ajustes?clave=pago"), api("ajustes?clave=precios"), api("ajustes?clave=beneficio"), api("ajustes?clave=testimonios"), api("ajustes?clave=marketing"), api("ajustes?clave=referidos"), api("ajustes?clave=google"), api("ajustes?clave=envios_fotos"), api("ajustes?clave=turnos"), api("ajustes?clave=drive"), api("ajustes?clave=aviso"), api("ajustes?clave=revendedores")])).map((x) => x.valor || {}); } catch {}
+    if (!Array.isArray(revs)) revs = [];
     if (!Array.isArray(caps)) caps = [];
     if (!Array.isArray(envf)) envf = [];
     const C = [["titular", "Titular de la cuenta", "Nombre y apellido o razón social"], ["cuit", "CUIT", ""], ["banco", "Banco o billetera", "Ej.: Banco Galicia, Mercado Pago"], ["alias", "Alias", "TIENDA.DE.VUELO"], ["cbu", "CBU o CVU", "22 números"], ["aliasUsd", "Alias de la cuenta en dólares", ""], ["cbuUsd", "CBU de la cuenta en dólares", "22 números"], ["usdtTrc20", "Dirección USDT (red TRC20)", "Empieza con T"], ["usdtBep20", "Dirección USDT (red BEP20)", "Empieza con 0x"]];
@@ -1225,6 +1333,16 @@
         <p class="muted small">Todos los domingos a la noche se guarda una copia de tus productos, pedidos, clientes y ajustes (se conservan las últimas 8). Si algo se borra por error, con la copia se recupera.</p>
         <p><a class="btn btn-primary btn-sm" href="/api/panel/respaldo?descargar=ahora" download>Descargar una copia ahora</a></p>
         <div id="respLista"><p class="muted small">Cargando copias guardadas…</p></div></section>
+      <form class="p-card p-form" id="avisoForm"><h2>Aviso de la tienda</h2>
+        <p class="muted small">Una franja celeste arriba de toda la web, para novedades puntuales (por ejemplo «Llegaron las almohadillas Bose»). Se apaga sola en la fecha que elijas.</p>
+        <label>Texto<input id="avTxt" maxlength="140" value="${esc(vav.texto || "")}" placeholder="Llegaron las almohadillas originales Bose A30"></label>
+        <div class="p-grid2"><label><span>Link <span class="muted">(opcional)</span></span><input id="avLink" value="${esc(vav.link || "")}" placeholder="/producto/almohadillas-bose-a20-a30"></label><label><span>Mostrar hasta <span class="muted">(opcional)</span></span><input id="avHasta" type="date" value="${esc(vav.hasta || "")}"></label></div>
+        <div class="p-head-btns"><button class="btn btn-primary" type="submit">Publicar aviso</button><button class="btn btn-ghost" type="button" id="avQuitar">Quitar aviso</button></div></form>
+      <section class="p-card p-form" id="revBox"><h2>Revendedores</h2>
+        <p class="muted small">Tiendas o instructores de otras provincias que revenden. Cada uno tiene un código con su descuento: lo ponen en el carrito y el pedido te llega marcado. Los interesados se anotan en <b>tiendadevuelo.com.ar/revendedores</b>.</p>
+        <div id="revLista"></div>
+        <div class="p-grid2"><label>Nombre<input id="revNom" maxlength="80" placeholder="Pilot Shop Córdoba"></label><label>Descuento (%)<input id="revPct" type="number" min="1" max="50" step="1" value="15"></label></div>
+        <button class="btn btn-ghost btn-sm" type="button" id="revAgregar">Agregar revendedor</button></section>
       <form class="p-card p-form" id="refForm"><h2>Recomendaciones entre clientes</h2>
         <p class="muted small">Cada cliente recibe su código al hacer un pedido (por ejemplo, JUAN-482). Quien compra con el código de otro tiene este descuento, y vos le das el mismo descuento a quien lo recomendó en su próxima compra (lo ves en Clientes). Poné 0 para apagarlo.</p>
         <label>Descuento (%)<input id="refPct" type="number" min="0" max="30" step="1" value="${esc(vr.pct ?? 0)}"></label>
@@ -1284,6 +1402,28 @@
         toast(`Listo: se guardó ${r.nombre} en tu Drive.`);
       } catch (x) { toast(x.message); }
       b.disabled = false; b.textContent = "Guardar y probar";
+    };
+    document.getElementById("avisoForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const link = document.getElementById("avLink").value.trim();
+      if (link && !/^(https:\/\/|\/)/.test(link)) return toast("El link tiene que empezar con / o con https://");
+      try { await api("ajustes", { method: "POST", body: { clave: "aviso", valor: { texto: document.getElementById("avTxt").value.trim(), link, hasta: document.getElementById("avHasta").value } } }); toast("Aviso publicado. Puede tardar unos minutos en verse."); } catch (x) { toast(x.message); }
+    };
+    document.getElementById("avQuitar").onclick = async () => { try { await api("ajustes", { method: "POST", body: { clave: "aviso", valor: {} } }); document.getElementById("avTxt").value = ""; toast("Aviso quitado."); } catch (x) { toast(x.message); } };
+    const guardarRevs = () => api("ajustes", { method: "POST", body: { clave: "revendedores", valor: revs } });
+    const pintarRevs = () => {
+      document.getElementById("revLista").innerHTML = revs.length ? `<div class="p-list">${revs.map((r, i) => `<div class="p-cart-row"><div><b>${esc(r.nombre)}</b><br><span class="small">Código <b>${esc(r.codigo)}</b> · ${esc(r.pct)}% de descuento</span></div><div class="p-head-btns"><button class="btn btn-ghost btn-sm" data-revcopy="${i}">Copiar mensaje</button><button class="btn btn-ghost btn-sm" data-revx="${i}">Quitar</button></div></div>`).join("")}</div>` : '<p class="muted small">Todavía no hay revendedores.</p>';
+      document.querySelectorAll("[data-revx]").forEach((b) => (b.onclick = async () => { revs.splice(+b.dataset.revx, 1); pintarRevs(); await guardarRevs().catch((x) => toast(x.message)); }));
+      document.querySelectorAll("[data-revcopy]").forEach((b) => (b.onclick = async () => { const r = revs[+b.dataset.revcopy]; const t = `¡Hola! Tu código de revendedor de Tienda de Vuelo es ${r.codigo}: ponelo en el carrito de ${sitio} y tenés ${r.pct}% de descuento en cada pedido.`; try { await navigator.clipboard.writeText(t); toast("Mensaje copiado."); } catch { toast(t); } }));
+    };
+    pintarRevs();
+    document.getElementById("revAgregar").onclick = async () => {
+      const nombre = document.getElementById("revNom").value.trim(), pct = Math.min(50, Math.max(1, Math.round(+document.getElementById("revPct").value || 0)));
+      if (!nombre) return toast("Poné el nombre del revendedor.");
+      const base = nombre.normalize("NFD").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 6) || "REV";
+      let codigo; do codigo = `REV-${base}${Math.floor(10 + Math.random() * 90)}`; while (revs.some((r) => r.codigo === codigo));
+      revs.push({ nombre, pct, codigo }); pintarRevs();
+      try { await guardarRevs(); document.getElementById("revNom").value = ""; toast(`Listo: código ${codigo}.`); } catch (x) { toast(x.message); }
     };
     document.getElementById("refForm").onsubmit = async (e) => {
       e.preventDefault();

@@ -99,6 +99,7 @@
               <input id="search" type="search" placeholder="Buscar: auricular, GPS, logbook…" aria-label="Buscar productos">
             </label>
             <select id="brand" aria-label="Marca"><option value="">Todas las marcas</option></select>
+            <select id="uso" aria-label="Ideal para"><option value="">Ideal para…</option></select>
             <div class="price-range" role="group" aria-label="Precio en pesos">
               <input id="pMin" type="number" inputmode="numeric" min="0" step="1000" placeholder="Desde $" aria-label="Precio desde, en pesos">
               <input id="pMax" type="number" inputmode="numeric" min="0" step="1000" placeholder="Hasta $" aria-label="Precio hasta, en pesos">
@@ -206,7 +207,9 @@
           <span class="kicker">Preguntas frecuentes</span>
           <h2>Antes de despegar</h2>
         </div>
-        <div class="faq">
+        <label class="faq-buscar"><span class="sr-only">Buscar en las preguntas frecuentes</span><input type="search" id="faqBuscar" placeholder="Buscá tu duda: envío, pago, ficha, pilas…" autocomplete="off"></label>
+        <p class="small muted" id="faqNada" role="status" aria-live="polite"></p>
+        <div class="faq" id="faqHome">
           <details><summary>¿Cómo compro?</summary><p>Agregá los productos al carrito, completá tus datos y mandanos el pedido por WhatsApp. Te confirmamos stock, costo de envío y forma de pago.</p></details>
           <details><summary>¿Cómo pago?</summary><p>Por transferencia en pesos o en dólares, en efectivo al retirar (o al recibir un envío en el día en CABA), en dólares billete o con cripto. Puede pagar otra persona por vos. Para reservar podés dejar una seña: la reserva dura 48 h y, si te arrepentís, la seña se devuelve.</p></details>
           <details><summary>¿Hacen envíos a todo el país?</summary><p>Sí, incluida Tierra del Fuego. Despachamos en 48 h hábiles por Andreani, Correo Argentino, Vía Cargo u otro transporte que elijas. En CABA hacemos envíos en el día. El envío se paga aparte. <a href="/envios">Más sobre envíos</a>.</p></details>
@@ -216,6 +219,7 @@
           <details><summary>¿Qué pasa si no encuentro lo que busco?</summary><p>Lo traemos por encargo en 15 a 30 días. <a href="/contacto#pedido">Pedilo acá</a>.</p></details>
           <details><summary>¿Puedo arrepentirme de una compra?</summary><p>Sí. Tenés 10 días corridos desde que recibís el producto para revocar la compra, como indica la ley. <a href="/legales#arrepentimiento">Botón de arrepentimiento</a>.</p></details>
         </div>
+        <div class="faq faq-prod" id="faqProd" hidden></div>
       </div>
     </section>
 
@@ -245,6 +249,7 @@
           <a class="pv-rating" id="pvRating" href="#pvResenasH" hidden></a>
           <div data-google="ficha" hidden></div>
           <div class="pv-tags" id="pvTags"></div>
+          <div class="pv-usos" id="pvUsos" hidden></div>
           <div class="pv-price" id="pvPrice"></div>
           <ul class="pv-medios" id="pvMedios" hidden></ul>
           <p class="pv-desc" id="pvDesc"></p>
@@ -269,6 +274,7 @@
           <a class="pv-instala" id="pvInstala" href="/avionica#presupuesto" hidden>🛠️ <span><b>¿Lo querés instalado?</b> Pedí presupuesto con instalación en un taller habilitado.</span></a>
           <h2 class="pv-sub">Características</h2>
           <div id="pvSpecs"></div>
+          <div class="pv-funciona" id="pvFunciona" hidden><h2 class="pv-sub">Funciona con</h2><ul id="pvFuncionaLista"></ul></div>
           <div class="pv-incluye" id="pvIncluye" hidden><h2 class="pv-sub">En la caja</h2><ul id="pvIncluyeLista"></ul></div>
           <div class="pv-faqs" id="pvFaqsWrap" hidden><h2 class="pv-sub">Preguntas frecuentes</h2><div class="faq" id="pvFaqs"></div></div>
           <div class="pv-etapas" id="pvEtapas"></div>

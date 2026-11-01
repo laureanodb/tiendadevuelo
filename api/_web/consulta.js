@@ -14,9 +14,11 @@ export default async function handler(req, res) {
     await ensureSchema();
     if (!(await permitido(req, "consulta", 10))) return send(res, 429, { mensaje: "Probá de nuevo en un rato." });
     // Presupuesto con instalación: lleva avión, matrícula y lugar en el detalle (más largo)
-    const largo = b.instalacion ? 400 : 80, opcion = s(b.opcion, largo);
+    const ETIQ = { instalacion: "🛠️ Presupuesto con instalación", revendedor: "🏪 Quiere ser revendedor", kit: "🎓 Kit de bienvenida para escuela" };
+    const tipo = b.instalacion ? "instalacion" : ETIQ[b.tipo] ? b.tipo : "";
+    const largo = tipo ? 400 : 80, opcion = s(b.opcion, largo);
     await q("insert into tdv_consultas (producto, producto_nombre, opcion, cliente, tel) values ($1, $2, $3, $4, $5)", [producto, s(b.nombre), opcion, cliente, tel]);
-    await avisar(`${b.instalacion ? "🛠️ Presupuesto con instalación" : "💬 Piden precio"}: ${s(b.nombre)}${opcion ? " (" + opcion + ")" : ""}\n${cliente} · wa.me/${tel}\nhttps://www.tiendadevuelo.com.ar/panel#pedidos`);
+    await avisar(`${tipo ? ETIQ[tipo] : "💬 Piden precio"}: ${s(b.nombre)}${opcion ? " (" + opcion + ")" : ""}\n${cliente} · wa.me/${tel}\nhttps://www.tiendadevuelo.com.ar/panel#pedidos`);
     send(res, 200, { ok: true });
   } catch (e) { console.error(e); send(res, 500, { mensaje: "No se pudo enviar." }); }
 }

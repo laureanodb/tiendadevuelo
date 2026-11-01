@@ -1,8 +1,9 @@
 // La web guarda cada pedido al mandarlo por WhatsApp, para verlo en el panel y que el cliente lo siga.
-import { DB_URL, ajuste, avisar, body, codigoCliente, ensureSchema, permitido, pctReferidos, q, send, telWa } from "../_lib.js";
+import { DB_URL, ajuste, avisar, body, codigoCliente, enviarMail, ensureSchema, permitido, pctReferidos, q, send, telWa } from "../_lib.js";
 
 const PROVINCIAS = ["Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"];
 const s = (v, n = 200) => String(v ?? "").trim().slice(0, n);
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const n = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Math.max(0, Number(v)));
 
 export default async function handler(req, res) {
@@ -15,7 +16,10 @@ export default async function handler(req, res) {
     if (!/^TDV-\d{6}-\d{3,5}$/.test(num) || !/^[a-z0-9]{8,24}$/.test(token)) return send(res, 400, { error: "datos" });
     const c = b.cliente || {};
     const cliente = { nombre: s(c.nombre, 80), tel: s(c.tel, 30), dni: s(c.dni, 20), entrega: s(c.entrega, 40), franja: s(c.franja, 40), dir: s(c.dir, 200), notas: s(c.notas, 500), provincia: PROVINCIAS.includes(c.provincia) ? c.provincia : "",
-      empresa: s(c.empresa, 40), modo: s(c.modo, 40), aerodromo: s(c.aerodromo, 60), escuela: s(c.escuela, 80) };
+      empresa: s(c.empresa, 40), modo: s(c.modo, 40), aerodromo: s(c.aerodromo, 60), escuela: s(c.escuela, 80),
+      email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s(c.email, 120)) ? s(c.email, 120) : "",
+      fechaEntrega: /^\d{4}-\d{2}-\d{2}$/.test(String(c.fechaEntrega || "")) ? c.fechaEntrega : "",
+      retira: c.retira && s(c.retira.nombre, 80) ? { nombre: s(c.retira.nombre, 80), dni: s(c.retira.dni, 20) } : null };
     const cumple = /^\d{4}-\d{2}-\d{2}$/.test(String(c.cumple || "")) ? c.cumple : null;
     if (!cliente.nombre || !cliente.tel) return send(res, 400, { error: "datos" });
     const items = (Array.isArray(b.items) ? b.items : []).slice(0, 40).map((i) => ({
@@ -30,7 +34,9 @@ export default async function handler(req, res) {
     // Código de recomendación: tiene que existir, no ser el propio y estar activado en Ajustes
     let ref = "";
     const pedido = s(c.ref, 20).toUpperCase().replace(/[^A-Z0-9-]/g, "");
-    if (pedido && pctReferidos(await ajuste("referidos", {})) > 0) {
+    const rev = (await ajuste("revendedores", [])).find?.((x) => String(x.codigo).toUpperCase() === pedido);
+    if (pedido && rev) cliente.revendedor = { codigo: pedido, nombre: String(rev.nombre || "").slice(0, 80), pct: Number(rev.pct) || 0 };
+    else if (pedido && pctReferidos(await ajuste("referidos", {})) > 0) {
       const { rows: [r] } = await q("select tel from tdv_clientes where codigo = $1", [pedido]);
       if (r && r.tel !== tel) ref = pedido;
     }
@@ -47,6 +53,19 @@ export default async function handler(req, res) {
     }
     const codigo = tel ? await codigoCliente(tel, cliente.nombre) : "";
     if (nuevo) await avisar(`✈ Pedido nuevo ${num}\n${cliente.nombre} · ${cliente.entrega}${ref ? `\nRecomendado con el código ${ref}` : ""}\n${items.map((i) => `${i.qty} x ${i.name}`).join("\n")}${n(b.totalArs) ? `\nTotal aprox.: $${Math.round(n(b.totalArs)).toLocaleString("es-AR")}` : ""}\nhttps://www.tiendadevuelo.com.ar/panel#pedidos`);
+    // Mail de confirmación (si el cliente dejó su mail y está configurado el envío)
+    if (nuevo && cliente.email) {
+      const seguir = `https://www.tiendadevuelo.com.ar/seguimiento#${num}.${token}`;
+      const fila = (i) => `<tr><td style="padding:6px 0">${i.qty} × ${esc(i.name)}${i.sub ? `<br><small style="color:#5a6b82">${esc(i.sub)}</small>` : ""}</td><td style="padding:6px 0;text-align:right">${esc(i.label || "")}</td></tr>`;
+      await enviarMail(cliente.email, `Recibimos tu pedido ${num} · Tienda de Vuelo`, `<div style="font:15px/1.5 Arial,sans-serif;color:#0c2340;max-width:560px">
+        <h2 style="margin:0 0 8px">¡Gracias, ${esc(cliente.nombre.split(" ")[0])}!</h2>
+        <p>Recibimos tu pedido <b>${num}</b>. Te escribimos por WhatsApp para confirmar stock, envío y forma de pago.</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #e3edf6;border-bottom:1px solid #e3edf6">${items.map(fila).join("")}</table>
+        ${n(b.totalArs) ? `<p><b>Total aproximado: $${Math.round(n(b.totalArs)).toLocaleString("es-AR")}</b> (el envío se cotiza aparte)</p>` : ""}
+        <p>Entrega: ${esc(cliente.entrega)}${cliente.fechaEntrega ? ` · para el ${cliente.fechaEntrega.split("-").reverse().join("/")}` : ""}</p>
+        <p><a href="${seguir}" style="display:inline-block;background:#0a74c2;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Seguí tu pedido</a></p>
+        <p style="color:#5a6b82;font-size:13px">Tienda de Vuelo · WhatsApp 11 3358-6360 · tiendadevuelo.com.ar</p></div>`);
+    }
     send(res, 200, { guardado: true, codigo, ref: !!ref });
   } catch (e) {
     console.error(e);

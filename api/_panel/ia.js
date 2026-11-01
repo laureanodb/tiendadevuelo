@@ -45,6 +45,9 @@ export default panel(async (req, res) => {
       { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.imagen } },
       { type: "text", text: `Es una foto de un producto para un pilot shop argentino (Tienda de Vuelo). Completá los datos para cargarlo en el catálogo. ${tono}${b.nota ? `\nDato del vendedor: ${String(b.nota).slice(0, 300)}` : ""}` },
     ];
+  } else if (b.modo === "resena") {
+    schema = { type: "object", additionalProperties: false, required: ["texto"], properties: { texto: { type: "string", description: "Respuesta pública a la opinión, de 1 a 3 oraciones" } } };
+    content = [{ type: "text", text: `Escribí la respuesta pública de Tienda de Vuelo (pilot shop argentino) a esta opinión de un cliente. Agradecé por el nombre de pila, respondé lo que comenta y, si la opinión es negativa, reconocé el problema y ofrecé resolverlo por WhatsApp. Sin promesas que no puedas cumplir ni descuentos. ${tono}\n\nProducto: ${String(b.producto || "").slice(0, 120)}\nEstrellas: ${Number(b.estrellas) || ""} de 5\nCliente: ${String(b.nombre || "").slice(0, 60)}\nOpinión: ${String(b.texto || "").slice(0, 1200)}` }];
   } else if (b.modo === "post") {
     schema = { type: "object", additionalProperties: false, required: ["texto"], properties: { texto: { type: "string", description: "Texto listo para publicar en Instagram, con 3 a 6 hashtags al final" } } };
     content = [{ type: "text", text: `Mejorá este texto para una publicación de Instagram de Tienda de Vuelo (@tiendadevueloar), un pilot shop argentino. Mantené los datos (precio, link, WhatsApp) tal cual. Máximo 900 caracteres. Sin emojis en exceso (2 como mucho). ${tono}\n\nTexto:\n${String(b.texto || "").slice(0, 1500)}` }];

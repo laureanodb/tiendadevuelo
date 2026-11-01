@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kit de bienvenida para escuelas · Tienda de Vuelo</title>
+  <meta name="description" content="Un kit para que tu escuela de vuelo o aeroclub reciba a cada alumno nuevo: computadora de vuelo, plotter, llavero y lanyard, con precio por cantidad.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/kit-escuelas">
+  <meta property="og:title" content="Kit de bienvenida para escuelas · Tienda de Vuelo">
+  <meta property="og:description" content="Un kit para que tu escuela de vuelo o aeroclub reciba a cada alumno nuevo: computadora de vuelo, plotter, llavero y lanyard, con precio por cantidad.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="kit-escuelas" data-wa="¡Hola! Quería información del kit de bienvenida para escuelas.">
+  <div id="siteHeader"></div>
+  <main>
+    <section class="page-hero"><div class="wrap">
+      <span class="kicker">Para escuelas y aeroclubes</span>
+      <h1>Kit de bienvenida para cada alumno nuevo</h1>
+      <p>Armá el kit que tu escuela le entrega a cada alumno al empezar el curso. Elegís qué lleva, cuántos necesitás por año y te pasamos el precio por cantidad.</p>
+    </div></section>
+    <section class="wrap prose">
+      <h2>Elegí qué lleva</h2>
+      <form class="form-card" id="fF" style="max-width:760px">
+        <div class="kit-esc" id="kItems"></div>
+        <div class="p-grid2-mini"><label>Escuela o aeroclub<input id="fOrg" required maxlength="80"></label><label>Alumnos nuevos por año<input id="fCant" type="number" min="5" step="1" value="20" required></label></div>
+        <div class="p-grid2-mini"><label>Tu nombre<input id="fNom" required maxlength="80" autocomplete="name"></label><label>Tu WhatsApp<input id="fTel" required type="tel" autocomplete="tel"></label></div>
+        <input name="web" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true" id="fWeb">
+        <button class="btn btn-primary" type="submit">Pedir presupuesto</button>
+        <p class="small" id="fMsg" role="status"></p>
+      </form>
+    </section>
+  </main>
+  <div id="siteFooter"></div>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/site.js"></script>
+  <script>
+    window.addEventListener("tdv:listo", () => {
+      const { esc, waLink, $ } = window.TDV;
+      const ids = ["jeppesen-cr-3", "jeppesen-pj-1", "jeppesen-pn-1", "asa-flight-timer-3", "llavero-remove-before-flight", "llavero-pilot-amarillo", "lanyard-boeing-azul", "pin-boeing-737-dorado"];
+      const lista = ids.map((id) => PRODUCTS.find((p) => p.id === id && !p.agotado)).filter(Boolean);
+      const pre = new Set(["jeppesen-cr-3", "jeppesen-pj-1", "llavero-remove-before-flight"]);
+      $("#kItems").innerHTML = lista.map((p) => `<label class="kit-esc-item"><input type="checkbox" name="kit" value="${esc(p.name)}"${pre.has(p.id) ? " checked" : ""}>${TDV.art(p)}<span>${esc(p.name)}</span></label>`).join("");
+      $("#fF").onsubmit = async (e) => {
+        e.preventDefault();
+        const det = `${$("#fOrg").value.trim()} · ${$("#fCant").value} alumnos por año · Kit: ${[...document.querySelectorAll('input[name="kit"]:checked')].map((x) => x.value).join(", ") || "a definir"}`, nom = $("#fNom").value.trim(), msg = $("#fMsg"); msg.textContent = "Enviando…";
+        try {
+          const r = await fetch("/api/consulta", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tipo: "kit", producto: "kit", nombre: "Kit de bienvenida para escuela", opcion: det, cliente: nom, tel: $("#fTel").value.trim(), web: $("#fWeb").value }) });
+          if (!r.ok) throw new Error();
+          $("#fF").innerHTML = `<h2>¡Listo, ${esc(nom.split(" ")[0])}!</h2><p>Te escribimos por WhatsApp en el día.</p>`;
+        } catch { window.open(waLink(`¡Hola! Soy ${nom}. ${"Kit de bienvenida para escuela"}.\n${det}`), "_blank", "noopener"); msg.textContent = "Te abrimos WhatsApp para terminar."; }
+      };
+    });
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

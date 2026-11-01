@@ -8,6 +8,9 @@ export default async function handler(req, res) {
   if (!c) return send(res, 400, { valido: false });
   await ensureSchema();
   if (!(await permitido(req, "codigo", 20, 10))) return send(res, 429, { valido: false, mensaje: "Probaste muchos códigos. Esperá unos minutos." });
+  // Códigos de revendedor (cargados en el panel) primero
+  const rev = (await ajuste("revendedores", [])).find?.((x) => String(x.codigo).toUpperCase() === c);
+  if (rev) return send(res, 200, { valido: true, pct: Math.min(50, Math.max(0, Number(rev.pct) || 0)), codigo: c, de: String(rev.nombre || "").slice(0, 60), revendedor: true });
   const pct = pctReferidos(await ajuste("referidos", {}));
   if (!pct) return send(res, 200, { valido: false });
   const { rows: [r] } = await q("select nombre from tdv_clientes where codigo = $1", [c]);

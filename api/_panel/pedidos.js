@@ -46,6 +46,27 @@ export default panel(async (req, res) => {
     return send(res, 200, { pedido: pedidoAdmin(u[0]) });
   }
 
+  // Etiquetas de color, seguimiento postventa y devoluciones
+  const ETIQ = ["urgente", "regalo", "aerodromo", "revendedor", "revisar"];
+  if (b.accion === "etiquetas") {
+    const et = (Array.isArray(b.etiquetas) ? b.etiquetas : []).filter((x) => ETIQ.includes(x));
+    const { rows: u } = await q("update tdv_pedidos set etiquetas = $2 where num = $1 returning *", [p.num, et]);
+    return send(res, 200, { pedido: pedidoAdmin(u[0]) });
+  }
+  if (b.accion === "seguimiento") {
+    if (!["gracias", "como", "google"].includes(b.tipo)) return send(res, 400, { error: "tipo" });
+    const { rows: u } = await q("update tdv_pedidos set seguimiento = seguimiento || jsonb_build_object($2::text, now()) where num = $1 returning *", [p.num, b.tipo]);
+    return send(res, 200, { pedido: pedidoAdmin(u[0]) });
+  }
+  if (b.accion === "devolucion") {
+    const MOTIVOS = ["Ficha equivocada", "Falla del producto", "No era lo que esperaba", "Llegó dañado", "Arrepentimiento", "Otro"];
+    const d = b.devolucion;
+    const dev = d ? { tipo: d.tipo === "cambio" ? "cambio" : "devolucion", motivo: MOTIVOS.includes(d.motivo) ? d.motivo : "Otro", monto: n(d.monto), nota: String(d.nota || "").slice(0, 300), at: new Date().toISOString() } : null;
+    const { rows: u } = await q("update tdv_pedidos set devolucion = $2 where num = $1 returning *", [p.num, dev ? JSON.stringify(dev) : null]);
+    if (dev) await anotar("pedido", p.num, p.cliente.nombre || p.num, `${dev.tipo === "cambio" ? "Cambio" : "Devolución"}: ${dev.motivo}`, null, req.usuario);
+    return send(res, 200, { pedido: pedidoAdmin(u[0]) });
+  }
+
   const estado = ESTADOS.includes(b.estado) ? b.estado : p.estado;
   const historial = [...p.historial];
   if (estado !== p.estado) historial.push({ estado, at: new Date().toISOString() });
@@ -53,9 +74,9 @@ export default panel(async (req, res) => {
   const { rows: u } = await q(`update tdv_pedidos set estado = $2, cobrado_ars = $3, cobrado_usd = $4,
       pagado_en = case when $5 then coalesce(pagado_en, now()) else null end,
       envio_empresa = $6, envio_codigo = $7, enviado_en = case when $2 in ('enviado', 'entregado') then coalesce(enviado_en, now()) else enviado_en end,
-      notas = $8, historial = $9 where num = $1 returning *`,
+      notas = $8, historial = $9, costo_envio = $10 where num = $1 returning *`,
     [p.num, estado, n(b.cobradoArs), n(b.cobradoUsd), vendido, String(b.envioEmpresa ?? p.envio_empresa).slice(0, 60), String(b.envioCodigo ?? p.envio_codigo).slice(0, 80),
-      String(b.notas ?? p.notas).slice(0, 1000), JSON.stringify(historial)]);
+      String(b.notas ?? p.notas).slice(0, 1000), JSON.stringify(historial), b.costoEnvio === undefined ? p.costo_envio : n(b.costoEnvio)]);
   if (estado !== p.estado) await anotar("pedido", p.num, p.cliente.nombre || p.num, `Estado: ${p.estado} → ${estado}`, null, req.usuario);
   send(res, 200, { pedido: pedidoAdmin(u[0]) });
 });

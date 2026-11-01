@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       const { rows } = prod
         ? await q("select r.*, p.name from tdv_resenas r left join tdv_productos p on p.id = r.producto where r.estado = 'aprobada' and r.producto = $1 order by r.creado desc limit 30", [prod])
         : await q("select r.*, p.name from tdv_resenas r left join tdv_productos p on p.id = r.producto where r.estado = 'aprobada' and r.texto <> '' order by r.creado desc limit 6");
-      return send(res, 200, { resenas: rows.map((r) => ({ nombre: corto(r.nombre), estrellas: r.estrellas, texto: r.texto, fecha: r.creado, producto: r.producto, productoNombre: r.name || "" })) });
+      return send(res, 200, { resenas: rows.map((r) => ({ nombre: corto(r.nombre), estrellas: r.estrellas, texto: r.texto, fecha: r.creado, producto: r.producto, productoNombre: r.name || "", respuesta: r.respuesta || "" })) });
     }
     if (req.method !== "POST") return send(res, 405, { error: "metodo" });
     res.setHeader("Cache-Control", "no-store");
