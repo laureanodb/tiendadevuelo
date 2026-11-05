@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Catálogo de WhatsApp · Tienda de Vuelo</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f2f7fc; font: 15px/1.5 Inter, Arial, sans-serif; color: #0c2340; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+    h1 { font: 700 30px/1.1 Outfit, sans-serif; margin: 0 0 6px; } h2 { font: 700 22px Outfit, sans-serif; margin: 34px 0 12px; }
+    .muted { color: #4a5d75; }
+    .pasos { background: #fff; border: 1.5px solid #dbe7f3; border-radius: 16px; padding: 16px 20px; margin: 18px 0; }
+    .pasos ol { margin: 8px 0 0; padding-left: 20px; } .pasos li { margin: 6px 0; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 16px; border-radius: 999px; border: 1.5px solid #dbe7f3; background: #fff; color: #0c2340; font: 600 14px Inter, sans-serif; cursor: pointer; text-decoration: none; }
+    .btn-pri { background: #0b6fb5; border-color: #0b6fb5; color: #fff; }
+    .barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .col { background: #e6f1fb; border-radius: 14px; padding: 12px 16px; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .item { background: #fff; border: 1.5px solid #dbe7f3; border-radius: 18px; padding: 16px; margin: 12px 0; display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; }
+    .item.hecho { opacity: .6; }
+    .fotos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; border: 1px solid #e3edf6; display: block; }
+    .fotos .mas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 13px; }
+    .campo { margin: 0 0 10px; } .campo b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #4a5d75; margin-bottom: 2px; }
+    .valor { display: flex; gap: 8px; align-items: flex-start; } .valor div { flex: 1; white-space: pre-line; background: #f6f9fc; border-radius: 10px; padding: 8px 10px; min-width: 0; overflow-wrap: anywhere; }
+    .valor button { flex: none; min-height: 36px; padding: 6px 12px; }
+    .hecho-chk { display: flex; gap: 8px; align-items: center; font-weight: 600; margin-top: 6px; }
+    .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .galeria figure { margin: 0; background: #fff; border: 1.5px solid #dbe7f3; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .galeria img { width: 100%; height: 150px; object-fit: contain; border-radius: 8px; background: #f6f9fc; }
+    .galeria figcaption { font-size: 13px; font-weight: 600; }
+    .rapidas .campo b { text-transform: none; letter-spacing: 0; font-size: 14px; color: #0b6fb5; }
+    @media (max-width: 600px) { .item { grid-template-columns: minmax(0, 1fr); } .fotos img { max-width: 260px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Catálogo de WhatsApp Business</h1>
+    <p class="muted">Todo listo para cargar cada producto en el catálogo: imagen, nombre, descripción, link y código. Abrí esta página en el celular y andá copiando y pegando.</p>
+    <div class="pasos"><b>Cómo cargarlo</b>
+      <ol>
+        <li>En WhatsApp Business: <b>Configuración → Herramientas para la empresa → Catálogo → Agregar artículo</b>.</li>
+        <li>Imagen: tocá <b>“Descargar”</b> en cada producto (o bajá todas juntas con el botón de abajo) y elegila de la galería. Podés sumar las fotos extra.</li>
+        <li>Copiá el <b>nombre</b>, la <b>descripción</b>, el <b>link</b> y el <b>código</b> con sus botones. El precio dejalo vacío: cambia con el dólar del día y la descripción ya lo aclara.</li>
+        <li>Marcá “Ya lo cargué” para no perderte (queda guardado en este teléfono).</li>
+        <li>Al final, en el catálogo tocá <b>Agregar colección</b> y armá una por cada grupo de abajo (Comunicaciones, Aviónica…).</li>
+      </ol>
+    </div>
+    <div id="perfil"></div>
+    <h2 style="font-size:26px;margin-top:44px">Productos del catálogo</h2>
+    <div class="barra"><button class="btn btn-pri" id="zip" type="button">⬇ Descargar todas las imágenes (.zip)</button><span class="muted" id="cuenta" role="status"></span></div>
+    <div id="lista"></div>
+  </main>
+  <script src="/products.js"></script>
+  <script src="/catalogo.js" data-load="/catalogo-whatsapp.js"></script>
+</body>
+</html>

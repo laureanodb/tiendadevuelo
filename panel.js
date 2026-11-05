@@ -905,7 +905,7 @@
     const pintar = () => {
       app.innerHTML = tabsHTML("respuestas") + `
         <div class="p-head"><div><h1>Respuestas rápidas</h1><p class="muted">Mensajes listos para copiar y pegar en WhatsApp. Editalos a tu gusto y completá lo que dice COMPLETAR.</p></div>
-          <div class="p-head-btns"><a class="btn btn-ghost" href="/folleto" target="_blank" rel="noopener">Folleto con QR ↗</a><a class="btn btn-ghost" href="/tarjeta" target="_blank" rel="noopener">Tarjeta digital ↗</a><button class="btn btn-ghost" id="plNueva">＋ Nueva</button><button class="btn btn-primary" id="plGuardar">Guardar cambios</button></div></div>
+          <div class="p-head-btns"><a class="btn btn-ghost" href="/folleto" target="_blank" rel="noopener">Folleto con QR ↗</a><a class="btn btn-ghost" href="/tarjeta" target="_blank" rel="noopener">Tarjeta digital ↗</a><a class="btn btn-ghost" href="/catalogo-whatsapp" target="_blank" rel="noopener">Catálogo de WhatsApp ↗</a><button class="btn btn-ghost" id="plNueva">＋ Nueva</button><button class="btn btn-primary" id="plGuardar">Guardar cambios</button></div></div>
         <div class="p-list">${lista.map((x, i) => `
           <section class="p-card p-pl"><input class="p-pl-t" data-plt="${i}" value="${esc(x.titulo)}" aria-label="Título">
             <textarea rows="4" data-plx="${i}" aria-label="Mensaje">${esc(x.texto)}</textarea>
