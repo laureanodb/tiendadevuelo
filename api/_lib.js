@@ -62,6 +62,14 @@ export function ensureSchema() {
     await q(`alter table tdv_productos add column if not exists codigo text not null default ''`);
     await q(`alter table tdv_productos add column if not exists liquidacion boolean not null default false`);
     await q(`alter table tdv_productos add column if not exists alquiler_moneda text not null default 'ARS'`);
+    // Venta de garage aeronáutica (/garage): artículos sueltos, aparte del catálogo de la tienda.
+    await q(`create table if not exists tdv_garage (
+      id bigserial primary key, nombre text not null, precio numeric, moneda text not null default 'ARS',
+      detalle text not null default '', fotos text[] not null default '{}',
+      visible boolean not null default true, vendido timestamptz, orden integer not null default 0,
+      creado timestamptz not null default now(), actualizado timestamptz not null default now()
+    )`);
+    await q(`alter table tdv_garage enable row level security`).catch(() => {});
     await q(`create table if not exists tdv_resenas (
       id bigserial primary key, num text not null, producto text not null, nombre text not null default '',
       estrellas integer not null, texto text not null default '', estado text not null default 'pendiente',

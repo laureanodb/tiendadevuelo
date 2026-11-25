@@ -96,7 +96,7 @@
   }
 
   // ---------- Pestañas ----------
-  const TABS = [["hoy", "Hoy"], ["productos", "Productos"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["redes", "Redes"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
+  const TABS = [["hoy", "Hoy"], ["productos", "Productos"], ["garage", "Garage"], ["pedidos", "Pedidos"], ["ventas", "Ventas"], ["clientes", "Clientes"], ["opiniones", "Opiniones"], ["respuestas", "Respuestas"], ["redes", "Redes"], ["actividad", "Actividad"], ["ajustes", "Ajustes"]];
   const tabsHTML = (act) => `<nav class="p-tabs" aria-label="Secciones del panel">${TABS.filter(([k]) => esDueno() || !["ventas", "ajustes"].includes(k)).map(([k, t]) => `<button type="button" data-tab="${k}"${k === act ? ' aria-current="page"' : ""}>${t}${k === "pedidos" && pendientes ? ` <span class="p-dot">${pendientes}</span>` : ""}${k === "opiniones" && porRevisar ? ` <span class="p-dot">${porRevisar}</span>` : ""}</button>`).join("")}</nav>`;
   let pendientes = 0, pedidosCache = null, porRevisar = 0;
   function ir(tab) {
@@ -109,6 +109,7 @@
     if (tab === "ajustes" && esDueno()) return verAjustes();
     if (tab === "ventas" && esDueno()) return verVentas();
     if (tab === "redes") return verRedes();
+    if (tab === "garage") return verGarage();
     lista();
   }
   // Link de compra directa (tiendadevuelo.com.ar/c/<producto>): deja el producto en el carrito del cliente
@@ -231,6 +232,121 @@
     if ($("busca")) $("busca").oninput = (e) => { busca = e.target.value; const pos = e.target.selectionStart; lista(); const b = $("busca"); b.focus(); b.setSelectionRange(pos, pos); };
     app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filtro = b.dataset.f; lista(); }));
     app.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => editar(productos.find((p) => p.id === b.dataset.edit))));
+  }
+
+  // ---------- Venta de garage aeronáutica (/garage): artículos sueltos, aparte del catálogo ----------
+  async function verGarage() {
+    app.innerHTML = tabsHTML("garage") + '<p class="p-loading">Cargando…</p>';
+    let d;
+    try { d = await api("garage"); } catch (x) { app.innerHTML = tabsHTML("garage") + `<p class="p-error">${esc(x.message)}</p>`; return; }
+    const arts = d.articulos;
+    const enVenta = arts.filter((a) => !a.vendido && a.visible).length;
+    const precioG = (a) => (a.precio === null ? "Consultar" : a.moneda === "USD" ? usd(a.precio) : ars(a.precio));
+    const hace = (f) => Math.floor((Date.now() - new Date(f)) / 864e5);
+    app.innerHTML = tabsHTML("garage") + `
+      <div class="p-head">
+        <div><h1>Venta de garage</h1>
+          <p class="muted">${enVenta} a la venta en <a href="/garage" target="_blank" rel="noopener">tiendadevuelo.com.ar/garage</a> · lo vendido se ve 7 días con el sello VENDIDO y después se oculta solo.</p></div>
+        <div class="p-head-btns"><button class="btn btn-primary" id="gNuevo">＋ Publicar algo</button></div>
+      </div>
+      ${arts.length ? `<div class="p-list">${arts.map((a) => `
+        <div class="p-row${a.vendido || !a.visible ? " off" : ""}">
+          <span class="p-thumb">${a.fotos[0] ? `<img src="${esc(a.fotos[0])}" alt="">` : "📦"}</span>
+          <span class="p-row-info"><b>${esc(a.nombre)}</b><span class="muted small">${esc(a.detalle || "Sin detalle")}</span>
+            <span class="p-flags">${a.vendido ? `<i class="f-low">Vendido${hace(a.vendido) < 7 ? ` · se ve ${7 - hace(a.vendido)} día${7 - hace(a.vendido) === 1 ? "" : "s"} más` : " · ya no se ve"}</i>` : ""}${!a.visible ? '<i class="f-off">Oculto</i>' : ""}<i>${a.fotos.length} foto${a.fotos.length === 1 ? "" : "s"}</i></span>
+</span>
+          <span class="p-row-num"><b>${precioG(a)}</b></span>
+          <span class="p-g-acc"><button class="btn btn-ghost btn-sm" data-gedit="${a.id}">Editar</button><button class="btn btn-ghost btn-sm" data-gvend="${a.id}">${a.vendido ? "Volver a la venta" : "✓ Marcar vendido"}</button></span>
+        </div>`).join("")}</div>` : `
+      <section class="p-card p-empty">
+        <h2>Todavía no publicaste nada</h2>
+        <p class="muted">Cargá headsets con detalles, equipos que quedaron en desuso o cualquier oportunidad suelta. Sacá las fotos con el celular y subilas desde acá.</p>
+        <div class="p-head-btns"><button class="btn btn-primary" id="gNuevo2">Publicar el primero</button></div>
+      </section>`}`;
+    const $ = (id) => document.getElementById(id);
+    $("gNuevo").onclick = () => editarGarage(null);
+    if ($("gNuevo2")) $("gNuevo2").onclick = () => editarGarage(null);
+    app.querySelectorAll("[data-gedit]").forEach((b) => (b.onclick = () => editarGarage(arts.find((a) => a.id === +b.dataset.gedit))));
+    app.querySelectorAll("[data-gvend]").forEach((b) => (b.onclick = async () => {
+      const a = arts.find((x) => x.id === +b.dataset.gvend);
+      b.disabled = true;
+      try { await api("garage", { method: "POST", body: { id: a.id, vendido: !a.vendido } }); toast(a.vendido ? "Otra vez a la venta." : "Marcado como vendido. 🎉"); verGarage(); }
+      catch (x) { toast(x.message); b.disabled = false; }
+    }));
+  }
+
+  function editarGarage(a) {
+    const nuevo = !a;
+    a = a || { nombre: "", precio: null, moneda: "ARS", detalle: "", fotos: [], visible: true };
+    let fotos = [...a.fotos], dirty = false;
+    app.innerHTML = tabsHTML("garage") + `
+      <form class="p-form" id="gForm">
+        <div class="p-head"><div><h1>${nuevo ? "Publicar en la venta de garage" : "Editar"}</h1></div></div>
+        <section class="p-card">
+          <h2>Fotos</h2>
+          <p class="muted small">La primera es la que se ve en la tarjeta. Mostrá los detalles: si tiene un raspón, que se vea.</p>
+          <div class="p-fotos" id="gFotos"></div>
+          <div><label class="btn btn-ghost p-upload">📷 Agregar fotos<input type="file" id="gFotoIn" accept="image/*" multiple hidden></label></div>
+        </section>
+        <section class="p-card">
+          <h2>Datos</h2>
+          <label>¿Qué es?<input id="gNombre" maxlength="120" required placeholder="Auricular David Clark H10-13.4" value="${esc(a.nombre)}"></label>
+          <label><span>Estado y detalles <span class="muted">(qué tiene, qué incluye)</span></span><textarea id="gDetalle" rows="3" maxlength="400" placeholder="Funciona perfecto. Vincha despintada y almohadillas gastadas. Sin bolso.">${esc(a.detalle)}</textarea></label>
+          <div class="p-seg" role="radiogroup" aria-label="Moneda">
+            ${[["ARS", "En pesos"], ["USD", "En dólares"]].map(([v, t]) => `<label><input type="radio" name="gMoneda" value="${v}"${v === a.moneda ? " checked" : ""}> ${t}</label>`).join("")}
+          </div>
+          <label><span>Precio <span class="muted">(vacío = «Consultar»)</span></span><input id="gPrecio" type="number" min="0" step="1" inputmode="numeric" value="${a.precio ?? ""}"></label>
+          <label class="p-chk"><input type="checkbox" id="gVisible"${a.visible ? " checked" : ""}> Mostrar en la página</label>
+        </section>
+        <div class="p-head-btns">
+          <button class="btn btn-primary" type="submit" id="gGuardar">${nuevo ? "Publicar" : "Guardar cambios"}</button>
+          <button class="btn btn-ghost" type="button" id="gVolver">Volver</button>
+          ${nuevo ? "" : '<button class="btn btn-ghost" type="button" id="gBorrar">Borrar</button>'}
+        </div>
+      </form>`;
+    const $ = (id) => document.getElementById(id);
+    const render = () => {
+      $("gFotos").innerHTML = fotos.length ? fotos.map((u, i) => `
+        <figure class="p-foto${i === 0 ? " main" : ""}"><img src="${esc(u)}" alt="">
+          <figcaption>${i > 0 ? `<button type="button" data-izq="${i}" aria-label="Mover a la izquierda">←</button>` : "<span>Principal</span>"}<button type="button" data-quitar="${i}" aria-label="Quitar foto">✕</button></figcaption>
+        </figure>`).join("") : '<p class="muted small">Sin fotos todavía.</p>';
+    };
+    render();
+    $("gForm").addEventListener("input", () => (dirty = true));
+    $("gFotos").onclick = (e) => {
+      const t = e.target.closest("button"); if (!t) return;
+      if (t.dataset.quitar) fotos.splice(+t.dataset.quitar, 1);
+      if (t.dataset.izq) { const i = +t.dataset.izq; [fotos[i - 1], fotos[i]] = [fotos[i], fotos[i - 1]]; }
+      dirty = true; render();
+    };
+    $("gFotoIn").onchange = async (e) => {
+      const files = [...e.target.files].slice(0, 10 - fotos.length);
+      e.target.value = "";
+      for (const [i, f] of files.entries()) {
+        toast(`Subiendo foto ${i + 1} de ${files.length}…`);
+        try {
+          const [data, m] = await Promise.all([achicar(f), miniatura(f)]);
+          const d = await api("foto", { method: "POST", body: { data, ...m, tipo: "image/jpeg", producto: "garage-" + ($("gNombre").value || "articulo") } });
+          fotos.push(d.url); dirty = true; render();
+        } catch (x) { toast(x.message); }
+      }
+      if (files.length) toast("Fotos listas. Acordate de publicar.");
+    };
+    $("gVolver").onclick = () => { if (!dirty || confirm("Tenés cambios sin guardar. ¿Salir igual?")) verGarage(); };
+    if ($("gBorrar")) $("gBorrar").onclick = async () => {
+      if (!confirm(`¿Borrar «${a.nombre}»? Si se vendió, mejor marcalo como vendido.`)) return;
+      try { await api("garage?id=" + a.id, { method: "DELETE" }); toast("Borrado."); verGarage(); } catch (x) { toast(x.message); }
+    };
+    $("gForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const b = $("gGuardar"); b.disabled = true;
+      try {
+        await api("garage", { method: "POST", body: { id: a.id, nombre: $("gNombre").value, detalle: $("gDetalle").value, precio: $("gPrecio").value,
+          moneda: document.querySelector('[name="gMoneda"]:checked')?.value || "ARS", fotos, visible: $("gVisible").checked } });
+        toast(nuevo ? "¡Publicado en la venta de garage!" : "Guardado.");
+        verGarage();
+      } catch (x) { toast(x.message); b.disabled = false; }
+    };
   }
 
   // ---------- Cambio de precios en bloque ----------

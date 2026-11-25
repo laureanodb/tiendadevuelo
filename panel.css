@@ -242,3 +242,8 @@ details summary { cursor: pointer; }
 .p-etq { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .e-urgente { background: #dc2626; } .e-regalo { background: #9333ea; } .e-aerodromo { background: #0a74c2; } .e-revendedor { background: #0a7d55; } .e-revisar { background: #eab308; }
 .p-etqs { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+
+/* Venta de garage: botones de cada artículo en su propio renglón */
+.p-g-acc { grid-column: 1 / -1; display: flex; gap: 8px; }
+.p-g-acc .btn { flex: 1; white-space: nowrap; }
+@media (min-width: 640px) { .p-g-acc { grid-column: 2 / -1; } .p-g-acc .btn { flex: 0 0 auto; } }
