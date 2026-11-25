@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Venta de garage aeronáutica</title>
+  <meta name="description" content="Equipos de aviación usados, con detalles estéticos o que quedaron en desuso, a precio de garage. Se venden como están. Consultas por WhatsApp.">
+  <meta name="theme-color" content="#1d1b18">
+  <link rel="canonical" href="https://www.tiendadevuelo.com.ar/garage">
+  <meta property="og:title" content="Venta de garage aeronáutica">
+  <meta property="og:description" content="Headsets, radios y equipos de aviación usados o en desuso, a precio de garage.">
+  <meta property="og:image" content="https://www.tiendadevuelo.com.ar/og.png">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --fondo: #f4efe6; --carton: #e3d5bd; --tinta: #1d1b18; --suave: #5f574b; --linea: #d9ccb6; --rojo: #c8102e; --verde: #0d7a3e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.5 Inter, Arial, sans-serif; }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; }
+
+    .cinta { height: 12px; background: repeating-linear-gradient(-45deg, #f2c200 0 14px, var(--tinta) 14px 28px); }
+    header { max-width: 1100px; margin: 0 auto; padding: 36px 16px 8px; }
+    .kicker { display: inline-block; font: 700 12px/1 Inter, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: var(--rojo); margin-bottom: 10px; }
+    h1 { font: 800 clamp(32px, 7vw, 56px)/1 Outfit, sans-serif; margin: 0 0 12px; letter-spacing: -.01em; }
+    .bajada { margin: 0; max-width: 620px; color: var(--suave); font-size: 16px; }
+    .reglas { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+    .reglas li { background: #fff; border: 1px solid var(--linea); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    .grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+    .item { position: relative; background: #fff; border: 1px solid var(--linea); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+    .foto { position: relative; border: 0; padding: 0; background: #ece6da; cursor: zoom-in; aspect-ratio: 1; width: 100%; }
+    .foto img { width: 100%; height: 100%; object-fit: cover; }
+    .foto .cant { position: absolute; right: 10px; bottom: 10px; background: rgba(29,27,24,.8); color: #fff; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 9px; }
+    .sinfoto { display: grid; place-items: center; height: 100%; color: var(--suave); font-size: 13px; }
+    .precio { position: absolute; left: 0; top: 14px; background: var(--rojo); color: #fff; font: 700 18px/1 Outfit, sans-serif; padding: 9px 14px 9px 12px; border-radius: 0 6px 6px 0; box-shadow: 0 3px 8px rgba(0,0,0,.2); }
+    .precio small { font: 600 11px Inter, sans-serif; opacity: .85; margin-right: 3px; }
+    .cuerpo { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .cuerpo h2 { font: 700 18px/1.2 Outfit, sans-serif; margin: 0; }
+    .cuerpo p { margin: 0; color: var(--suave); font-size: 14px; flex: 1; }
+    .wa { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; margin-top: 8px; border-radius: 10px; background: var(--verde); color: #fff; text-decoration: none; font-weight: 600; }
+    .wa:hover { filter: brightness(1.08); }
+    .wa svg { width: 18px; height: 18px; fill: currentColor; }
+
+    .item.vendido .foto img { filter: grayscale(1) opacity(.6); }
+    .item.vendido .precio { background: var(--suave); text-decoration: line-through; }
+    .item.vendido .sello { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); border: 4px solid var(--rojo); color: var(--rojo); font: 800 30px/1 Outfit, sans-serif; letter-spacing: .08em; padding: 6px 14px; border-radius: 8px; background: rgba(255,255,255,.85); pointer-events: none; }
+    .item.vendido .wa { background: #ddd5c7; color: var(--suave); pointer-events: none; }
+
+    .vacio { background: #fff; border: 2px dashed var(--linea); border-radius: 16px; padding: 40px 20px; text-align: center; }
+    .vacio h2 { font: 700 24px Outfit, sans-serif; margin: 0 0 6px; }
+    .vacio p { margin: 0 auto 18px; color: var(--suave); max-width: 440px; }
+    .vacio .wa { display: inline-flex; padding: 0 22px; }
+
+    footer { border-top: 1px solid var(--linea); padding: 24px 16px 32px; text-align: center; color: var(--suave); font-size: 14px; }
+    footer p { margin: 4px 0; }
+    footer a { font-weight: 600; color: var(--tinta); }
+
+    dialog { border: 0; padding: 0; background: rgba(15,14,12,.96); max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
+    dialog::backdrop { background: rgba(15,14,12,.92); }
+    .visor { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 56px 12px; }
+    .visor img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; user-select: none; }
+    .visor button { position: absolute; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.55); color: #fff; width: 46px; height: 46px; border-radius: 50%; font-size: 24px; line-height: 1; cursor: pointer; }
+    .visor button:hover { background: rgba(0,0,0,.8); }
+    .cerrar { top: 10px; right: 10px; }
+    .ant { left: 10px; top: 50%; transform: translateY(-50%); }
+    .sig { right: 10px; top: 50%; transform: translateY(-50%); }
+    .contador { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: #fff; font-size: 14px; }
+    :focus-visible { outline: 3px solid #f2c200; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="cinta" aria-hidden="true"></div>
+  <header>
+    <span class="kicker">Hasta agotar · Una unidad de cada cosa</span>
+    <h1>Venta de garage aeronáutica</h1>
+    <p class="bajada">Equipos de aviación usados, con detalles estéticos o que quedaron en desuso, a precio de garage. Lo que ves en las fotos es lo que hay.</p>
+    <ul class="reglas">
+      <li>Se vende como está</li>
+      <li>Sin cambios</li>
+      <li>Consultas y reservas por WhatsApp</li>
+    </ul>
+  </header>
+
+  <main>
+    <div class="grilla" id="grilla"></div>
+  </main>
+
+  <footer>
+    <p>¿Preguntas o querés que te avisemos cuando entre algo?</p>
+    <p><a id="waPie" href="#">WhatsApp</a></p>
+  </footer>
+
+  <dialog id="visor" aria-label="Fotos">
+    <div class="visor">
+      <img id="visorImg" alt="">
+      <button class="cerrar" id="cerrar" aria-label="Cerrar">✕</button>
+      <button class="ant" id="ant" aria-label="Foto anterior">‹</button>
+      <button class="sig" id="sig" aria-label="Foto siguiente">›</button>
+      <div class="contador" id="contador"></div>
+    </div>
+  </dialog>
+
+  <script src="/garage.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const waIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1 2.7.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
+      const G = typeof GARAGE !== "undefined" ? GARAGE : { whatsapp: "", whatsappVisible: "", articulos: [] };
+      const wa = (texto) => `https://wa.me/${G.whatsapp}?text=${encodeURIComponent(texto)}`;
+      const monto = (a) => {
+        const n = Number(a.precio);
+        if (!a.precio || !isFinite(n)) return "Consultar";
+        const usd = String(a.moneda || "ARS").toUpperCase() === "USD";
+        return `<small>${usd ? "US$" : "$"}</small>${n.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+      };
+
+      // Disponibles primero; lo vendido queda al final.
+      const items = (G.articulos || []).filter((a) => a && a.nombre).map((a, i) => ({ ...a, i, fotos: Array.isArray(a.fotos) ? a.fotos : [] }))
+        .sort((a, b) => (!!a.vendido - !!b.vendido) || a.i - b.i);
+
+      $("waPie").href = wa("Hola, vi la venta de garage aeronáutica. ");
+      $("waPie").textContent = `WhatsApp ${G.whatsappVisible || ""}`.trim();
+
+      if (!items.some((a) => !a.vendido)) {
+        $("grilla").outerHTML = `<div class="vacio"><h2>Por ahora no hay nada a la venta</h2><p>Las oportunidades aparecen de vez en cuando y se van rápido. Escribinos y te avisamos cuando entre algo.</p><a class="wa" href="${wa("Hola, avisame cuando entre algo a la venta de garage aeronáutica.")}" target="_blank" rel="noopener">${waIcon}Avisame por WhatsApp</a></div>`
+          + (items.length ? '<div class="grilla" id="grilla" style="margin-top:24px"></div>' : "");
+        if (!items.length) return;
+      }
+
+      $("grilla").innerHTML = items.map((a) => `
+        <article class="item${a.vendido ? " vendido" : ""}">
+          <button class="foto" data-i="${a.i}" aria-label="Ver fotos de ${esc(a.nombre)}"${a.fotos.length ? "" : " disabled"}>
+            ${a.fotos.length ? `<img src="${esc(a.fotos[0])}" alt="${esc(a.nombre)}" loading="lazy">` : '<span class="sinfoto">Sin foto</span>'}
+            ${a.fotos.length > 1 ? `<span class="cant">${a.fotos.length} fotos</span>` : ""}
+          </button>
+          <span class="precio">${monto(a)}</span>
+          ${a.vendido ? '<span class="sello">VENDIDO</span>' : ""}
+          <div class="cuerpo">
+            <h2>${esc(a.nombre)}</h2>
+            ${a.detalle ? `<p>${esc(a.detalle)}</p>` : "<p></p>"}
+            <a class="wa" href="${wa(`Hola, me interesa "${a.nombre}" de la venta de garage. ¿Sigue disponible?`)}" target="_blank" rel="noopener"${a.vendido ? ' aria-disabled="true" tabindex="-1"' : ""}>${waIcon}${a.vendido ? "Vendido" : "Lo quiero"}</a>
+          </div>
+        </article>`).join("");
+
+      // Visor de fotos: flechas, teclado y deslizar con el dedo.
+      const visor = $("visor");
+      let fotos = [], pos = 0, nombre = "";
+      const mostrar = () => {
+        $("visorImg").src = fotos[pos];
+        $("visorImg").alt = `${nombre} (foto ${pos + 1} de ${fotos.length})`;
+        $("contador").textContent = fotos.length > 1 ? `${pos + 1} / ${fotos.length}` : "";
+        $("ant").hidden = $("sig").hidden = fotos.length < 2;
+      };
+      const mover = (d) => { pos = (pos + d + fotos.length) % fotos.length; mostrar(); };
+      $("grilla").addEventListener("click", (e) => {
+        const b = e.target.closest(".foto");
+        if (!b || b.disabled) return;
+        const a = items.find((x) => x.i === +b.dataset.i);
+        fotos = a.fotos; nombre = a.nombre; pos = 0; mostrar(); visor.showModal();
+      });
+      $("ant").onclick = () => mover(-1);
+      $("sig").onclick = () => mover(1);
+      $("cerrar").onclick = () => visor.close();
+      visor.addEventListener("click", (e) => { if (e.target.classList.contains("visor")) visor.close(); });
+      visor.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") mover(-1); if (e.key === "ArrowRight") mover(1); });
+      let x0 = null;
+      visor.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+      visor.addEventListener("touchend", (e) => {
+        if (x0 === null || fotos.length < 2) return;
+        const dx = e.changedTouches[0].clientX - x0; x0 = null;
+        if (Math.abs(dx) > 40) mover(dx < 0 ? 1 : -1);
+      });
+    })();
+  </script>
+</body>
+</html>
