@@ -25,6 +25,7 @@ const RUTAS = {
   hoy: () => import("../_panel/hoy.js"),
   busquedas: () => import("../_panel/busquedas.js"),
   ia: () => import("../_panel/ia.js"),
+  kuotta: () => import("../_panel/kuotta.js"),
 };
 
 export default async function handler(req, res) {

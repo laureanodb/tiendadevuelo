@@ -16,6 +16,11 @@ export default async function handler(req, res) {
   // 1) Control de la web en vivo: si algo falla, aviso aparte
   const fallas = await controlarWeb();
   if (fallas.length) await avisar(`⚠ Revisá la web: algo no anda\n${fallas.map((f) => "· " + f).join("\n")}`);
+  // 1b) Stock desde Kuotta (si está conectada): la web muestra lo que hay de verdad
+  try {
+    const { aplicarKuotta, kuottaListo } = await import("../_kuotta.js");
+    if (kuottaListo()) await aplicarKuotta();
+  } catch (e) { console.error(e); await avisar(`⚠ No se pudo traer el stock de Kuotta: ${e.message || e}`); }
   // 2) Copia de seguridad semanal (domingos): se guardan las últimas 8
   let respaldo = false, drive = false;
   if (domingo) {

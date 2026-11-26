@@ -185,6 +185,7 @@
         <div class="p-head-btns">
           <button class="btn btn-ghost" id="escanear">📷 Escanear</button>
           ${esDueno() ? '<button class="btn btn-ghost" id="bloque">Cambiar precios</button>' : ""}
+          ${esDueno() ? '<button class="btn btn-ghost" id="kuotta">↻ Kuotta</button>' : ""}
           <button class="btn btn-primary" id="nuevo">＋ Nuevo producto</button>
         </div>
       </div>
@@ -221,6 +222,7 @@
       catch (x) { toast(x.message); $("importar").disabled = false; }
     };
     if ($("bloque")) $("bloque").onclick = bloque;
+    if ($("kuotta")) $("kuotta").onclick = kuotta;
     $("escanear").onclick = async () => {
       const cod = await escanear();
       if (!cod) return;
@@ -263,6 +265,40 @@
         const d = await api("precios", { method: "POST", body: { porcentaje: document.getElementById("bPct").value, moneda: document.getElementById("bMon").value, cat: document.getElementById("bCat").value } });
         toast(`Precios actualizados (${d.cambiados})`); await cargar();
       } catch (x) { toast(x.message); document.getElementById("bOk").disabled = false; }
+    };
+  }
+
+  // ---------- Stock y precios desde Kuotta (vinculados por el código) ----------
+  async function kuotta() {
+    const box = document.getElementById("bloqueBox");
+    if (box.dataset.k === "1" && box.innerHTML) { box.innerHTML = ""; box.dataset.k = ""; return; }
+    box.dataset.k = "1";
+    box.innerHTML = `<div class="p-card p-bloque"><h2>Kuotta</h2><p class="muted small">Leyendo Kuotta…</p></div>`;
+    let d;
+    try { d = await api("kuotta"); } catch (x) { box.innerHTML = `<div class="p-card p-bloque"><h2>Kuotta</h2><p>${esc(x.message)}</p></div>`; return; }
+    if (!d.listo) {
+      box.innerHTML = `<div class="p-card p-bloque"><h2>Conectar con Kuotta</h2><p class="small">Falta configurar la conexión. En Vercel (proyecto de la web → Settings → Environment Variables) cargá <b>KUOTTA_URL</b> (https://app.kuotta.com.ar) y <b>KUOTTA_FEED_SECRET</b>; en el proyecto de Kuotta, <b>CATALOG_FEED_SECRET</b> con la misma clave. Después, Redeploy en los dos.</p></div>`;
+      return;
+    }
+    const camb = d.vinculados.filter((v) => v.cambiaStock || v.cambiaPrecio);
+    const fila = (v) => `<li>${esc(v.name)} <span class="muted">(${esc(v.codigo)})</span>: ${v.cambiaStock ? `stock ${v.stockWeb ?? "—"} → <b>${v.stockKuotta}</b>` : `stock ${v.stockWeb ?? "—"}`}${v.cambiaPrecio ? ` · precio US$ ${v.usdWeb ?? "—"} → <b>${v.usdKuotta}</b>` : ""}</li>`;
+    box.innerHTML = `
+      <div class="p-card p-bloque">
+        <h2>Stock y precios desde Kuotta</h2>
+        <p class="small">${d.vinculados.length} productos vinculados por el código · ${camb.length} con diferencias${d.sinCodigo ? ` · ${d.sinCodigo} sin código (no se vinculan)` : ""}. El stock se trae solo todas las noches.</p>
+        ${camb.length ? `<ul class="small">${camb.slice(0, 40).map(fila).join("")}</ul>` : '<p class="small">Está todo igual que en Kuotta.</p>'}
+        ${d.sinMatch.length ? `<p class="small muted">Con código que Kuotta no tiene: ${d.sinMatch.slice(0, 15).map((x) => esc(`${x.name} (${x.codigo})`)).join(", ")}</p>` : ""}
+        ${d.soloKuotta.length ? `<p class="small muted">En Kuotta pero no en la web: ${d.soloKuotta.slice(0, 15).map((x) => esc(`${x.name} (${x.code}, stock ${x.stock ?? "sin llevar"})`)).join(", ")}</p>` : ""}
+        <label class="small"><input type="checkbox" id="kPrecios"> Traer también el precio de contado en dólares</label>
+        <div class="p-head-btns"><button type="button" class="btn btn-ghost" id="kCancel">Cerrar</button><button class="btn btn-primary" id="kOk" type="button" ${camb.length ? "" : "disabled"}>Aplicar</button></div>
+      </div>`;
+    document.getElementById("kCancel").onclick = () => { box.innerHTML = ""; box.dataset.k = ""; };
+    document.getElementById("kOk").onclick = async () => {
+      document.getElementById("kOk").disabled = true;
+      try {
+        const r = await api("kuotta", { method: "POST", body: { precios: document.getElementById("kPrecios").checked } });
+        toast(`Listo: ${r.stock} stock${r.precio ? ` y ${r.precio} precios` : ""} actualizados`); box.innerHTML = ""; box.dataset.k = ""; await cargar();
+      } catch (x) { toast(x.message); document.getElementById("kOk").disabled = false; }
     };
   }
 
